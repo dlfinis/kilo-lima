@@ -1,13 +1,18 @@
-import type { LocalForage } from 'localforage'
+import localforage from 'localforage'
 
 import { localforageInstance } from '@/services/localforage.client'
 import type { IStorageService } from '@/services/storage.interface'
+
+// `localforage` does not export its `LocalForage` interface, so we derive the
+// instance type from `createInstance`'s return — keeps us in sync with whatever
+// shape the library ships.
+type LocalforageInstance = ReturnType<typeof localforage.createInstance>
 
 // Concrete adapter binding the LSP contract to localforage. The constructor
 // takes the LocalForage instance so tests can inject an in-memory fake
 // (tests/setup.ts already exposes a Map-backed mock) without touching this file.
 export class LocalforageStorageService implements IStorageService {
-  constructor(private readonly store: LocalForage) {}
+  constructor(private readonly store: LocalforageInstance) {}
 
   async guardar<T>(clave: string, datos: T): Promise<void> {
     await this.store.setItem(clave, datos)
