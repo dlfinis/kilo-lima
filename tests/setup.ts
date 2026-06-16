@@ -16,6 +16,17 @@ Object.defineProperty(window, 'matchMedia', {
   })),
 })
 
+// jsdom does not implement ResizeObserver. Vuetify's <v-app> uses it for
+// layout sizing on first mount. The stub records callbacks so they can be
+// inspected but never invokes them.
+class ResizeObserverStub {
+  observe = vi.fn()
+  unobserve = vi.fn()
+  disconnect = vi.fn()
+}
+;(globalThis as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver =
+  ResizeObserverStub
+
 // localforage hits IndexedDB / WebSQL in jsdom, which is unreliable in
 // unit tests. The Map-backed stub keeps every call synchronous-shaped
 // (async signatures preserved) and resets between test files when
