@@ -3,10 +3,13 @@ import vue from '@vitejs/plugin-vue'
 import vuetify from 'vite-plugin-vuetify'
 import { fileURLToPath, URL } from 'node:url'
 
-// vite-plugin-vuetify must be registered BEFORE @vitejs/plugin-vue
-// so its autoImport transform runs first and tags components for tree-shaking.
+// vue() MUST be registered BEFORE vite-plugin-vuetify — the Vuetify plugin
+// throws at config resolution otherwise (it depends on the Vue plugin's
+// filter to know which files are .vue SFCs for autoImport). This matches
+// the official Vuetify 3 install guide and overrides the original
+// design §10 ordering note.
 export default defineConfig({
-  plugins: [vuetify({ autoImport: true }), vue()],
+  plugins: [vue(), vuetify({ autoImport: true })],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
