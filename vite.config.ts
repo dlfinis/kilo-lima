@@ -6,10 +6,7 @@ import { fileURLToPath, URL } from 'node:url'
 // vite-plugin-vuetify must be registered BEFORE @vitejs/plugin-vue
 // so its autoImport transform runs first and tags components for tree-shaking.
 export default defineConfig({
-  plugins: [
-    vuetify({ autoImport: true }),
-    vue(),
-  ],
+  plugins: [vuetify({ autoImport: true }), vue()],
   resolve: {
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url)),
