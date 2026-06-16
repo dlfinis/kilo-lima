@@ -441,10 +441,10 @@ After PR4, main has a fully installable PWA with offline detection, a composable
 - **Depends on**: PR3 merged
 - **Work-unit commit message**: `feat(pwa): register vite-plugin-pwa with kilo-lima manifest`
 - **Verification**:
-  - [ ] `pnpm build` produces `dist/manifest.webmanifest`
-  - [ ] `dist/sw.js` exists
-  - [ ] `pnpm typecheck` passes
-  - [ ] Manifest has `name: 'Kilo-Lima'`, `short_name: 'KiloLima'`, `theme_color: '#1976D2'`, `display: 'standalone'`, icons array
+  - [x] `pnpm build` produces `dist/manifest.webmanifest`
+  - [x] `dist/sw.js` exists
+  - [x] `pnpm typecheck` passes
+  - [x] Manifest has `name: 'Kilo-Lima'`, `short_name: 'KiloLima'`, `theme_color: '#1976D2'`, `display: 'standalone'`, icons array
 - **Estimated changed lines**: 30 (diff)
 - **Notes**: Uses `generateSW` strategy (default). `devOptions: { enabled: true }` for development testing. This is the ONLY place where `VitePWA` is imported. Follows design §5, spec §8 (REQ-PWA-1, REQ-PWA-3).
 
@@ -457,8 +457,8 @@ After PR4, main has a fully installable PWA with offline detection, a composable
 - **Depends on**: Task 4.1
 - **Work-unit commit message**: `feat(pwa): usePwaUpdate composable wraps registerSW`
 - **Verification**:
-  - [ ] `pnpm typecheck` passes
-  - [ ] Exports `needRefresh: Ref<boolean>` and `updateServiceWorker: () => Promise<void>`
+  - [x] `pnpm typecheck` passes
+  - [x] Exports `needRefresh: Ref<boolean>` and `updateServiceWorker: () => Promise<void>`
 - **Estimated changed lines**: 25
 - **Notes**: This is the ONLY consumer of `virtual:pwa-register/vue`. Exposes `{ needRefresh, offlineReady, updateServiceWorker }`. The `autoUpdate` strategy applies new SW on next page load. Follows design §5, spec §8 (REQ-PWA-4).
 
@@ -471,9 +471,9 @@ After PR4, main has a fully installable PWA with offline detection, a composable
 - **Depends on**: PR3 merged
 - **Work-unit commit message**: `feat(offline): useOnlineStatus composable from navigator.onLine`
 - **Verification**:
-  - [ ] `pnpm typecheck` passes
-  - [ ] Returns `{ online: Ref<boolean> }`
-  - [ ] Initial value matches `navigator.onLine`
+  - [x] `pnpm typecheck` passes
+  - [x] Returns `{ online: Ref<boolean> }`
+  - [x] Initial value matches `navigator.onLine`
 - **Estimated changed lines**: 25
 - **Notes**: Listens to `online` and `offline` window events. No cleanup needed for foundation (component lifecycle `onUnmounted` deferred to offline-sync slice). Follows design §5, spec §8 (REQ-PWA-5).
 
@@ -486,10 +486,10 @@ After PR4, main has a fully installable PWA with offline detection, a composable
 - **Depends on**: Tasks 4.3, 2.8, 2.3
 - **Work-unit commit message**: `feat(home): pwa status card and store value display`
 - **Verification**:
-  - [ ] `pnpm dev` shows "En línea" / "Sin conexión" card
-  - [ ] Toggling browser offline updates the card reactively
-  - [ ] Store `appName` value is visible in rendered output
-  - [ ] Uses Vuetify `v-card` with `success`/`warning` color
+  - [x] `pnpm dev` shows "En línea" / "Sin conexión" card
+  - [x] Toggling browser offline updates the card reactively
+  - [x] Store `appName` value is visible in rendered output
+  - [x] Uses Vuetify `v-card` with `success`/`warning` color
 - **Estimated changed lines**: 50 (diff from PR2 placeholder)
 - **Notes**: Adds a Vuetify `v-card` with `color="success"` when online, `color="warning"` when offline. Displays "En línea" or "Sin conexión". The `v-card` itself proves Vuetify tree-shaking works (REQ-UI-3). Follows design §9, spec §10 (REQ-HOME-3, REQ-HOME-4), spec §3 (REQ-UI-3).
 
@@ -502,9 +502,9 @@ After PR4, main has a fully installable PWA with offline detection, a composable
 - **Depends on**: Task 4.4, Task 2.6
 - **Work-unit commit message**: `test(home): smoke test mounts and asserts h1, subtitle, store, online status`
 - **Verification**:
-  - [ ] `pnpm test` exits 0 with ≥1 passing test
-  - [ ] Test output includes "Tests 1 passed" (or equivalent)
-  - [ ] Assertions: `<h1>` contains "Kilo-Lima", subtitle contains "Pre-evento", store's `appName` visible, online status text present
+  - [x] `pnpm test` exits 0 with ≥1 passing test
+  - [x] Test output includes "Tests 1 passed" (or equivalent)
+  - [x] Assertions: `<h1>` contains "Kilo-Lima", subtitle contains "Pre-evento", store's `appName` visible, online status text present
 - **Estimated changed lines**: 40
 - **Notes**: This test passing flips `strict_tdd` to `true` in the next session. Uses `global: { plugins: [createPinia()] }` for Pinia injection. Follows design §12, spec §11 (REQ-TEST-4, REQ-TEST-5).
 
@@ -513,13 +513,13 @@ After PR4, main has a fully installable PWA with offline detection, a composable
 - **PR**: PR4
 - **REQ-IDs covered**: REQ-OFF-4
 - **Files**:
-  - `docs/offline-sync.md` (create — document 4-pillar architecture)
+  - `docs/offline-sync.md` (already exists from initial planning commit `13d48f9`; content covers all 4 pillars + data flow + alternatives — see PR4 deviations in `sdd/foundation/apply-progress`)
 - **Depends on**: PR3 merged
 - **Work-unit commit message**: `docs(offline): document sync queue architecture for future slice`
 - **Verification**:
-  - [ ] File exists at `docs/offline-sync.md`
-  - [ ] Contains the 4-pillar architecture: optimistic UI + localforage WAL + Pinia sync queue + Background Sync API
-  - [ ] No sync queue code exists in `src/` (REQ-OFF-4 negative requirement)
+  - [x] File exists at `docs/offline-sync.md`
+  - [x] Contains the 4-pillar architecture: optimistic UI + localforage WAL + Pinia sync queue + Background Sync API
+  - [x] No sync queue code exists in `src/` (REQ-OFF-4 negative requirement)
 - **Estimated changed lines**: 80
 - **Notes**: Documents the chosen architecture WITHOUT implementing it. This is the architecture record for the future `offline-sync` slice. Follows design §6, spec §6 (REQ-OFF-4).
 
