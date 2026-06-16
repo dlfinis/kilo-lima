@@ -1,11 +1,15 @@
 <script setup lang="ts">
-// Foundation PR1 root component: plain HTML heading.
-// Vuetify's <v-app><v-main> wrapper arrives in PR2 (Task 2.7) once the
-// Vuetify plugin is installed in main.ts.
+// Foundation PR2 root component: Vuetify layout shell. <v-app> applies
+// the theme background and <v-main> provides the responsive padding
+// grid that every page composes against.
 </script>
 
 <template>
-  <div id="app-root">
-    <h1>Kilo-Lima</h1>
-  </div>
+  <v-app>
+    <v-main>
+      <div id="app-root">
+        <h1>Kilo-Lima</h1>
+      </div>
+    </v-main>
+  </v-app>
 </template>
