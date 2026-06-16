@@ -260,7 +260,7 @@ createVuetify({
 
 **WHY `accent #FF6B35` (orange)**: The brief calls it the "color de ventas" — the emotional signal at the POS. Used by future sale-confirmation toasts and POS buttons.
 
-**`vite-plugin-vuetify` registered FIRST** in `vite.config.ts` plugins array (before `@vitejs/plugin-vue`) — required for auto-import and tree-shaking.
+**`@vitejs/plugin-vue` registered FIRST**, then `vite-plugin-vuetify` — `vite-plugin-vuetify@2.1.3` THROWS at config resolution if the Vue plugin is not loaded first (discovered during PR1 verify). The plugin order in the code follows the library's runtime requirement, not the older README guidance.
 
 ---
 
@@ -328,7 +328,7 @@ export interface Database {
 
 | REQ | Files |
 |-----|-------|
-| REQ-UI-1 | `vite.config.ts` (vite-plugin-vuetify before Vue), `src/plugins/vuetify.ts` |
+| REQ-UI-1 | `vite.config.ts` (vue before vite-plugin-vuetify — library-enforced), `src/plugins/vuetify.ts` (PR2) |
 | REQ-UI-2 | `src/plugins/vuetify.ts` (theme colors) |
 | REQ-UI-3 | `src/views/HomeView.vue` (renders at least one Vuetify component) |
 | REQ-UI-4 | `src/plugins/vuetify.ts` (only `light` theme key; no `dark` block) |
@@ -424,10 +424,10 @@ export interface Database {
 
 This grouping balances capability coherence with the 400-line review budget. `sdd-tasks` MAY refine it.
 
-**PR1 — Bootable shell** (`~250 lines`): REQ-TOOL-1..7, REQ-SHELL-1..3, REQ-UI-1..4, REQ-CONV-7 (README), REQ-PWA-1..3
+**PR1 — Bootable shell** (post-F2 split, ~385 lines): REQ-TOOL-1..7, REQ-SHELL-1..2, REQ-STATE-1, REQ-UI-1 (partial — plugin registered, theme in PR2), REQ-BE-4..5, REQ-PWA-2 (icon assets only), REQ-CONV-7 (README)
 - Root config files: `package.json`, `tsconfig*.json`, `vite.config.ts`, `eslint.config.js`, `.prettierrc.json`, `.editorconfig`, `env.d.ts`, `.env.example`, `index.html`, `README.md`
-- Entry + plugins: `src/main.ts`, `src/App.vue`, `src/plugins/vuetify.ts`, `src/plugins/services.ts`
-- PWA: `vite.config.ts` PWA block, `public/icons/*.png`, `public/favicon.ico`, `public/robots.txt`
+- Entry + plugins: `src/main.ts`, `src/App.vue` (vuetify.ts is PR2, services.ts is PR3)
+- PWA assets: `public/icons/*.png`, `public/favicon.ico`, `public/robots.txt` (vite.config PWA block is PR4)
 - Folder structure: empty `src/components/ui/`, `src/components/business/`
 
 **PR2 — Router + stores + utils + types** (`~200 lines`): REQ-STATE-1..2, REQ-ROUTE-1..3, REQ-HOME-1..5, REQ-BE-3..5, REQ-CONV-1..6

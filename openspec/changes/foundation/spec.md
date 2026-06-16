@@ -267,11 +267,12 @@ and on-demand style injection, reducing bundle size.
 - THEN Vuetify components and directives are globally available
 - AND Vuetify styles are injected into the page
 
-**Scenario: vite-plugin-vuetify is registered before @vitejs/plugin-vue**
+**Scenario: @vitejs/plugin-vue is registered before vite-plugin-vuetify**
 
 - GIVEN `vite.config.ts` defines the plugin array
 - WHEN the developer inspects the plugin order
-- THEN `vite-plugin-vuetify` appears before `@vitejs/plugin-vue` in the array
+- THEN `@vitejs/plugin-vue` appears before `vite-plugin-vuetify` in the array
+- AND `vite-plugin-vuetify@2.1.3`'s runtime check is satisfied (it throws at config resolution if the Vue plugin is not loaded first; discovered during PR1 verify)
 
 ---
 
@@ -1224,7 +1225,7 @@ intent and business rules that are invisible from the code alone.
 
 #### REQ-CONV-7: README quickstart
 
-`README.md` SHALL document: prerequisites (Node 20+, pnpm 9+), `pnpm install`,
+`README.md` SHALL document: prerequisites (Node 22+, pnpm 9+), `pnpm install`,
 `.env.local` setup (copy from `.env.example` and fill in Supabase values),
 `pnpm dev`, `pnpm build`, `pnpm preview`, `pnpm test`, `pnpm lint`, `pnpm
 format`, and `pnpm typecheck`.
@@ -1237,7 +1238,7 @@ months later) reads.
 
 - GIVEN `README.md` in the repository root
 - WHEN the developer reads the file
-- THEN the document lists Node 20+ and pnpm 9+ as prerequisites
+- THEN the document lists Node 22+ and pnpm 9+ as prerequisites
 - AND the document includes the exact commands: `pnpm install`, `cp .env.example .env.local`, `pnpm dev`, `pnpm build`, `pnpm test`, `pnpm lint`, `pnpm format`, and `pnpm typecheck`
 
 **Scenario: README is in English (infrastructure)**
