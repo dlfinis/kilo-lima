@@ -1,12 +1,24 @@
 <script setup lang="ts">
-// Foundation PR2 placeholder. The richer PWA status card and store value
-// display land in PR4 Task 4.4. The <v-container> below proves Vuetify
-// tree-shakes end-to-end (REQ-UI-3) without pulling the full grid system.
+import { useAppStore } from '@/stores/app.store'
+import { useOnlineStatus } from '@/composables/useOnlineStatus'
+
+const app = useAppStore()
+const { online } = useOnlineStatus()
 </script>
 
 <template>
   <v-container>
     <h1>Kilo-Lima</h1>
     <p>Pre-evento · Durante evento · Post-evento</p>
+    <v-card
+      :color="online ? 'success' : 'warning'"
+      class="mt-4 pa-4"
+      data-testid="estado-conexion"
+    >
+      <v-card-title>{{ app.appName }}</v-card-title>
+      <v-card-text>
+        {{ online ? 'En línea' : 'Sin conexión' }}
+      </v-card-text>
+    </v-card>
   </v-container>
 </template>
