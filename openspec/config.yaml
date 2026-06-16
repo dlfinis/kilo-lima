@@ -4,7 +4,7 @@ schema: spec-driven
 context: |
   Tech stack: Vue 3.4+ (Composition API + <script setup>), Vite 5+, TypeScript 5+, Vuetify 3, Pinia, Vue Router 4, Supabase JS v2, localforage, Day.js, Chart.js 4 + vue-chartjs, jsPDF, ESLint + Prettier
   Architecture: Monolith Vue PWA + Supabase Cloud backend. Offline-first via IndexedDB (localforage). Deployed on Cloudflare Pages.
-  Testing: No test runner installed yet (greenfield). Recommended: Vitest + @vue/test-utils + Playwright.
+  Testing: Vitest + @vue/test-utils installed and active. E2E (Playwright) recommended for future slices.
   Style: KISS + SOLID. Domain names in Spanish. Files ≤ 200 lines, functions ≤ 30 lines. Comments only for "why". Props in camelCase, emits in kebab-case.
   Business: Three phases — pre-evento (planning), durante-evento (sales), post-evento (analysis). Currency: USD.
 
@@ -28,24 +28,24 @@ rules:
     - Follow existing code patterns from brief.md
     - Single-file changes preferred; avoid touching multiple domains
     - Respect 200/30 line limits for .vue files and functions
-    tdd: false
-    test_command: ""
+    tdd: true
+    test_command: "pnpm test"
   verify:
-    test_command: ""
-    build_command: ""
+    test_command: "pnpm test"
+    build_command: "pnpm build"
     coverage_threshold: 0
   archive:
     - Warn before merging destructive deltas
 
 testing:
-  strict_tdd: false
+  strict_tdd: true
   detected: "2026-06-16"
-  runner: none
-  framework: none
+  runner: vitest
+  framework: vitest + @vue/test-utils
   layers:
     unit:
-      available: false
-      tool: none
+      available: true
+      tool: vitest
     integration:
       available: false
       tool: none
@@ -57,14 +57,14 @@ testing:
     command: none
   quality:
     linter:
-      available: false
-      command: none
+      available: true
+      command: "pnpm lint"
     type_checker:
-      available: false
-      command: none
+      available: true
+      command: "pnpm typecheck"
     formatter:
-      available: false
-      command: none
+      available: true
+      command: "pnpm format"
   recommended: "Vitest + @vue/test-utils (unit/integration), Playwright (E2E)"
 
 preflight:
