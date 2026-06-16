@@ -41,7 +41,7 @@ describe('calcularCostoReceta', () => {
     expect(result.costoPorUnidad).toBe(1.48)
     expect(result.ingredientes).toHaveLength(2)
     expect(result.ingredientes[0]?.subtotal).toBe(5)
-    expect(result.ingredientes[1]?.subtotal).toBe(0.9)
+    expect(result.ingredientes[1]?.subtotal).toBeCloseTo(0.9, 10)
   })
 
   it('returns zeroed result for empty ingredients (REQ-CATALOG-18)', () => {
