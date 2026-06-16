@@ -1,0 +1,74 @@
+# openspec/config.yaml
+schema: spec-driven
+
+context: |
+  Tech stack: Vue 3.4+ (Composition API + <script setup>), Vite 5+, TypeScript 5+, Vuetify 3, Pinia, Vue Router 4, Supabase JS v2, localforage, Day.js, Chart.js 4 + vue-chartjs, jsPDF, ESLint + Prettier
+  Architecture: Monolith Vue PWA + Supabase Cloud backend. Offline-first via IndexedDB (localforage). Deployed on Cloudflare Pages.
+  Testing: No test runner installed yet (greenfield). Recommended: Vitest + @vue/test-utils + Playwright.
+  Style: KISS + SOLID. Domain names in Spanish. Files ≤ 200 lines, functions ≤ 30 lines. Comments only for "why". Props in camelCase, emits in kebab-case.
+  Business: Three phases — pre-evento (planning), durante-evento (sales), post-evento (analysis). Currency: USD.
+
+rules:
+  proposal:
+    - Include rollback plan for risky changes
+    - Link to brief.md sections for business context
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Domain names in Spanish matching business glossary
+  design:
+    - Include sequence diagrams for complex flows
+    - Document architecture decisions with rationale
+    - Prefer Pinia stores over provide/inject for shared state
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Reference openspec/specs/ for acceptance criteria
+  apply:
+    - Follow existing code patterns from brief.md
+    - Single-file changes preferred; avoid touching multiple domains
+    - Respect 200/30 line limits for .vue files and functions
+    tdd: false
+    test_command: ""
+  verify:
+    test_command: ""
+    build_command: ""
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+
+testing:
+  strict_tdd: false
+  detected: "2026-06-16"
+  runner: none
+  framework: none
+  layers:
+    unit:
+      available: false
+      tool: none
+    integration:
+      available: false
+      tool: none
+    e2e:
+      available: false
+      tool: none
+  coverage:
+    available: false
+    command: none
+  quality:
+    linter:
+      available: false
+      command: none
+    type_checker:
+      available: false
+      command: none
+    formatter:
+      available: false
+      command: none
+  recommended: "Vitest + @vue/test-utils (unit/integration), Playwright (E2E)"
+
+preflight:
+  execution_mode: interactive
+  artifact_store_mode: both
+  delivery_strategy: ask-always
+  review_budget_lines: 400
