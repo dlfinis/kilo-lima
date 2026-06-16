@@ -322,7 +322,7 @@ After PR2, main has Vuetify 3 fully integrated with the light theme, a working r
 
 After PR3, main has all service layer interfaces and implementations, a stubbed auth composable, and the services plugin providing both singletons via DI.
 
-### Task 3.1: Author localforage singleton client
+### Task 3.1: Author localforage singleton client ✅
 
 - **PR**: PR3
 - **REQ-IDs covered**: REQ-OFF-1
@@ -336,7 +336,7 @@ After PR3, main has all service layer interfaces and implementations, a stubbed 
 - **Estimated changed lines**: 20
 - **Notes**: `localforage.createInstance({ name: 'kilo-lima', storeName: 'kilo_lima_store' })`. Follows design §3, §6, spec §6 (REQ-OFF-1).
 
-### Task 3.2: Author IStorageService interface
+### Task 3.2: Author IStorageService interface ✅
 
 - **PR**: PR3
 - **REQ-IDs covered**: REQ-OFF-2
@@ -350,7 +350,7 @@ After PR3, main has all service layer interfaces and implementations, a stubbed 
 - **Estimated changed lines**: 25
 - **Notes**: Generic interface: `guardar<T>(clave: string, datos: T): Promise<void>`, `obtener<T>(clave: string): Promise<T | null>`, `eliminar(clave: string): Promise<void>`, `listarClaves(): Promise<string[]>`. Spanish method names per convention (REQ-CONV-5). Follows design §6, spec §6 (REQ-OFF-2).
 
-### Task 3.3: Author LocalforageStorageService implementation
+### Task 3.3: Author LocalforageStorageService implementation ✅
 
 - **PR**: PR3
 - **REQ-IDs covered**: REQ-OFF-3
@@ -365,7 +365,7 @@ After PR3, main has all service layer interfaces and implementations, a stubbed 
 - **Estimated changed lines**: 50
 - **Notes**: Constructor receives localforage instance. Follows design §3, §6, spec §6 (REQ-OFF-3).
 
-### Task 3.4: Author Supabase singleton client
+### Task 3.4: Author Supabase singleton client ✅
 
 - **PR**: PR3
 - **REQ-IDs covered**: REQ-BE-1, REQ-BE-2, REQ-AUTH-1
@@ -381,7 +381,7 @@ After PR3, main has all service layer interfaces and implementations, a stubbed 
 - **Estimated changed lines**: 20
 - **Notes**: Uses `env` from `@/utils/env` (Task 2.1) and `Database` from `@/types` (Task 2.2). If env is invalid, `createClient` is never called because the import chain fails at `env.ts`. Follows design §3, §4, spec §5 (REQ-BE-1, REQ-BE-2), spec §7 (REQ-AUTH-1).
 
-### Task 3.5: Author useAuth stub composable
+### Task 3.5: Author useAuth stub composable ✅
 
 - **PR**: PR3
 - **REQ-IDs covered**: REQ-AUTH-2, REQ-AUTH-3, REQ-AUTH-4
@@ -398,7 +398,7 @@ After PR3, main has all service layer interfaces and implementations, a stubbed 
 - **Estimated changed lines**: 50
 - **Notes**: All methods throw `new Error('No implementado: el flujo de autenticación llega en un slice posterior')`. Reactive refs: `usuarioActual: Ref<User | null>(null)`, `sesionActiva: Ref<boolean>(false)`, `cargando: Ref<boolean>(false)`. Methods: `iniciarSesion`, `cerrarSesion`, `obtenerUsuarioActual`, `registrar`. Follows design §7, spec §7 (REQ-AUTH-2, REQ-AUTH-3, REQ-AUTH-4).
 
-### Task 3.6: Author services plugin (provide)
+### Task 3.6: Author services plugin (provide) ✅
 
 - **PR**: PR3
 - **REQ-IDs covered**: REQ-SHELL-1
@@ -412,7 +412,7 @@ After PR3, main has all service layer interfaces and implementations, a stubbed 
 - **Estimated changed lines**: 25
 - **Notes**: Thin factory: imports both singletons, exports them, provides them via `app.provide('supabase', ...)` and `app.provide('storageService', ...)`. Follows design §2, §3, spec §2 (REQ-SHELL-1).
 
-### Task 3.7: Wire services plugin into main.ts
+### Task 3.7: Wire services plugin into main.ts ✅
 
 - **PR**: PR3
 - **REQ-IDs covered**: REQ-SHELL-1

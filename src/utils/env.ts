@@ -12,7 +12,11 @@ const parsed = schema.safeParse(import.meta.env)
 
 if (!parsed.success) {
   const issues = parsed.error.issues.map((i) => `  - ${i.path.join('.')}: ${i.message}`).join('\n')
-  throw new Error(`Configuración de entorno inválida:\n${issues}`)
+  // Throw a ZodError (per spec REQ-BE-3) with the friendly multi-line
+  // message preserved for the solo dev's DX. instanceof ZodError === true.
+  const err = new z.ZodError(parsed.error.issues)
+  err.message = `Configuración de entorno inválida:\n${issues}`
+  throw err
 }
 
 export const env = parsed.data
