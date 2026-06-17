@@ -37,13 +37,18 @@ describe('MateriaPrimaForm', () => {
     expect(inputs.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('prefills fields from valoresIniciales (edit mode, REQ-CATALOG-3)', () => {
+  it('prefills fields from valoresIniciales (edit mode, REQ-CATALOG-3)', async () => {
     const wrapper = mountForm({
       valoresIniciales: mkInput({ nombre: 'Mantequilla', unidad: 'g', costo_por_unidad: 0.12 }),
     })
 
-    const text = wrapper.text()
-    expect(text).toContain('Mantequilla')
+    await flushPromises()
+    // v-text-field forwards extra attrs to the input; find the bound input
+    // by its label association and assert the model populated the value.
+    const inputs = wrapper.findAll('input')
+    const values = inputs.map((w) => (w.element as HTMLInputElement).value)
+    expect(values).toContain('Mantequilla')
+    expect(values).toContain('0.12')
   })
 
   it('emits submit with the typed values when valid (REQ-CATALOG-2)', async () => {
