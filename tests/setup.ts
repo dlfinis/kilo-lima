@@ -67,8 +67,18 @@ interface LlamadaSupabase {
   args: unknown[]
 }
 
+// Queue of pending responses — each `then`/`single`/`maybeSingle` consumes
+// one. Tests push responses in call order; the queue is drained FIFO.
+// Falls back to `__mockDefault` when the queue is empty (single-call paths
+// only need the default response).
 let __mockLlamadas: LlamadaSupabase[] = []
-let __mockRespuesta: Respuesta<unknown> = { data: [], error: null }
+let __mockCola: Respuesta<unknown>[] = []
+let __mockDefault: Respuesta<unknown> = { data: [], error: null }
+
+function consumir(): Respuesta<unknown> {
+  if (__mockCola.length > 0) return __mockCola.shift() as Respuesta<unknown>
+  return __mockDefault
+}
 
 function crearBuilder(): Record<string, unknown> {
   const registrar = (metodo: string) => (...args: unknown[]) => {
@@ -83,10 +93,16 @@ function crearBuilder(): Record<string, unknown> {
     delete: registrar('delete'),
     eq: registrar('eq'),
     order: registrar('order'),
-    single: async () => __mockRespuesta,
-    maybeSingle: async () => __mockRespuesta,
-    then: (resolve: (v: unknown) => void) => resolve(__mockRespuesta),
   }
+  builder.single = async (...args: unknown[]) => {
+    registrar('single')(...args)
+    return consumir()
+  }
+  builder.maybeSingle = async (...args: unknown[]) => {
+    registrar('maybeSingle')(...args)
+    return consumir()
+  }
+  builder.then = (resolve: (v: unknown) => void) => resolve(consumir())
   return builder
 }
 
@@ -94,9 +110,21 @@ vi.mock('@supabase/supabase-js', () => ({
   createClient: () => crearBuilder() as unknown as ReturnType<typeof import('@supabase/supabase-js').createClient<Database>>,
 }))
 
-export function __resetSupabaseMock<T>(respuesta: Respuesta<T> = { data: [], error: null }) {
+export function __resetSupabaseMock<T>(respuesta?: Respuesta<T> | Respuesta<T>[]) {
   __mockLlamadas = []
-  __mockRespuesta = respuesta as Respuesta<unknown>
+  __mockCola = []
+  if (Array.isArray(respuesta)) {
+    __mockCola = respuesta as Respuesta<unknown>[]
+    __mockDefault = __mockCola.length > 0
+      ? (__mockCola[__mockCola.length - 1] as Respuesta<unknown>)
+      : { data: [], error: null }
+  } else {
+    __mockDefault = (respuesta ?? { data: [], error: null }) as Respuesta<unknown>
+  }
+}
+
+export function __pushSupabaseResponse<T>(respuesta: Respuesta<T>) {
+  __mockCola.push(respuesta as Respuesta<unknown>)
 }
 
 export function __getSupabaseMockCalls(): LlamadaSupabase[] {
