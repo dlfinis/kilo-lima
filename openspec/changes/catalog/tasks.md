@@ -366,9 +366,9 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/services/recipes.service.spec.ts` (create — `listar`, `crear` joined insert, `actualizar` delete-reinsert, `eliminar` cascade, error path)
 - **Depends on**: Task 2.1 (mock), Task 1.3 (types)
-- **Work-unit commit message**: `test(catalog): add recipes.service.spec.ts with joined insert and delete-reinsert`
+- **Work-unit commit message**: `test(catalog): add recipes.service.spec.ts with joined insert and delete-reinsert` ✅ `e49007b`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — service not yet implemented)
+  - [x] `pnpm test -- --run` fails (RED — service not yet implemented)
 - **Estimated changed lines**: 65
 
 ### Task 3.1b (GREEN): Create recipes.service.ts
@@ -378,12 +378,12 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/services/recipes.service.ts` (create — `crearRecipesService(supabase)` factory with `crear` joined insert, `actualizar` delete-reinsert, `listar`, `eliminar`)
 - **Depends on**: Task 3.1a (spec), Task 1.3 (types)
-- **Work-unit commit message**: `feat(catalog): implement recipes service with joined insert and delete-reinsert`
+- **Work-unit commit message**: `feat(catalog): implement recipes service with joined insert and delete-reinsert` ✅ `704ad76`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] `crear()` inserts `recetas` row + batch-inserts `receta_ingredientes` rows
-  - [ ] `actualizar()` deletes all existing ingredients then inserts new set
-  - [ ] Each method returns `{ data, error }` — never throws
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] `crear()` inserts `recetas` row + batch-inserts `receta_ingredientes` rows
+  - [x] `actualizar()` deletes all existing ingredients then inserts new set
+  - [x] Each method returns `{ data, error }` — never throws
 - **Estimated changed lines**: 65
 - **Notes**: Factory pattern per design §2. `actualizar` uses delete-then-reinsert strategy for ingredient lines.
 
@@ -394,9 +394,9 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/stores/recipes.store.spec.ts` (create — state transitions, `cargarTodas`, `crear`, `actualizar`, `eliminar`, `costoPorReceta` reactive getter, cross-store reactivity)
 - **Depends on**: Task 3.1b (service), Task 2.1 (mock), PR2 (ingredients store for cross-store test)
-- **Work-unit commit message**: `test(catalog): add recipes.store.spec.ts with cross-store costoPorReceta`
+- **Work-unit commit message**: `test(catalog): add recipes.store.spec.ts with cross-store costoPorReceta` ✅ `04ac907`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — store not yet implemented)
+  - [x] `pnpm test -- --run` fails (RED — store not yet implemented)
 - **Estimated changed lines**: 65
 
 ### Task 3.2b (GREEN): Create recipes.store.ts
@@ -406,27 +406,30 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/stores/recipes.store.ts` (create — setup-style Pinia store with `recetas`, `cargando`, `error`, CRUD actions, `costoPorReceta(id)` computed getter)
 - **Depends on**: Task 3.2a (spec), Task 3.1b (service), PR2 (ingredients.store)
-- **Work-unit commit message**: `feat(catalog): implement recipes store with reactive costoPorReceta getter`
+- **Work-unit commit message**: `feat(catalog): implement recipes store with reactive costoPorReceta getter` ✅ `8acac4c`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] `costoPorReceta(id)` reads `useIngredientsStore().materiasPrimas` inside `computed()` (cross-store reactivity)
-  - [ ] SRP: no `materiasPrimas` state array (reads from ingredients store)
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] `costoPorReceta(id)` reads `useIngredientsStore().materiasPrimas` inside `computed()` (cross-store reactivity)
+  - [x] SRP: no `materiasPrimas` state array (reads from ingredients store)
 - **Estimated changed lines**: 60
 - **Notes**: Cross-store reactivity via `computed()` per design §3 / proposal §15 risk #4 mitigation. No manual watchers.
 
-### Task 3.3: Create useRecipes composable
+### Task 3.3: Create useRecipes composable (+ F2 reactive useCalculoReceta from PR1)
 
 - **PR**: PR3
 - **REQ-IDs covered**: REQ-CATALOG-46
 - **Files**:
   - `src/composables/useRecipes.ts` (create — thin `storeToRefs()` wrapper around `useRecipesStore` + form state)
+  - `src/composables/useCalculoReceta.ts` (modify — add reactive `useCalculoReceta(recetaId)` wrapper alongside the pure function)
+  - `src/types/catalog.types.ts` (modify — add `RecetaConIngredientes`, `IngredienteRecetaInput`)
+  - `src/types/index.ts` (modify — re-export new types)
 - **Depends on**: Task 3.2b (store)
-- **Work-unit commit message**: `feat(catalog): add useRecipes composable wrapping store`
+- **Work-unit commit message**: `feat(catalog): add useRecipes composable and useCalculoReceta reactive wrapper (F2 from PR1)` ✅ `d93d2dc` (composable) / `6c3d9ef` (types)
 - **Verification**:
-  - [ ] `pnpm typecheck` passes
-  - [ ] Exposes `{ recetas, cargando, error, cargar, crear, actualizar, eliminar }`
+  - [x] `pnpm typecheck` passes
+  - [x] Exposes `{ recetas, cargando, error, cargar, crear, actualizar, eliminar }`
 - **Estimated changed lines**: 25
-- **Notes**: Container/presentational seam per design §4. Also manages ingredient selector interactions.
+- **Notes**: Container/presentational seam per design §4. F2 split from PR1: the reactive `useCalculoReceta(recetaId)` composable lands here, not in PR1, because it depends on the recipes store. The pure `calcularCostoReceta` function remains in the same file and is the only thing PR1 tested.
 
 ### Task 3.4a (RED): Create RecetasView.spec.ts
 
@@ -435,9 +438,9 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/views/RecetasView.spec.ts` (create — mount, list, create flow, edit flow, delete with confirmation, empty/loading/error states)
 - **Depends on**: Task 3.2b (store), PR2 patterns
-- **Work-unit commit message**: `test(catalog): add RecetasView.spec.ts with all states`
+- **Work-unit commit message**: `test(catalog): add RecetasView.spec.ts with all states` ✅ `d49cec3`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — view not yet implemented)
+  - [x] `pnpm test -- --run` fails (RED — view not yet implemented)
 - **Estimated changed lines**: 55
 
 ### Task 3.4b (GREEN): Create RecetasView.vue
@@ -447,12 +450,12 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/views/RecetasView.vue` (create — list with `v-data-table`, create/edit dialog, delete confirmation, loading/error/empty states)
 - **Depends on**: Task 3.4a (spec), Task 3.3 (composable)
-- **Work-unit commit message**: `feat(catalog): implement RecetasView with list and CRUD dialogs`
+- **Work-unit commit message**: `feat(catalog): implement RecetasView with list and CRUD dialogs` ✅ `57bd0de`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] 4 states: loading, empty-with-CTA, error-with-retry, data-list
-  - [ ] Row click → navigates to `/recetas/:id`
-  - [ ] All UI text in Spanish
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] 4 states: loading, empty-with-CTA, error-with-retry, data-list
+  - [x] Row click → navigates to `/recetas/:id`
+  - [x] All UI text in Spanish
 - **Estimated changed lines**: 110
 - **Notes**: Matches MateriasPrimasView pattern (loading/error/empty/data). Row navigation uses `useRouter()`.
 
@@ -463,9 +466,9 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/views/RecetaDetalleView.spec.ts` (create — route param `:id`, cost breakdown renders, "not found" state, reactive recalculation)
 - **Depends on**: Task 3.2b (store), Task 1.6b (calculator)
-- **Work-unit commit message**: `test(catalog): add RecetaDetalleView.spec.ts with breakdown and not-found states`
+- **Work-unit commit message**: `test(catalog): add RecetaDetalleView.spec.ts with breakdown and not-found states` ✅ `3d8c201`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — view not yet implemented)
+  - [x] `pnpm test -- --run` fails (RED — view not yet implemented)
 - **Estimated changed lines**: 50
 
 ### Task 3.5b (GREEN): Create RecetaDetalleView.vue
@@ -475,11 +478,11 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/views/RecetaDetalleView.vue` (create — reads route param `:id`, renders recipe detail + `<RecetaCostoDesglose>`, error state for not-found)
 - **Depends on**: Task 3.5a (spec), Task 3.2b (store), Task 3.8b (RecetaCostoDesglose)
-- **Work-unit commit message**: `feat(catalog): implement RecetaDetalleView with cost breakdown`
+- **Work-unit commit message**: `feat(catalog): implement RecetaDetalleView with cost breakdown` ✅ `5540954`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] Route param `:id` loads correct recipe
-  - [ ] "Receta no encontrada" on invalid ID
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] Route param `:id` loads correct recipe
+  - [x] "Receta no encontrada" on invalid ID
 - **Estimated changed lines**: 60
 - **Notes**: The recipe detail is brief item 9's centerpiece. Delegates rendering to `<RecetaCostoDesglose>`.
 
@@ -494,11 +497,11 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/components/business/SelectorMateriaPrima.vue` (create — `v-autocomplete` showing `nombre (unidad)`, props: `modelValue`, `materiasPrimas`)
 - **Depends on**: Task 2.3b (ingredients store for data)
-- **Work-unit commit message**: `feat(catalog): add SelectorMateriaPrima autocomplete component`
+- **Work-unit commit message**: `feat(catalog): add SelectorMateriaPrima autocomplete component` ✅ `40d6bc2`
 - **Verification**:
-  - [ ] `pnpm typecheck` passes
-  - [ ] Renders "Harina (kg)" format for each option
-  - [ ] Emits `update:modelValue` on selection
+  - [x] `pnpm typecheck` passes
+  - [x] Renders "Harina (kg)" format for each option
+  - [x] Emits `update:modelValue` on selection
 - **Estimated changed lines**: 50
 - **Notes**: No spec required — covered by RecetaForm spec. Props per ISP design §5.
 
@@ -509,9 +512,9 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/components/business/RecetaForm.spec.ts` (create — add/remove ingredients, submit, validation: empty nombre, 0 ingredients, negative cantidad)
 - **Depends on**: Task 1.3 (types)
-- **Work-unit commit message**: `test(catalog): add RecetaForm.spec.ts with ingredient validation scenarios`
+- **Work-unit commit message**: `test(catalog): add RecetaForm.spec.ts with ingredient validation scenarios` ✅ `435033e`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — form not yet implemented)
+  - [x] `pnpm test -- --run` fails (RED — form not yet implemented)
 - **Estimated changed lines**: 50
 
 ### Task 3.7b (GREEN): Create RecetaForm.vue
@@ -521,12 +524,12 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/components/business/RecetaForm.vue` (create — N dynamic ingredient rows with `SelectorMateriaPrima`, add/remove buttons, validation)
 - **Depends on**: Task 3.7a (spec), Task 3.6 (SelectorMateriaPrima), Task 1.3 (types)
-- **Work-unit commit message**: `feat(catalog): implement RecetaForm with dynamic ingredient lines`
+- **Work-unit commit message**: `feat(catalog): implement RecetaForm with dynamic ingredient lines` ✅ `159b6bd`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] Dynamic add/remove ingredient rows
-  - [ ] Validation in Spanish: empty nombre, ≥1 ingredient, all cantidad > 0
-  - [ ] Receives `valoresIniciales: RecetaInput | null` (ISP per REQ-CATALOG-45)
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] Dynamic add/remove ingredient rows
+  - [x] Validation in Spanish: empty nombre, ≥1 ingredient, all cantidad > 0
+  - [x] Receives `valoresIniciales: RecetaInput | null` (ISP per REQ-CATALOG-45)
 - **Estimated changed lines**: 120
 - **Notes**: Most complex form in catalog. N `SelectorMateriaPrima` instances with add/remove array logic.
 
@@ -537,9 +540,9 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/components/business/RecetaCostoDesglose.spec.ts` (create — render with fixture `CalculoReceta`, assert lines + totals + `MATERIA_PRIMA_FALTANTE` warning)
 - **Depends on**: Task 1.3 (types)
-- **Work-unit commit message**: `test(catalog): add RecetaCostoDesglose.spec.ts with warning state`
+- **Work-unit commit message**: `test(catalog): add RecetaCostoDesglose.spec.ts with warning state` ✅ `092f3a0`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — component not yet implemented)
+  - [x] `pnpm test -- --run` fails (RED — component not yet implemented)
 - **Estimated changed lines**: 40
 
 ### Task 3.8b (GREEN): Create RecetaCostoDesglose.vue
@@ -549,12 +552,12 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/components/business/RecetaCostoDesglose.vue` (create — display-only table: per-ingredient line, totals row, yellow `v-alert` for missing MP)
 - **Depends on**: Task 3.8a (spec), Task 1.6b (calculator types)
-- **Work-unit commit message**: `feat(catalog): implement RecetaCostoDesglose breakdown card`
+- **Work-unit commit message**: `feat(catalog): implement RecetaCostoDesglose breakdown card` ✅ `092f3a0`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] Displays each ingredient: nombre, cantidad, unidad, costo_por_unidad, subtotal
-  - [ ] Shows `costoTotal` and `costoPorUnidad`
-  - [ ] Yellow `v-alert` when `advertencia === 'MATERIA_PRIMA_FALTANTE'`
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] Displays each ingredient: nombre, cantidad, unidad, costo_por_unidad, subtotal
+  - [x] Shows `costoTotal` and `costoPorUnidad`
+  - [x] Yellow `v-alert` when `advertencia === 'MATERIA_PRIMA_FALTANTE'`
 - **Estimated changed lines**: 70
 - **Notes**: Display-only (no emits). Pure presentation component per design §5.
 

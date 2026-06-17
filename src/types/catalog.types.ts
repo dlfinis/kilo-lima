@@ -34,11 +34,19 @@ export interface IngredienteReceta {
   created_at: string
 }
 
-export interface IngredienteRecetaConCosto extends IngredienteReceta {
-  nombre: string
-  unidad: UnidadMedida
-  costo_por_unidad: number
+export type IngredienteRecetaInput = Pick<IngredienteReceta, 'materia_prima_id' | 'cantidad'>
+
+// Receta + its ingredient lines as a single store-friendly shape. The
+// service.listar() returns this so the recipes store and the calculator
+// can read both fields without a second round-trip.
+export interface RecetaConIngredientes extends Receta {
+  ingredientes: IngredienteReceta[]
 }
+
+// `RecetaInput` joined with the ingredient inputs the form passes up.
+// Lives next to the form-facing types so callers can name it without
+// importing from the service layer.
+export type RecetaInputCompleto = RecetaInput & { ingredientes: IngredienteRecetaInput[] }
 
 export interface LineaCalculo {
   ingrediente: IngredienteReceta
