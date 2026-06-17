@@ -201,12 +201,12 @@ After PR2, main has full CRUD over `materias_primas` via the factory-based servi
 - **Files**:
   - `tests/setup.ts` (modify — add `crearSupabaseMock()`, `__resetSupabaseMock()`, `__getSupabaseMockCalls()`)
 - **Depends on**: PR1 merged
-- **Work-unit commit message**: `test(setup): add chainable supabase mock with reset helper`
+- **Work-unit commit message**: `test(setup): add chainable supabase mock with reset helper` ✅ `634bc37`
 - **Verification**:
-  - [ ] `pnpm typecheck` passes
-  - [ ] `__resetSupabaseMock()` is exported and callable
-  - [ ] Mock builder supports `.from().select().eq().single()` chain
-  - [ ] Mock is thenable (`await` works in service tests)
+  - [x] `pnpm typecheck` passes
+  - [x] `__resetSupabaseMock()` is exported and callable
+  - [x] Mock builder supports `.from().select().eq().single()` chain
+  - [x] Mock is thenable (`await` works in service tests)
 - **Estimated changed lines**: 40
 - **Notes**: F2 split from PR1. Per design §10: chainable design, every method returns builder. `__resetSupabaseMock()` called in `beforeEach` for test isolation.
 
@@ -217,9 +217,9 @@ After PR2, main has full CRUD over `materias_primas` via the factory-based servi
 - **Files**:
   - `src/services/ingredients.service.spec.ts` (create — `listar`, `crear`, `actualizar`, `eliminar`, error path, duplicate prevention)
 - **Depends on**: Task 2.1 (supabase mock), Task 1.3 (types)
-- **Work-unit commit message**: `test(catalog): add ingredients.service.spec.ts with CRUD + error scenarios`
+- **Work-unit commit message**: `test(catalog): add ingredients.service.spec.ts with CRUD + error scenarios` ✅ `e51b2cd`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — service not yet implemented)
+  - [x] `pnpm test -- --run` fails (RED — service not yet implemented)
 - **Estimated changed lines**: 60
 
 ### Task 2.2b (GREEN): Create ingredients.service.ts
@@ -229,11 +229,11 @@ After PR2, main has full CRUD over `materias_primas` via the factory-based servi
 - **Files**:
   - `src/services/ingredients.service.ts` (create — `crearIngredientsService(supabase)` factory with 4 methods)
 - **Depends on**: Task 2.2a (spec), Task 1.3 (types)
-- **Work-unit commit message**: `feat(catalog): implement ingredients service with factory pattern`
+- **Work-unit commit message**: `feat(catalog): implement ingredients service with factory pattern` ✅ `17580dc`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] Factory accepts `SupabaseClient<Database>` parameter (no direct import)
-  - [ ] Each method returns `{ data, error }` — never throws
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] Factory accepts `SupabaseClient<Database>` parameter (no direct import)
+  - [x] Each method returns `{ data, error }` — never throws
 - **Estimated changed lines**: 50
 - **Notes**: Factory pattern per design §2. OCP — client injected, not imported. `crear` checks for duplicates case-insensitively (REQ-CATALOG-5).
 
@@ -244,9 +244,9 @@ After PR2, main has full CRUD over `materias_primas` via the factory-based servi
 - **Files**:
   - `src/stores/ingredients.store.spec.ts` (create — state transitions, `cargarTodas`, `crear`, `actualizar`, `eliminar`, error handling, reactive updates)
 - **Depends on**: Task 2.2b (service), Task 2.1 (mock)
-- **Work-unit commit message**: `test(catalog): add ingredients.store.spec.ts with state + action tests`
+- **Work-unit commit message**: `test(catalog): add ingredients.store.spec.ts with state + action tests` ✅ `1ba0c84`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — store not yet implemented)
+  - [x] `pnpm test -- --run` fails (RED — store not yet implemented)
 - **Estimated changed lines**: 60
 
 ### Task 2.3b (GREEN): Create ingredients.store.ts
@@ -256,11 +256,11 @@ After PR2, main has full CRUD over `materias_primas` via the factory-based servi
 - **Files**:
   - `src/stores/ingredients.store.ts` (create — setup-style Pinia store with `materiasPrimas`, `cargando`, `error`, CRUD actions)
 - **Depends on**: Task 2.3a (spec), Task 2.2b (service)
-- **Work-unit commit message**: `feat(catalog): implement ingredients store with CRUD actions`
+- **Work-unit commit message**: `feat(catalog): implement ingredients store with CRUD actions` ✅ `158a2b9`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] Store receives `crearIngredientsService(supabaseClient)` via DI — no direct import
-  - [ ] SRP verified: no recipe concerns (REQ-CATALOG-42)
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] Store receives `crearIngredientsService(supabaseClient)` via DI — no direct import
+  - [x] SRP verified: no recipe concerns (REQ-CATALOG-42)
 - **Estimated changed lines**: 50
 - **Notes**: Setup-style Pinia per design §3. SRP: manages only `materias_primas` state. Cross-store `costoPorReceta` lives in recipes.store.
 
@@ -271,10 +271,10 @@ After PR2, main has full CRUD over `materias_primas` via the factory-based servi
 - **Files**:
   - `src/composables/useIngredients.ts` (create — thin `storeToRefs()` wrapper around `useIngredientsStore`)
 - **Depends on**: Task 2.3b (store)
-- **Work-unit commit message**: `feat(catalog): add useIngredients composable wrapping store`
+- **Work-unit commit message**: `feat(catalog): add useIngredients composable wrapping store` ✅ `66eb293`
 - **Verification**:
-  - [ ] `pnpm typecheck` passes
-  - [ ] Exposes `{ materiasPrimas, cargando, error, cargar, crear, actualizar, eliminar }`
+  - [x] `pnpm typecheck` passes
+  - [x] Exposes `{ materiasPrimas, cargando, error, cargar, crear, actualizar, eliminar }`
 - **Estimated changed lines**: 20
 - **Notes**: Container/presentational seam per design §4. No spec required — covered by view spec.
 
@@ -285,9 +285,9 @@ After PR2, main has full CRUD over `materias_primas` via the factory-based servi
 - **Files**:
   - `src/components/business/MateriaPrimaForm.spec.ts` (create — mount with `valoresIniciales`, fill form, submit, validation: empty nombre, bad unidad, negative cost)
 - **Depends on**: Task 1.3 (types)
-- **Work-unit commit message**: `test(catalog): add MateriaPrimaForm.spec.ts with validation scenarios`
+- **Work-unit commit message**: `test(catalog): add MateriaPrimaForm.spec.ts with validation scenarios` ✅ `b03ffa4`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — component not yet created)
+  - [x] `pnpm test -- --run` fails (RED — component not yet created)
 - **Estimated changed lines**: 40
 
 ### Task 2.5b (GREEN): Create MateriaPrimaForm.vue
@@ -297,12 +297,12 @@ After PR2, main has full CRUD over `materias_primas` via the factory-based servi
 - **Files**:
   - `src/components/business/MateriaPrimaForm.vue` (create — props: `valoresIniciales`, emits: `submit`, `cancel`; inline Spanish validation)
 - **Depends on**: Task 2.5a (spec), Task 1.3 (types)
-- **Work-unit commit message**: `feat(catalog): implement MateriaPrimaForm with inline Spanish validation`
+- **Work-unit commit message**: `feat(catalog): implement MateriaPrimaForm with inline Spanish validation` ✅ `f1889a1`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] Fields: nombre, unidad (select), costo_por_unidad (number), notas (textarea)
-  - [ ] Validation in Spanish before submission
-  - [ ] Receives `valoresIniciales: MateriaPrimaInput | null` (ISP per REQ-CATALOG-45)
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] Fields: nombre, unidad (select), costo_por_unidad (number), notas (textarea)
+  - [x] Validation in Spanish before submission
+  - [x] Receives `valoresIniciales: MateriaPrimaInput | null` (ISP per REQ-CATALOG-45)
 - **Estimated changed lines**: 80
 - **Notes**: Pure form component — no DI, no store import. All state from props. `v-dialog` rendered by the parent view.
 
@@ -313,11 +313,11 @@ After PR2, main has full CRUD over `materias_primas` via the factory-based servi
 - **Files**:
   - `src/components/business/MateriaPrimaListItem.vue` (create — props: `materia: MateriaPrima`, emits: `edit`, `delete`)
 - **Depends on**: Task 1.3 (types)
-- **Work-unit commit message**: `feat(catalog): add MateriaPrimaListItem row component`
+- **Work-unit commit message**: `feat(catalog): add MateriaPrimaListItem row component` ✅ `8f399eb`
 - **Verification**:
-  - [ ] `pnpm typecheck` passes
-  - [ ] Displays `nombre`, `unidad`, `costo_por_unidad` formatted
-  - [ ] Emits `edit` and `delete` on button click
+  - [x] `pnpm typecheck` passes
+  - [x] Displays `nombre`, `unidad`, `costo_por_unidad` formatted
+  - [x] Emits `edit` and `delete` on button click
 - **Estimated changed lines**: 40
 - **Notes**: No spec required — covered by view spec. Minimal typed props per ISP.
 
@@ -328,9 +328,9 @@ After PR2, main has full CRUD over `materias_primas` via the factory-based servi
 - **Files**:
   - `src/views/MateriasPrimasView.spec.ts` (create — mount, list renders, create flow, edit flow, delete with confirmation, empty/loading/error states)
 - **Depends on**: Tasks 2.3b, 2.5b, 2.6
-- **Work-unit commit message**: `test(catalog): add MateriasPrimasView.spec.ts with all states and flows`
+- **Work-unit commit message**: `test(catalog): add MateriasPrimasView.spec.ts with all states and flows` ✅ `f396cfb`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — view not yet implemented)
+  - [x] `pnpm test -- --run` fails (RED — view not yet implemented)
 - **Estimated changed lines**: 55
 
 ### Task 2.7b (GREEN): Create MateriasPrimasView.vue
@@ -340,16 +340,16 @@ After PR2, main has full CRUD over `materias_primas` via the factory-based servi
 - **Files**:
   - `src/views/MateriasPrimasView.vue` (create — list with `v-data-table`, create/edit `v-dialog`, delete confirmation `v-dialog`, loading `v-progress-linear`, error `v-alert`, empty state CTA)
 - **Depends on**: Task 2.7a (spec), Tasks 2.4, 2.5b, 2.6
-- **Work-unit commit message**: `feat(catalog): implement MateriasPrimasView with all states and CRUD flows`
+- **Work-unit commit message**: `feat(catalog): implement MateriasPrimasView with all states and CRUD flows` ✅ `507064d`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] All 4 states: loading, empty-with-CTA, error-with-retry, data-list
-  - [ ] Delete shows confirmation dialog with "Eliminar" / "Cancelar"
-  - [ ] View calls `inject('supabase')` — no direct supabase import (DIP per REQ-CATALOG-46)
-  - [ ] All UI text in Spanish
-  - [ ] ≤ 200 lines
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] All 4 states: loading, empty-with-CTA, error-with-retry, data-list
+  - [x] Delete shows confirmation dialog with "Eliminar" / "Cancelar"
+  - [x] View calls `inject('supabase')` — no direct supabase import (DIP per REQ-CATALOG-46)
+  - [x] All UI text in Spanish
+  - [x] ≤ 200 lines (143 lines)
 - **Estimated changed lines**: 120
-- **Notes**: The largest single file in PR2. If line count exceeds 200, split the dialog into a wrapper component.
+- **Notes**: 143 lines — within the 200-line budget. v-dialog teleports content to document.body; tests assert via `document.querySelector` and `findComponent` (component tree) rather than the wrapper's DOM directly.
 
 ---
 
