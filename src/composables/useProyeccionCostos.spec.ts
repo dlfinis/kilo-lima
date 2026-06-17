@@ -6,7 +6,13 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 
-import type { Evento, GastoFijo, MateriaPrima, PlanProduccion, Receta } from '@/types'
+import type {
+  Evento,
+  GastoFijo,
+  MateriaPrima,
+  PlanProduccion,
+  RecetaConIngredientes,
+} from '@/types'
 import { calcularProyeccion } from './useProyeccionCostos'
 
 const mkEvento = (id = 'e-1'): Evento => ({
@@ -30,7 +36,11 @@ const mkMateria = (id: string, costo: number): MateriaPrima => ({
   updated_at: '2026-01-01T00:00:00Z',
 })
 
-const mkReceta = (id: string, rendimiento: number, ingredientes: { materiaPrimaId: string; cantidad: number }[]): Receta => ({
+const mkReceta = (
+  id: string,
+  rendimiento: number,
+  ingredientes: { materiaPrimaId: string; cantidad: number }[],
+): RecetaConIngredientes => ({
   id,
   nombre: id,
   descripcion: null,
@@ -177,10 +187,11 @@ describe('calcularProyeccion', () => {
     const plan = [mkPlan('pp-1', 'r-1', 8)]
     const resultado = calcularProyeccion(mkEvento(), gastos, plan, [receta1], [harina, azucar])
 
-    // receta1: (2×2 + 1×1.5) = 5.5 over 4 unidades → 1.375/unit × 8 = 11
+    // receta1: (2×2 + 1×1.5) = 5.5; costoPorUnidad = redondearCentavos(5.5/4) = 1.38;
+    // costoLinea = 1.38 × 8 = 11.04
     expect(resultado.costosFijos).toBe(150)
-    expect(resultado.costosVariables).toBe(11)
-    expect(resultado.costoTotal).toBe(161)
+    expect(resultado.costosVariables).toBe(11.04)
+    expect(resultado.costoTotal).toBe(161.04)
     expect(resultado.desgloseFijos).toHaveLength(2)
     expect(resultado.desgloseVariables).toHaveLength(1)
     expect(resultado.desgloseVariables[0]?.recetaNombre).toBe('r-1')
