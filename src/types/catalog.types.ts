@@ -43,6 +43,11 @@ export interface RecetaConIngredientes extends Receta {
   ingredientes: IngredienteReceta[]
 }
 
+// `RecetaInput` joined with the ingredient inputs the form passes up.
+// Lives next to the form-facing types so callers can name it without
+// importing from the service layer.
+export type RecetaInputCompleto = RecetaInput & { ingredientes: IngredienteRecetaInput[] }
+
 export interface LineaCalculo {
   ingrediente: IngredienteReceta
   materiaPrima: MateriaPrima | null

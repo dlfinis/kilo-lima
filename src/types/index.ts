@@ -5,6 +5,7 @@ export type {
   Receta,
   RecetaInput,
   RecetaConIngredientes,
+  RecetaInputCompleto,
   IngredienteReceta,
   IngredienteRecetaInput,
   LineaCalculo,

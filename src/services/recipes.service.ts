@@ -8,15 +8,12 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type {
   Database,
-  IngredienteRecetaInput,
   RecetaConIngredientes,
-  RecetaInput,
+  RecetaInputCompleto,
   ServiceError,
 } from '@/types'
 
-export interface RecetaInputCompleto extends RecetaInput {
-  ingredientes: IngredienteRecetaInput[]
-}
+export type { RecetaInputCompleto }
 
 export interface RecipesService {
   listar(): Promise<{ data: RecetaConIngredientes[] | null; error: ServiceError | null }>

@@ -3,7 +3,7 @@
 // `materiasPrimas` array — the cross-store `costoPorReceta(id)` getter
 // reads `useIngredientsStore().materiasPrimas` inside a `computed()`
 // so Vue's reactivity propagates price changes without manual watchers.
-import { computed, inject, ref } from 'vue'
+import { computed, inject, ref, type ComputedRef } from 'vue'
 import { defineStore } from 'pinia'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
@@ -11,9 +11,10 @@ import type {
   CalculoReceta,
   Database,
   RecetaConIngredientes,
+  RecetaInputCompleto,
 } from '@/types'
 import { useIngredientsStore } from '@/stores/ingredients.store'
-import { crearRecipesService, type RecetaInputCompleto, type RecipesService } from '@/services/recipes.service'
+import { crearRecipesService, type RecipesService } from '@/services/recipes.service'
 import { calcularCostoReceta } from '@/composables/useCalculoReceta'
 
 const MENSAJE_ERROR_CARGA = 'Error al cargar las recetas'
@@ -51,7 +52,16 @@ export const useRecipesStore = defineStore('recipes', () => {
       return res
     }
     if (res.data) {
-      const nueva: RecetaConIngredientes = { ...res.data, ingredientes: input.ingredientes }
+      const nueva: RecetaConIngredientes = {
+        ...res.data,
+        ingredientes: input.ingredientes.map((i, idx) => ({
+          id: `ri-new-${idx}`,
+          receta_id: res.data!.id,
+          materia_prima_id: i.materia_prima_id,
+          cantidad: i.cantidad,
+          created_at: new Date().toISOString(),
+        })),
+      }
       recetas.value = [nueva, ...recetas.value]
     }
     return res
@@ -65,7 +75,16 @@ export const useRecipesStore = defineStore('recipes', () => {
       return res
     }
     if (res.data) {
-      const actualizada: RecetaConIngredientes = { ...res.data, ingredientes: cambios.ingredientes }
+      const actualizada: RecetaConIngredientes = {
+        ...res.data,
+        ingredientes: cambios.ingredientes.map((i, idx) => ({
+          id: `ri-upd-${idx}`,
+          receta_id: id,
+          materia_prima_id: i.materia_prima_id,
+          cantidad: i.cantidad,
+          created_at: new Date().toISOString(),
+        })),
+      }
       recetas.value = recetas.value.map((r) => (r.id === id ? actualizada : r))
     }
     return res
@@ -88,7 +107,7 @@ export const useRecipesStore = defineStore('recipes', () => {
   // Vue's dep tracking so any ingredient price change triggers a
   // recompute without watchers or events. Pinia auto-unwraps the
   // ref so we read the array directly.
-  function costoPorReceta(id: string): ReturnType<typeof computed<CalculoReceta>> {
+  function costoPorReceta(id: string): ComputedRef<CalculoReceta> {
     const ingredientsStore = useIngredientsStore()
     return computed<CalculoReceta>(() => {
       const receta = recetas.value.find((r) => r.id === id)
