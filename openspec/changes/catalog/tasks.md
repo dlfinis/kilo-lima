@@ -366,9 +366,9 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/services/recipes.service.spec.ts` (create — `listar`, `crear` joined insert, `actualizar` delete-reinsert, `eliminar` cascade, error path)
 - **Depends on**: Task 2.1 (mock), Task 1.3 (types)
-- **Work-unit commit message**: `test(catalog): add recipes.service.spec.ts with joined insert and delete-reinsert`
+- **Work-unit commit message**: `test(catalog): add recipes.service.spec.ts with joined insert and delete-reinsert` ✅ `e49007b`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — service not yet implemented)
+  - [x] `pnpm test -- --run` fails (RED — service not yet implemented)
 - **Estimated changed lines**: 65
 
 ### Task 3.1b (GREEN): Create recipes.service.ts
@@ -378,12 +378,12 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/services/recipes.service.ts` (create — `crearRecipesService(supabase)` factory with `crear` joined insert, `actualizar` delete-reinsert, `listar`, `eliminar`)
 - **Depends on**: Task 3.1a (spec), Task 1.3 (types)
-- **Work-unit commit message**: `feat(catalog): implement recipes service with joined insert and delete-reinsert`
+- **Work-unit commit message**: `feat(catalog): implement recipes service with joined insert and delete-reinsert` ✅ `704ad76`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] `crear()` inserts `recetas` row + batch-inserts `receta_ingredientes` rows
-  - [ ] `actualizar()` deletes all existing ingredients then inserts new set
-  - [ ] Each method returns `{ data, error }` — never throws
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] `crear()` inserts `recetas` row + batch-inserts `receta_ingredientes` rows
+  - [x] `actualizar()` deletes all existing ingredients then inserts new set
+  - [x] Each method returns `{ data, error }` — never throws
 - **Estimated changed lines**: 65
 - **Notes**: Factory pattern per design §2. `actualizar` uses delete-then-reinsert strategy for ingredient lines.
 
@@ -394,9 +394,9 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/stores/recipes.store.spec.ts` (create — state transitions, `cargarTodas`, `crear`, `actualizar`, `eliminar`, `costoPorReceta` reactive getter, cross-store reactivity)
 - **Depends on**: Task 3.1b (service), Task 2.1 (mock), PR2 (ingredients store for cross-store test)
-- **Work-unit commit message**: `test(catalog): add recipes.store.spec.ts with cross-store costoPorReceta`
+- **Work-unit commit message**: `test(catalog): add recipes.store.spec.ts with cross-store costoPorReceta` ✅ `04ac907`
 - **Verification**:
-  - [ ] `pnpm test -- --run` fails (RED — store not yet implemented)
+  - [x] `pnpm test -- --run` fails (RED — store not yet implemented)
 - **Estimated changed lines**: 65
 
 ### Task 3.2b (GREEN): Create recipes.store.ts
@@ -406,27 +406,30 @@ After PR3, main has full CRUD over `recetas` with joined ingredient lines, the c
 - **Files**:
   - `src/stores/recipes.store.ts` (create — setup-style Pinia store with `recetas`, `cargando`, `error`, CRUD actions, `costoPorReceta(id)` computed getter)
 - **Depends on**: Task 3.2a (spec), Task 3.1b (service), PR2 (ingredients.store)
-- **Work-unit commit message**: `feat(catalog): implement recipes store with reactive costoPorReceta getter`
+- **Work-unit commit message**: `feat(catalog): implement recipes store with reactive costoPorReceta getter` ✅ `8acac4c`
 - **Verification**:
-  - [ ] `pnpm test -- --run` passes (GREEN)
-  - [ ] `costoPorReceta(id)` reads `useIngredientsStore().materiasPrimas` inside `computed()` (cross-store reactivity)
-  - [ ] SRP: no `materiasPrimas` state array (reads from ingredients store)
+  - [x] `pnpm test -- --run` passes (GREEN)
+  - [x] `costoPorReceta(id)` reads `useIngredientsStore().materiasPrimas` inside `computed()` (cross-store reactivity)
+  - [x] SRP: no `materiasPrimas` state array (reads from ingredients store)
 - **Estimated changed lines**: 60
 - **Notes**: Cross-store reactivity via `computed()` per design §3 / proposal §15 risk #4 mitigation. No manual watchers.
 
-### Task 3.3: Create useRecipes composable
+### Task 3.3: Create useRecipes composable (+ F2 reactive useCalculoReceta from PR1)
 
 - **PR**: PR3
 - **REQ-IDs covered**: REQ-CATALOG-46
 - **Files**:
   - `src/composables/useRecipes.ts` (create — thin `storeToRefs()` wrapper around `useRecipesStore` + form state)
+  - `src/composables/useCalculoReceta.ts` (modify — add reactive `useCalculoReceta(recetaId)` wrapper alongside the pure function)
+  - `src/types/catalog.types.ts` (modify — add `RecetaConIngredientes`, `IngredienteRecetaInput`)
+  - `src/types/index.ts` (modify — re-export new types)
 - **Depends on**: Task 3.2b (store)
-- **Work-unit commit message**: `feat(catalog): add useRecipes composable wrapping store`
+- **Work-unit commit message**: `feat(catalog): add useRecipes composable and useCalculoReceta reactive wrapper (F2 from PR1)` ✅ `d93d2dc` (composable) / `6c3d9ef` (types)
 - **Verification**:
-  - [ ] `pnpm typecheck` passes
-  - [ ] Exposes `{ recetas, cargando, error, cargar, crear, actualizar, eliminar }`
+  - [x] `pnpm typecheck` passes
+  - [x] Exposes `{ recetas, cargando, error, cargar, crear, actualizar, eliminar }`
 - **Estimated changed lines**: 25
-- **Notes**: Container/presentational seam per design §4. Also manages ingredient selector interactions.
+- **Notes**: Container/presentational seam per design §4. F2 split from PR1: the reactive `useCalculoReceta(recetaId)` composable lands here, not in PR1, because it depends on the recipes store. The pure `calcularCostoReceta` function remains in the same file and is the only thing PR1 tested.
 
 ### Task 3.4a (RED): Create RecetasView.spec.ts
 
