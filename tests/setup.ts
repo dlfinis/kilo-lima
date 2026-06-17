@@ -28,6 +28,22 @@ class ResizeObserverStub {
 ;(globalThis as unknown as { ResizeObserver: typeof ResizeObserverStub }).ResizeObserver =
   ResizeObserverStub
 
+// jsdom does not implement window.visualViewport. Vuetify's VOverlay /
+// VDialog reach for it on first render to position the dialog; without
+// the stub the dialog test crashes before the form mounts.
+;(globalThis as unknown as { visualViewport: object }).visualViewport = {
+  width: 1024,
+  height: 768,
+  offsetLeft: 0,
+  offsetTop: 0,
+  pageLeft: 0,
+  pageTop: 0,
+  scale: 1,
+  addEventListener: vi.fn(),
+  removeEventListener: vi.fn(),
+  dispatchEvent: vi.fn(),
+}
+
 // localforage hits IndexedDB / WebSQL in jsdom, which is unreliable in
 // unit tests. The Map-backed stub keeps every call synchronous-shaped
 // (async signatures preserved) and resets between test files when

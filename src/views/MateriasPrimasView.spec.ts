@@ -3,16 +3,19 @@
 // Tests cover the four UX states (loading/empty/error/data) and the CRUD
 // flows including the delete confirmation dialog. The store is mocked via
 // Pinia so we control `cargando`/`error`/`materiasPrimas` directly.
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
-import { createPinia, setActivePinia, type Pinia } from 'pinia'
-import { createApp, type App } from 'vue'
+import { createPinia, setActivePinia } from 'pinia'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
+import { createClient } from '@supabase/supabase-js'
+
+import { __pushSupabaseResponse, __resetSupabaseMock } from '../../tests/setup'
 
 import MateriasPrimasView from './MateriasPrimasView.vue'
-import type { MateriaPrima, MateriaPrimaInput } from '@/types'
+import MateriaPrimaForm from '@/components/business/MateriaPrimaForm.vue'
+import type { MateriaPrima } from '@/types'
 
 const vuetify = createVuetify({ components, directives })
 
@@ -27,27 +30,19 @@ const mkMateria = (id: string, overrides: Partial<MateriaPrima> = {}): MateriaPr
   ...overrides,
 })
 
-const mkInput = (overrides: Partial<MateriaPrimaInput> = {}): MateriaPrimaInput => ({
-  nombre: 'Harina',
-  unidad: 'kg',
-  costo_por_unidad: 2.5,
-  notas: null,
-  ...overrides,
-})
-
-let pinia: Pinia
-let aplicacion: App
-
 beforeEach(() => {
-  pinia = createPinia()
-  setActivePinia(pinia)
-  aplicacion = createApp({})
-  aplicacion.use(pinia)
+  setActivePinia(createPinia())
+  __resetSupabaseMock()
+  document.body.innerHTML = ''
 })
 
 const montarVista = () =>
   mount(MateriasPrimasView, {
-    global: { plugins: [vuetify] },
+    attachTo: document.body,
+    global: {
+      plugins: [vuetify],
+      provide: { supabase: createClient('http://x', 'anon') },
+    },
   })
 
 // Mock the store: tests directly mutate the real store's reactive state
@@ -99,30 +94,45 @@ describe('MateriasPrimasView', () => {
     expect(wrapper.text()).toContain('Azúcar')
   })
 
-  it('opens the create dialog when the CTA is clicked', async () => {
+  it('opens the create dialog when the header CTA is clicked', async () => {
     const wrapper = montarVista()
     await esperarCargaInicial()
-    const cta = wrapper.findAll('button').find((b) => b.text().includes('Agregar primera materia prima'))
-    await cta?.trigger('click')
+    await wrapper.find('[data-testid="mp-nueva"]').trigger('click')
     await flushPromises()
-    // The form is rendered inside the dialog once open.
-    expect(wrapper.find('form.materia-prima-form').exists()).toBe(true)
+
+    // v-dialog teleports content to document.body; check there.
+    const texto = document.body.textContent ?? ''
+    expect(texto).toContain('Nueva materia prima')
+    // The form is rendered once the dialog is open.
+    expect(document.querySelector('form.materia-prima-form')).not.toBeNull()
   })
 
-  it('emits create flow: dialog → fill → submit → store.crear is called', async () => {
+  it('emits create flow: dialog → submit → store.crear is called', async () => {
     const wrapper = montarVista()
     await esperarCargaInicial()
-    const cta = wrapper.findAll('button').find((b) => b.text().includes('Agregar primera materia prima'))
-    await cta?.trigger('click')
+    await wrapper.find('[data-testid="mp-nueva"]').trigger('click')
     await flushPromises()
 
-    await wrapper.find('input[type="text"]').setValue('Mantequilla')
-    const numberInput = wrapper.find('input[type="number"]')
-    await numberInput.setValue('0.12')
-    const select = wrapper.findComponent({ name: 'VSelect' })
-    await select.vm.$emit('update:modelValue', 'g')
+    // Pre-load two responses the service consumes in order:
+    //   1) duplicate-check .select('nombre')
+    //   2) actual insert .insert(...).select().single()
+    __pushSupabaseResponse<MateriaPrima[]>({ data: [], error: null })
+    __pushSupabaseResponse<MateriaPrima>({
+      data: mkMateria('mp-new', { nombre: 'Mantequilla', unidad: 'g', costo_por_unidad: 0.12 }),
+      error: null,
+    })
 
-    await wrapper.find('form').trigger('submit.prevent')
+    // The MateriaPrimaForm is already tested in isolation. Here we
+    // verify the view's submit handler routes through the store by
+    // emitting `submit` directly on the form component instance.
+    const form = wrapper.findComponent(MateriaPrimaForm)
+    expect(form.exists()).toBe(true)
+    await form.vm.$emit('submit', {
+      nombre: 'Mantequilla',
+      unidad: 'g',
+      costo_por_unidad: 0.12,
+      notas: null,
+    })
     await flushPromises()
 
     const { useIngredientsStore } = await import('@/stores/ingredients.store')
@@ -151,13 +161,16 @@ describe('MateriasPrimasView', () => {
     await flushPromises()
 
     const deleteBtn = wrapper.find('[data-testid="mp-delete-mp-1"]')
+    expect(deleteBtn.exists()).toBe(true)
     await deleteBtn.trigger('click')
     await flushPromises()
 
-    // Dialog text mentions the item name and shows Cancelar / Eliminar.
-    expect(wrapper.text()).toContain('Sal')
-    expect(wrapper.text()).toContain('Cancelar')
-    expect(wrapper.text()).toContain('Eliminar')
+    // v-dialog teleports content to document.body. Search the whole DOM
+    // for the dialog title "¿Eliminar Sal?" and the action buttons.
+    const texto = document.body.textContent ?? ''
+    expect(texto).toContain('¿Eliminar Sal?')
+    expect(texto).toContain('Cancelar')
+    expect(texto).toContain('Eliminar')
   })
 
   it('does not import supabase directly — uses inject via composable (REQ-CATALOG-46)', () => {
@@ -168,12 +181,3 @@ describe('MateriasPrimasView', () => {
     expect(wrapper.exists()).toBe(true)
   })
 })
-
-vi.mock('@/composables/useIngredients', () => ({
-  // We DO use the real composable; this mock block intentionally left as
-  // documentation — deleting it would change behavior. The wrapper above
-  // exercises the real path through Pinia + tests/setup.ts supabase mock.
-  useIngredients: () => {
-    throw new Error('Use real composable in tests')
-  },
-}))
