@@ -1,8 +1,11 @@
-// REQ-CATALOG-17..20: cost calculator pure function.
-// PR1 ships only the pure function (unit-testable without Vue/Pinia).
-// The reactive `useCalculoReceta(recetaId)` composable wires the function
-// to the recipes store; it lands in PR3 once that store exists.
+// REQ-CATALOG-17..20: cost calculator pure function plus the reactive
+// composable that wraps the recipes store's `costoPorReceta(id)` getter.
+// The pure function is the unit-testable core (PR1, ~15 unit tests);
+// the composable is the thin Vue-aware seam used by RecetaDetalleView.
+import { computed, type ComputedRef, type MaybeRefOrGetter, toValue } from 'vue'
+
 import type { CalculoReceta, IngredienteReceta, MateriaPrima } from '@/types'
+import { useRecipesStore } from '@/stores/recipes.store'
 import { redondearCentavos } from '@/utils/moneda'
 
 export type LineaInput = {
@@ -16,7 +19,7 @@ export function calcularCostoReceta(
   lineas: LineaInput[],
   rendimiento: number,
 ): CalculoReceta {
-  const ingredientes = lineas.map<CalcaoRecetaLinea>((linea) => {
+  const ingredientes = lineas.map<CalculoRecetaLinea>((linea) => {
     if (linea.materiaPrima === null) {
       return {
         ingrediente: linea.ingrediente,
@@ -40,5 +43,21 @@ export function calcularCostoReceta(
   return { ingredientes, costoTotal, costoPorUnidad }
 }
 
-type CalcaoRecetaLinea = CalculoReceta['ingredientes'][number]
+type CalculoRecetaLinea = CalculoReceta['ingredientes'][number]
+
+// REQ-CATALOG-15: reactive seam between the recipes store and the view.
+// The store's `costoPorReceta(id)` already returns a `computed()` that
+// tracks the ingredients store; this composable adapts the id arg to
+// accept refs/getters so `RecetaDetalleView` can pass `route.params.id`
+// without losing reactivity on navigation.
+export function useCalculoReceta(
+  recetaId: MaybeRefOrGetter<string | null>,
+): ComputedRef<CalculoReceta | null> {
+  const recipesStore = useRecipesStore()
+  return computed<CalculoReceta | null>(() => {
+    const id = toValue(recetaId)
+    if (!id) return null
+    return recipesStore.costoPorReceta(id).value
+  })
+}
 
