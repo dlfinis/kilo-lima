@@ -9,6 +9,21 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/HomeView.vue'),
   },
   {
+    path: '/materias-primas',
+    name: 'materias-primas',
+    component: () => import('@/views/MateriasPrimasView.vue'),
+  },
+  {
+    path: '/recetas',
+    name: 'recetas',
+    component: () => import('@/views/RecetasView.vue'),
+  },
+  {
+    path: '/recetas/:id',
+    name: 'receta-detalle',
+    component: () => import('@/views/RecetaDetalleView.vue'),
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
