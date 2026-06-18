@@ -1,0 +1,203 @@
+<script setup lang="ts">
+// REQ-EVENTS-3, REQ-EVENTS-4, REQ-EVENTS-7, REQ-EVENTS-11,
+// REQ-EVENTS-14, REQ-EVENTS-22, REQ-EVENTS-27, REQ-EVENTS-36,
+// REQ-EVENTS-38, REQ-EVENTS-39: detail view. Composes events +
+// gastos stores + projection composable. `estadoEsEditable` is the
+// single source of truth for the read-only mode (REQ-EVENTS-25):
+// when the evento is cerrado, all mutating controls disappear and
+// a v-alert explains why (REQ-EVENTS-27). The full ProyeccionCostos
+// Card lands in PR3; this view renders a compact summary so PR2b
+// ships without depending on PR3.
+import { computed, onMounted, ref } from 'vue'
+import { useRoute, useRouter } from 'vue-router'
+
+import EventoStatusChip from '@/components/business/EventoStatusChip.vue'
+import GastoFijoForm from '@/components/business/GastoFijoForm.vue'
+import GastoFijoListItem from '@/components/business/GastoFijoListItem.vue'
+import { useEvents } from '@/composables/useEvents'
+import { useGastosFijos } from '@/composables/useGastosFijos'
+import { useProyeccionCostos } from '@/composables/useProyeccionCostos'
+import { formatearUSD } from '@/utils/format'
+import { estadoEsEditable } from '@/utils/estado'
+import type { EstadoEvento, GastoFijoInput } from '@/types'
+
+const route = useRoute()
+const router = useRouter()
+
+const eventoId = computed<string | null>(() => {
+  const value = route.params.id
+  return typeof value === 'string' ? value : Array.isArray(value) ? value[0] ?? null : null
+})
+
+const { eventoActual, cargando, error, cargarPorId, cambiarEstado, eliminar } = useEvents()
+const { gastosPorEvento, cargando: cargandoGastos, error: errorGastos, cargarPorEvento, agregar, eliminar: eliminarGasto } = useGastosFijos()
+const proyeccion = useProyeccionCostos(eventoId)
+
+const gastos = computed(() => (eventoId.value ? gastosPorEvento.value.get(eventoId.value) ?? [] : []))
+const editable = computed(() => (eventoActual.value ? estadoEsEditable(eventoActual.value.estado) : false))
+
+// REQ-EVENTS-22: 3-state machine transitions visible from the detail
+// view. Each row carries the target estado + the testid the spec
+// asserts. Hidden in readonly mode (REQ-EVENTS-27). Filtered into a
+// computed so the template uses `v-for` without the legacy `v-if +
+// v-for` combination (deprecated and broke Vue 3.5 compile).
+interface Transicion {
+  hacia: EstadoEvento
+  etiqueta: string
+  testid: string
+  color: string
+  variant: 'flat' | 'text'
+}
+const TRANSICIONES: readonly Transicion[] = [
+  { hacia: 'en_curso', etiqueta: 'Iniciar evento', testid: 'evento-detalle-iniciar', color: 'primary', variant: 'flat' },
+  { hacia: 'cerrado', etiqueta: 'Cerrar evento', testid: 'evento-detalle-cerrar', color: 'primary', variant: 'flat' },
+  { hacia: 'cerrado', etiqueta: 'Cancelar evento', testid: 'evento-detalle-cancelar-estado', color: 'warning', variant: 'text' },
+]
+const transicionesVisibles = computed<Transicion[]>(() => {
+  const estado = eventoActual.value?.estado
+  if (!editable.value || !estado) return []
+  return TRANSICIONES.filter((t) => {
+    if (t.testid === 'evento-detalle-iniciar') return estado === 'planificacion'
+    if (t.testid === 'evento-detalle-cerrar') return estado === 'en_curso'
+    if (t.testid === 'evento-detalle-cancelar-estado') return estado === 'planificacion'
+    return false
+  })
+})
+
+function formatearFecha(iso: string): string {
+  const [y, m, d] = iso.split('-')
+  return `${d}/${m}/${y}`
+}
+
+onMounted(() => {
+  if (eventoId.value) {
+    void cargarPorId(eventoId.value)
+    void cargarPorEvento(eventoId.value)
+  }
+})
+
+const mostrarDialogoEliminar = ref<boolean>(false)
+const dialogoGastoAbierto = ref<boolean>(false)
+
+async function transicionar(t: Transicion) {
+  if (eventoId.value) await cambiarEstado(eventoId.value, t.hacia)
+}
+async function confirmarEliminar() {
+  if (!eventoId.value) return
+  const res = await eliminar(eventoId.value)
+  if (!res.error) router.push({ name: 'eventos' })
+  mostrarDialogoEliminar.value = false
+}
+async function manejarGastoSubmit(input: GastoFijoInput) {
+  await agregar(input)
+  dialogoGastoAbierto.value = false
+}
+function reintentar() {
+  if (eventoId.value) {
+    void cargarPorId(eventoId.value)
+    void cargarPorEvento(eventoId.value)
+  }
+}
+</script>
+
+<template>
+  <v-container>
+    <v-btn variant="text" prepend-icon="mdi-arrow-left" class="mb-2"
+      data-testid="evento-detalle-volver" @click="router.push({ name: 'eventos' })">
+      Volver
+    </v-btn>
+
+    <v-progress-linear v-if="cargando || cargandoGastos" indeterminate color="primary" />
+
+    <v-alert v-if="(error || errorGastos) && !cargando && !cargandoGastos"
+      type="error" class="mb-4" data-testid="evento-detalle-error">
+      Error al cargar
+      <template #append>
+        <v-btn variant="text" data-testid="evento-detalle-reintentar" @click="reintentar">
+          Reintentar
+        </v-btn>
+      </template>
+    </v-alert>
+
+    <template v-if="eventoActual">
+      <div class="d-flex align-center ga-3 mb-2">
+        <h1 data-testid="evento-detalle-titulo">{{ eventoActual.nombre }}</h1>
+        <EventoStatusChip :estado="eventoActual.estado" />
+      </div>
+      <p class="mb-4 text-medium-emphasis">
+        {{ formatearFecha(eventoActual.fecha) }}
+        <template v-if="eventoActual.ubicacion"> · {{ eventoActual.ubicacion }}</template>
+      </p>
+
+      <v-alert v-if="!editable" type="warning" class="mb-4"
+        data-testid="evento-detalle-alerta-cerrado">
+        Evento cerrado — no editable
+      </v-alert>
+
+      <div class="d-flex ga-2 mb-4 flex-wrap">
+        <v-btn v-for="t in transicionesVisibles" :key="t.testid"
+          :color="t.color" :variant="t.variant" :data-testid="t.testid" @click="transicionar(t)">
+          {{ t.etiqueta }}
+        </v-btn>
+        <v-btn v-if="editable" color="error" variant="text"
+          data-testid="evento-detalle-eliminar" @click="mostrarDialogoEliminar = true">
+          Eliminar evento
+        </v-btn>
+      </div>
+
+      <v-card v-if="proyeccion" class="mb-4 pa-4" data-testid="evento-detalle-proyeccion">
+        <h2 class="mb-2">Proyección de costos</h2>
+        <p class="text-h5" data-testid="evento-detalle-proyeccion-total">
+          Total: <strong>{{ formatearUSD(proyeccion.costoTotal) }}</strong>
+        </p>
+        <p class="text-body-2 text-medium-emphasis">
+          Fijos: {{ formatearUSD(proyeccion.costosFijos) }} · Variables:
+          {{ formatearUSD(proyeccion.costosVariables) }}
+        </p>
+      </v-card>
+
+      <div class="d-flex align-center justify-space-between mb-2">
+        <h2>Gastos fijos</h2>
+        <v-btn v-if="editable" color="primary" prepend-icon="mdi-plus" size="small"
+          data-testid="evento-detalle-agregar-gasto" @click="dialogoGastoAbierto = true">
+          Agregar gasto
+        </v-btn>
+      </div>
+
+      <v-list v-if="gastos.length > 0" data-testid="evento-detalle-gastos">
+        <GastoFijoListItem v-for="gasto in gastos" :key="gasto.id"
+          :gasto="gasto" :editable="editable"
+          @eliminar="(id) => eliminarGasto(id)" />
+      </v-list>
+      <v-card v-else class="pa-4 text-center text-medium-emphasis">
+        Sin gastos fijos todavía
+      </v-card>
+
+      <v-dialog v-model="dialogoGastoAbierto" max-width="500">
+        <v-card>
+          <v-card-title>Nuevo gasto fijo</v-card-title>
+          <v-card-text>
+            <GastoFijoForm
+              :valores-iniciales="eventoId ? { evento_id: eventoId, categoria: 'renta', monto: 0, descripcion: null } : null"
+              @submit="manejarGastoSubmit" @cancel="dialogoGastoAbierto = false" />
+          </v-card-text>
+        </v-card>
+      </v-dialog>
+
+      <v-dialog v-model="mostrarDialogoEliminar" max-width="500">
+        <v-card>
+          <v-card-title>¿Eliminar "{{ eventoActual.nombre }}"?</v-card-title>
+          <v-card-text>
+            Se eliminarán {{ gastos.length }} gastos fijos y todas las filas del plan de producción.
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" @click="mostrarDialogoEliminar = false">Cancelar</v-btn>
+            <v-btn color="error" data-testid="evento-detalle-confirmar-eliminar"
+              @click="confirmarEliminar">Eliminar</v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
+    </template>
+  </v-container>
+</template>
