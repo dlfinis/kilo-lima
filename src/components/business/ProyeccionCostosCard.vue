@@ -12,10 +12,9 @@
 //
 // Replaces the compact summary that PR2b's EventoDetalleView shipped
 // (REQ-EVENTS-22 design §6).
-import { computed } from 'vue'
+import type { CategoriaGasto, ProyeccionResultado } from '@/types'
 
 import { formatearUSD } from '@/utils/format'
-import type { CategoriaGasto, ProyeccionResultado } from '@/types'
 
 defineProps<{ proyeccion: ProyeccionResultado | null }>()
 
@@ -28,11 +27,8 @@ const ETIQUETAS_CATEGORIA: Record<CategoriaGasto, string> = {
   otro: 'Otro',
 }
 
-const advertenciaActiva = computed(() => false)
-
 // Component-scoped helper so the template stays declarative. Wraps
-// the prop + computed `advertenciaActiva` in one place — keeps the
-// template lean.
+// the categoria label lookup in one place — keeps the template lean.
 function categoria(c: CategoriaGasto): string {
   return ETIQUETAS_CATEGORIA[c]
 }

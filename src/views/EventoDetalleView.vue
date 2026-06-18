@@ -5,19 +5,19 @@
 // gastos stores + projection composable. `estadoEsEditable` is the
 // single source of truth for the read-only mode (REQ-EVENTS-25):
 // when the evento is cerrado, all mutating controls disappear and
-// a v-alert explains why (REQ-EVENTS-27). The full ProyeccionCostos
-// Card lands in PR3; this view renders a compact summary so PR2b
-// ships without depending on PR3.
+// a v-alert explains why (REQ-EVENTS-27). PR3 swaps the compact
+// projection summary for the full ProyeccionCostosCard.
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import EventoStatusChip from '@/components/business/EventoStatusChip.vue'
 import GastoFijoForm from '@/components/business/GastoFijoForm.vue'
 import GastoFijoListItem from '@/components/business/GastoFijoListItem.vue'
+import ProyeccionCostosCard from '@/components/business/ProyeccionCostosCard.vue'
 import { useEvents } from '@/composables/useEvents'
 import { useGastosFijos } from '@/composables/useGastosFijos'
+import { usePlans } from '@/composables/usePlans'
 import { useProyeccionCostos } from '@/composables/useProyeccionCostos'
-import { formatearUSD } from '@/utils/format'
 import { estadoEsEditable } from '@/utils/estado'
 import type { EstadoEvento, GastoFijoInput } from '@/types'
 
@@ -31,6 +31,7 @@ const eventoId = computed<string | null>(() => {
 
 const { eventoActual, cargando, error, cargarPorId, cambiarEstado, eliminar } = useEvents()
 const { gastosPorEvento, cargando: cargandoGastos, error: errorGastos, cargarPorEvento, agregar, eliminar: eliminarGasto } = useGastosFijos()
+const { cargarPorEvento: cargarPlan } = usePlans()
 const proyeccion = useProyeccionCostos(eventoId)
 
 const gastos = computed(() => (eventoId.value ? gastosPorEvento.value.get(eventoId.value) ?? [] : []))
@@ -73,6 +74,7 @@ onMounted(() => {
   if (eventoId.value) {
     void cargarPorId(eventoId.value)
     void cargarPorEvento(eventoId.value)
+    void cargarPlan(eventoId.value)
   }
 })
 
@@ -96,6 +98,12 @@ function reintentar() {
   if (eventoId.value) {
     void cargarPorId(eventoId.value)
     void cargarPorEvento(eventoId.value)
+    void cargarPlan(eventoId.value)
+  }
+}
+function irAPlanificar() {
+  if (eventoId.value) {
+    router.push({ name: 'planificar-evento', params: { id: eventoId.value } })
   }
 }
 </script>
@@ -139,22 +147,20 @@ function reintentar() {
           :color="t.color" :variant="t.variant" :data-testid="t.testid" @click="transicionar(t)">
           {{ t.etiqueta }}
         </v-btn>
+        <v-btn v-if="editable" color="primary" variant="flat"
+          prepend-icon="mdi-clipboard-list" data-testid="evento-detalle-planificar"
+          @click="irAPlanificar">
+          Planificar producción
+        </v-btn>
         <v-btn v-if="editable" color="error" variant="text"
           data-testid="evento-detalle-eliminar" @click="mostrarDialogoEliminar = true">
           Eliminar evento
         </v-btn>
       </div>
 
-      <v-card v-if="proyeccion" class="mb-4 pa-4" data-testid="evento-detalle-proyeccion">
-        <h2 class="mb-2">Proyección de costos</h2>
-        <p class="text-h5" data-testid="evento-detalle-proyeccion-total">
-          Total: <strong>{{ formatearUSD(proyeccion.costoTotal) }}</strong>
-        </p>
-        <p class="text-body-2 text-medium-emphasis">
-          Fijos: {{ formatearUSD(proyeccion.costosFijos) }} · Variables:
-          {{ formatearUSD(proyeccion.costosVariables) }}
-        </p>
-      </v-card>
+      <div class="mb-4" data-testid="evento-detalle-proyeccion">
+        <ProyeccionCostosCard :proyeccion="proyeccion" />
+      </div>
 
       <div class="d-flex align-center justify-space-between mb-2">
         <h2>Gastos fijos</h2>
