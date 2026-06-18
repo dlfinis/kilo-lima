@@ -134,10 +134,10 @@ export function useProyeccionCostos(
         ? eventsStore.eventoActual
         : eventsStore.eventos.find((e: Evento) => e.id === id) ?? null
     if (!evento) return null
-    // PR2a: gastos moved to their own store, keyed by evento_id in a
-    // Map for O(1) detail-view reads.
+    // PR3: both gastos and plan live in their own stores, keyed by
+    // evento_id in a Map for O(1) detail-view reads.
     const gastosFijos = gastosStore.gastosPorEvento.get(id) ?? []
-    const plan = plansStore.plan.filter((p: PlanProduccion) => p.evento_id === id)
+    const plan = plansStore.planesPorEvento.get(id) ?? []
     return calcularProyeccion(
       evento,
       gastosFijos,
