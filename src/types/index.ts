@@ -13,3 +13,17 @@ export type {
   UnidadMedida,
   ServiceError,
 } from './catalog.types'
+export type {
+  EstadoEvento,
+  CategoriaGasto,
+  Evento,
+  EventoInput,
+  GastoFijo,
+  GastoFijoInput,
+  PlanProduccion,
+  PlanProduccionInput,
+  LineaProyeccion,
+  ProyeccionResultado,
+  DesgloseFijo,
+  DesgloseVariable,
+} from './events.types'

@@ -1,0 +1,89 @@
+// Spanish domain types per REQ-EVENTS-31 / REQ-EVENTS-32. Field names
+// mirror SQL columns 1:1 to eliminate name-mapping bugs, matching the
+// catalog.types.ts convention. *Input variants exclude DB-only fields
+// so forms receive the minimum contract per ISP (REQ-EVENTS-43).
+
+export type EstadoEvento = 'planificacion' | 'en_curso' | 'cerrado'
+
+export type CategoriaGasto =
+  | 'renta'
+  | 'transporte'
+  | 'permisos'
+  | 'publicidad'
+  | 'servicios'
+  | 'otro'
+
+export interface Evento {
+  id: string
+  nombre: string
+  fecha: string
+  ubicacion: string | null
+  estado: EstadoEvento
+  notas: string | null
+  created_at: string
+  updated_at: string
+}
+
+export type EventoInput = Omit<Evento, 'id' | 'created_at' | 'updated_at'>
+
+export interface GastoFijo {
+  id: string
+  evento_id: string
+  categoria: CategoriaGasto
+  monto: number
+  descripcion: string | null
+  created_at: string
+}
+
+export type GastoFijoInput = Omit<GastoFijo, 'id' | 'created_at'>
+
+export interface PlanProduccion {
+  id: string
+  evento_id: string
+  receta_id: string
+  unidades_a_producir: number
+  created_at: string
+}
+
+export type PlanProduccionInput = Omit<PlanProduccion, 'id' | 'created_at'>
+
+// One row in the per-receta breakdown (REQ-EVENTS-22). Carries the
+// receta name so the UI can render the list without a second lookup.
+export interface LineaProyeccion {
+  recetaId: string
+  recetaNombre: string
+  unidades: number
+  costoPorUnidad: number
+  costoLinea: number
+  advertencia?: 'RECETA_FALTANTE' | 'MATERIA_PRIMA_FALTANTE'
+}
+
+// One row in the per-gasto breakdown (REQ-EVENTS-22).
+export interface DesgloseFijo {
+  gastoId: string
+  categoria: CategoriaGasto
+  monto: number
+  descripcion: string | null
+}
+
+// One row in the per-receta fixed-cost side (REQ-EVENTS-22). Lives
+// next to DesgloseFijo so the projection card can render two
+// independent lists without re-deriving the breakdown.
+export interface DesgloseVariable {
+  recetaId: string
+  recetaNombre: string
+  costoLinea: number
+}
+
+// Top-level projection return type consumed by ProyeccionCostosCard
+// (REQ-EVENTS-20). costoPorUnidad at the top level is intentionally
+// absent — it is OUT OF SCOPE v1 per REQ-EVENTS-23/24 and lives in
+// per-receta LineaProyeccion entries only.
+export interface ProyeccionResultado {
+  costosFijos: number
+  costosVariables: number
+  costoTotal: number
+  lineas: LineaProyeccion[]
+  desgloseFijos: DesgloseFijo[]
+  desgloseVariables: DesgloseVariable[]
+}
