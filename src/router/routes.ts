@@ -24,6 +24,21 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/RecetaDetalleView.vue'),
   },
   {
+    path: '/eventos',
+    name: 'eventos',
+    component: () => import('@/views/EventosView.vue'),
+  },
+  {
+    path: '/eventos/:id',
+    name: 'evento-detalle',
+    component: () => import('@/views/EventoDetalleView.vue'),
+  },
+  {
+    path: '/eventos/:id/planificar',
+    name: 'planificar-evento',
+    component: () => import('@/views/PlanificarEventoView.vue'),
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
