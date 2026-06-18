@@ -22,7 +22,7 @@ import { useGastosImprevistos } from '@/composables/useGastosImprevistos'
 import { useGastosFijos } from '@/composables/useGastosFijos'
 import { useVentas } from '@/composables/useVentas'
 import { estadoEsEditable } from '@/utils/estado'
-import type { CierreCajaInput, CategoriaImprevisto } from '@/types'
+import type { CierreCajaInput, GastoImprevistoInput } from '@/types'
 
 const router = useRouter()
 const { eventos, cargarTodas, cambiarEstado } = useEvents()
@@ -126,17 +126,13 @@ const dialogo = ref<Dialogo>({ tipo: 'cerrado' })
 const dialogoCerrar = ref(false)
 const editValores = computed(() => null)
 
-async function manejarSubmitImprevisto(input: {
-  monto: number
-  motivo: string
-  categoria: CategoriaImprevisto
-}) {
+async function manejarSubmitImprevisto(input: GastoImprevistoInput) {
   if (!eventoActivo.value) return
   await crearImprevisto({
     evento_id: eventoActivo.value.id,
     monto: input.monto,
     motivo: input.motivo,
-    categoria: input.categoria,
+    categoria: input.categoria ?? 'otro',
   })
   dialogo.value = { tipo: 'cerrado' }
 }

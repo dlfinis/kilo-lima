@@ -19,7 +19,6 @@ import { __pushSupabaseResponse, __resetSupabaseMock } from '../../tests/setup'
 import CierresCajaView from './CierresCajaView.vue'
 import { useEventsStore } from '@/stores/events.store'
 import { useCierresCajaStore } from '@/stores/cierresCaja.store'
-import { useGastosImprevistosStore } from '@/stores/gastosImprevistos.store'
 import type {
   CierreCaja,
   Database,

@@ -165,7 +165,8 @@ export const useGastosImprevistosStore = defineStore('gastosImprevistos', () => 
 
   function totalPorEvento(eventoId: string) {
     return computed<number>(() => {
-      const lista = gastosPorEvento.value.get(eventoId) ?? []
+      const raw = gastosPorEvento.value.get(eventoId)
+      const lista = Array.isArray(raw) ? raw : []
       const suma = lista.reduce((acc, g) => acc + (Number.isFinite(g.monto) ? g.monto : 0), 0)
       return redondearCentavos(suma)
     })
