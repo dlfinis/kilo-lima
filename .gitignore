@@ -143,3 +143,13 @@ vite.config.ts.timestamp-*
 .vite/
 
 .cgcignore
+
+# sdd-agent scratch (intermediate state from sub-agent runs)
+sdd/
+
+# Vite PWA dev artifacts
+dev-dist/
+
+# Local scratch verification scripts (Puppeteer one-offs)
+verify-*.mjs
+quick-verify.mjs
