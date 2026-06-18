@@ -134,10 +134,10 @@ Chain strategy: stacked-to-main
 
 ## PR4 — Router + docs + verify (~80 lines)
 
-  - [ ] **PR4-T1** `REQ-EVENTS-33,34,35` | `src/router/routes.ts` — append 3 lazy routes before catch-all: `/eventos` → `EventosView`, `/eventos/:id` → `EventoDetalleView`, `/eventos/:id/planificar` → `PlanificarEventoView`. Dep: PR2b-T10, PR2b-T12, PR3-T15. Commit: `feat(events): add 3 lazy routes for eventos`. Verify: `pnpm typecheck` passes; navigating to each route renders correct view. ~20 lines
-  - [ ] **PR4-T2** `REQ-EVENTS-33,34,35` | `src/router/routes.spec.ts` — add 3 expect assertions for the new routes (matches catalog pattern). Dep: PR4-T1. Commit: `test(events): add route assertions for eventos routes`. Verify: 3 new assertions pass; `pnpm test` exits 0. ~10 lines
-  - [ ] **PR4-T3** `REQ-EVENTS-28,29` | `docs/events-setup.md` — finalize: review and polish setup instructions. Dep: PR1-T10. Commit: `docs(events): finalize events-setup.md`. Verify: document covers migration + bypass steps. ~15 lines
-  - [ ] **PR4-T4** `REQ-EVENTS-45` | Final verification gate — `pnpm typecheck && pnpm lint && pnpm test && pnpm build`. Dep: all previous. Commit: `chore(events): final verify — typecheck, lint, test, build`. Verify: all 4 exit 0; ≥124 tests passing (foundation 4 + catalog 60 + events 60). ~0 lines
+  - [x] **PR4-T1** `REQ-EVENTS-33,34,35` | `src/router/routes.ts` — append 3 lazy routes before catch-all: `/eventos` → `EventosView`, `/eventos/:id` → `EventoDetalleView`, `/eventos/:id/planificar` → `PlanificarEventoView`. Dep: PR2b-T10, PR2b-T12, PR3-T15. Commit: `feat(events): add 3 lazy routes for eventos`. Verify: `pnpm typecheck` passes; navigating to each route renders correct view. ~20 lines
+  - [x] **PR4-T2** `REQ-EVENTS-33,34,35` | `src/router/routes.spec.ts` — add 3 expect assertions for the new routes (matches catalog pattern). Dep: PR4-T1. Commit: `test(events): add route assertions for eventos routes`. Verify: 3 new assertions pass; `pnpm test` exits 0. ~10 lines
+  - [x] **PR4-T3** `REQ-EVENTS-28,29` | `docs/events-setup.md` — finalize: review and polish setup instructions. Dep: PR1-T10. Commit: `docs(events): finalize events-setup.md`. Verify: document covers migration + bypass steps. ~15 lines
+  - [x] **PR4-T4** `REQ-EVENTS-45` | Final verification gate — `pnpm typecheck && pnpm lint && pnpm test && pnpm build`. Dep: all previous. Commit: `chore(events): final verify — typecheck, lint, test, build`. Verify: all 4 exit 0; ≥124 tests passing (foundation 4 + catalog 60 + events 60). ~0 lines
 
 ---
 
