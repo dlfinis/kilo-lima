@@ -207,56 +207,59 @@ function reintentar() {
           />
         </v-col>
       </v-row>
-
-      <!-- REQ-POS-40: collapsible Gastos Imprevistos de esta feria.
-           Collapsed by default so the grid + cart stay front-and-center;
-           expanding reveals the CRUD list + total. -->
-      <v-card class="mt-4" data-testid="pos-imprevistos">
-        <v-card-title
-          class="d-flex align-center"
-          data-testid="pos-imprevistos-titulo"
-          @click="toggleImprevistos"
-        >
-          <v-icon class="mr-2">{{ imprevistosAbierto ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
-          <span>Gastos imprevistos de esta feria</span>
-          <v-spacer />
-          <v-chip size="small" data-testid="pos-imprevistos-total">
-            Total: ${{ totalImprevistos.toFixed(2) }}
-          </v-chip>
-        </v-card-title>
-        <v-expand-transition>
-          <div v-show="imprevistosAbierto">
-            <v-card-text>
-              <v-list v-if="listaImprevistos.length > 0" data-testid="pos-imprevistos-lista">
-                <GastoImprevistoListItem
-                  v-for="gasto in listaImprevistos"
-                  :key="gasto.id"
-                  :gasto="gasto"
-                  @eliminar="manejarEliminarImprevisto"
-                />
-              </v-list>
-              <p
-                v-else
-                class="text-medium-emphasis"
-                data-testid="pos-imprevistos-empty"
-              >
-                Sin imprevistos todavía.
-              </p>
-              <v-btn
-                color="primary"
-                size="small"
-                prepend-icon="mdi-plus"
-                class="mt-2"
-                data-testid="pos-imprevistos-nuevo"
-                @click="dialogoCrearImprevisto = true"
-              >
-                Nuevo imprevisto
-              </v-btn>
-            </v-card-text>
-          </div>
-        </v-expand-transition>
-      </v-card>
     </template>
+
+    <!-- REQ-POS-40: collapsible Gastos Imprevistos de esta feria.
+         Always rendered (even with no evento) so the section is
+         visible — collapsing reveals the CRUD list + total.
+         When no evento en_curso exists, the list stays empty and the
+         add button is disabled (evento is the foreign key target). -->
+    <v-card class="mt-4" data-testid="pos-imprevistos">
+      <v-card-title
+        class="d-flex align-center"
+        data-testid="pos-imprevistos-titulo"
+        @click="toggleImprevistos"
+      >
+        <v-icon class="mr-2">{{ imprevistosAbierto ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
+        <span>Gastos imprevistos de esta feria</span>
+        <v-spacer />
+        <v-chip size="small" data-testid="pos-imprevistos-total">
+          Total: ${{ totalImprevistos.toFixed(2) }}
+        </v-chip>
+      </v-card-title>
+      <v-expand-transition>
+        <div v-show="imprevistosAbierto">
+          <v-card-text>
+            <v-list v-if="listaImprevistos.length > 0" data-testid="pos-imprevistos-lista">
+              <GastoImprevistoListItem
+                v-for="gasto in listaImprevistos"
+                :key="gasto.id"
+                :gasto="gasto"
+                @eliminar="manejarEliminarImprevisto"
+              />
+            </v-list>
+            <p
+              v-else
+              class="text-medium-emphasis"
+              data-testid="pos-imprevistos-empty"
+            >
+              {{ eventoEnCurso ? 'Sin imprevistos todavía.' : 'Activá un evento para registrar imprevistos.' }}
+            </p>
+            <v-btn
+              color="primary"
+              size="small"
+              prepend-icon="mdi-plus"
+              class="mt-2"
+              :disabled="!eventoEnCurso"
+              data-testid="pos-imprevistos-nuevo"
+              @click="dialogoCrearImprevisto = true"
+            >
+              Nuevo imprevisto
+            </v-btn>
+          </v-card-text>
+        </div>
+      </v-expand-transition>
+    </v-card>
 
     <v-dialog
       v-model="dialogoCrearImprevisto"
@@ -267,7 +270,7 @@ function reintentar() {
         <v-card-title>Nuevo gasto imprevisto</v-card-title>
         <v-card-text>
           <GastoImprevistoForm
-            :editable="true"
+            :editable="!!eventoEnCurso"
             @submit="manejarSubmitImprevisto"
             @cancel="dialogoCrearImprevisto = false"
           />
