@@ -23,6 +23,7 @@ import type {
   RecetaConIngredientes,
 } from '@/types'
 import { useEventsStore } from '@/stores/events.store'
+import { useGastosFijosStore } from '@/stores/gastosFijos.store'
 import { usePlansStore } from '@/stores/plans.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
@@ -120,6 +121,7 @@ export function useProyeccionCostos(
   eventoId: MaybeRefOrGetter<string | null>,
 ): ComputedRef<ProyeccionResultado | null> {
   const eventsStore = useEventsStore()
+  const gastosStore = useGastosFijosStore()
   const plansStore = usePlansStore()
   const recipesStore = useRecipesStore()
   const ingredientsStore = useIngredientsStore()
@@ -132,7 +134,9 @@ export function useProyeccionCostos(
         ? eventsStore.eventoActual
         : eventsStore.eventos.find((e: Evento) => e.id === id) ?? null
     if (!evento) return null
-    const gastosFijos = eventsStore.gastosFijos.filter((g: GastoFijo) => g.evento_id === id)
+    // PR2a: gastos moved to their own store, keyed by evento_id in a
+    // Map for O(1) detail-view reads.
+    const gastosFijos = gastosStore.gastosPorEvento.get(id) ?? []
     const plan = plansStore.plan.filter((p: PlanProduccion) => p.evento_id === id)
     return calcularProyeccion(
       evento,
