@@ -10,6 +10,7 @@
       <div id="app-root">
         <h1>Kilo-Lima</h1>
       </div>
+      <router-view />
     </v-main>
   </v-app>
 </template>

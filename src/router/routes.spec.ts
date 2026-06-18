@@ -68,4 +68,18 @@ describe('routes', () => {
       expect(ruta.redirect).toBe('/')
     })
   })
+
+  describe('pos routes (PR2)', () => {
+    it('registers /productos with a lazy component (REQ-POS-46)', () => {
+      const ruta = encontrar('/productos')
+      expect(ruta.name).toBe('productos')
+      expect(typeof ruta.component).toBe('function')
+    })
+
+    it('registers /pos with a lazy component (REQ-POS-45)', () => {
+      const ruta = encontrar('/pos')
+      expect(ruta.name).toBe('pos')
+      expect(typeof ruta.component).toBe('function')
+    })
+  })
 })
