@@ -134,4 +134,37 @@ describe('RecetaDetalleView', () => {
     const calculo = desglose.props('calculo') as { ingredientes: { advertencia?: string }[] }
     expect(calculo.ingredientes[0]?.advertencia).toBe('MATERIA_PRIMA_FALTANTE')
   })
+
+  // REQ-POS-47 cross-slice: when the receta has no producto yet, the
+  // detail view shows a "Vender esta receta" button that opens a
+  // quick-create dialog. The actual crear call lands via the productos
+  // store; for the spec we only assert the button + dialog surface.
+  it('shows "Vender esta receta" when the receta has no producto yet (REQ-POS-47)', async () => {
+    const wrapper = await montarVista('r-1')
+    const { useRecipesStore } = await import('@/stores/recipes.store')
+    await aplicacion.runWithContext(() => {
+      useRecipesStore().recetas.push(mkReceta('r-1'))
+    })
+    await flushPromises()
+
+    const boton = wrapper.find('[data-testid="receta-detalle-vender"]')
+    expect(boton.exists()).toBe(true)
+    expect(boton.text()).toContain('Vender esta receta')
+  })
+
+  it('opens the quick-create dialog with precio_venta input when "Vender esta receta" is clicked (REQ-POS-47)', async () => {
+    const wrapper = await montarVista('r-1')
+    const { useRecipesStore } = await import('@/stores/recipes.store')
+    await aplicacion.runWithContext(() => {
+      useRecipesStore().recetas.push(mkReceta('r-1'))
+    })
+    await flushPromises()
+
+    await wrapper.find('[data-testid="receta-detalle-vender"]').trigger('click')
+    await flushPromises()
+
+    // Dialog teleports to body; check globally.
+    expect(document.body.textContent).toContain('Vender esta receta')
+    expect(document.querySelector('form.producto-form')).not.toBeNull()
+  })
 })
