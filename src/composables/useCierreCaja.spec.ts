@@ -1,19 +1,23 @@
-// REQ-POS-30, REQ-POS-31, REQ-POS-33, REQ-POS-35, REQ-POS-44, REQ-POS-56:
+// REQ-POS-30, REQ-POS-31, REQ-POS-33, REQ-POS-35, REQ-POS-36,
+// REQ-POS-44, REQ-POS-56:
 // useCierreCaja composable. PR1 wires the reactive bridge between
 // `cierresCaja.store` + `ventas.store` + `gastosFijos.store` +
-// `gastosImprevistos.store` + the pure `calcularCierre` helper. Full
-// registrarCierre lands in PR4. Tests cover:
+// `gastosImprevistos.store` + the pure `calcularCierre` helper. PR4
+// adds `registrarCierre` to the composable surface. Tests cover:
 //   - resumen is null when eventoId is null
 //   - cierre resolves to the cached row whose evento_id matches
 //   - resumen aggregates ventas + gastos fijos + imprevistos
 //   - resumen picks up cierre.efectivo_esperado / efectivo_real when
 //     present (so the view can pre-fill the inputs after a prior cierre)
+//   - registrarCierre proxies to the store
 import { beforeEach, describe, expect, it } from 'vitest'
 import { createPinia, setActivePinia } from 'pinia'
 import { createApp, type App } from 'vue'
 import { createClient } from '@supabase/supabase-js'
 import type { SupabaseClient } from '@supabase/supabase-js'
-import type { Database } from '@/types'
+
+import { __pushSupabaseResponse, __resetSupabaseMock } from '../../tests/setup'
+import type { CierreCaja, CierreCajaInput, Database } from '@/types'
 import { useCierreCaja } from './useCierreCaja'
 import { useCierresCajaStore } from '@/stores/cierresCaja.store'
 import { useVentasStore } from '@/stores/ventas.store'
@@ -113,7 +117,7 @@ describe('useCierreCaja — PR1 reactive bridge (REQ-POS-30, REQ-POS-31)', () =>
           created_at: '2026-06-19T09:00:00Z',
         },
       ])
-      gastosImprevistosStore.gastos = [
+      gastosImprevistosStore.gastosPorEvento.set('e-1', [
         {
           id: 'gi-1',
           evento_id: 'e-1',
@@ -122,7 +126,7 @@ describe('useCierreCaja — PR1 reactive bridge (REQ-POS-30, REQ-POS-31)', () =>
           categoria: 'insumos_extra',
           created_at: '2026-06-19T11:00:00Z',
         },
-      ]
+      ])
 
       const { resumen } = useCierreCaja(() => 'e-1')
       expect(resumen.value?.totalVentas).toBe(50)
@@ -174,6 +178,46 @@ describe('useCierreCaja — PR1 reactive bridge (REQ-POS-30, REQ-POS-31)', () =>
       const { resumen } = useCierreCaja(() => 'e-1')
       expect(resumen.value?.totalVentas).toBe(0)
       expect(resumen.value?.cantidadVentas).toBe(0)
+    })
+  })
+
+  it('registrarCierre proxies the store action and returns the cierre row (REQ-POS-36)', async () => {
+    const creado: CierreCaja = {
+      id: 'cc-new',
+      evento_id: 'e-1',
+      fecha_cierre: '2026-06-19T20:00:00Z',
+      total_ventas: 100,
+      total_gastos_fijos: 30,
+      total_gastos_imprevistos: 20,
+      utilidad_bruta: 50,
+      efectivo_esperado: null,
+      efectivo_real: null,
+      diferencia: null,
+      notas: null,
+      created_at: '2026-06-19T20:00:00Z',
+    }
+    __resetSupabaseMock()
+    __pushSupabaseResponse<CierreCaja>({ data: creado, error: null })
+
+    await conContexto(async () => {
+      const { registrarCierre } = useCierreCaja(() => 'e-1')
+      const input: CierreCajaInput = {
+        evento_id: 'e-1',
+        total_ventas: 100,
+        total_gastos_fijos: 30,
+        total_gastos_imprevistos: 20,
+        utilidad_bruta: 50,
+        efectivo_esperado: null,
+        efectivo_real: null,
+        diferencia: null,
+        notas: null,
+      }
+      const resultado = await registrarCierre(input)
+      expect(resultado.error).toBeNull()
+      expect(resultado.data?.id).toBe('cc-new')
+
+      const cierresStore = useCierresCajaStore()
+      expect(cierresStore.cierre?.id).toBe('cc-new')
     })
   })
 })

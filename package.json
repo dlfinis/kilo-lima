@@ -18,7 +18,9 @@
     "test": "vitest run",
     "typecheck": "vue-tsc --noEmit -p tsconfig.app.json",
     "verify:pr1": "node scripts/verify-pr1.mjs",
-    "verify:pr2": "node scripts/verify-pr2.mjs"
+    "verify:pr2": "node scripts/verify-pr2.mjs",
+    "verify:pr3": "node scripts/verify-pr3.mjs",
+    "verify:pr4": "node scripts/verify-pr4.mjs"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.108.2",
