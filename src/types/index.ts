@@ -27,3 +27,22 @@ export type {
   DesgloseFijo,
   DesgloseVariable,
 } from './events.types'
+export type {
+  MetodoPago,
+  CategoriaImprevisto,
+  Producto,
+  ProductoInput,
+  Venta,
+  VentaInput,
+  VentaItem,
+  VentaItemInput,
+  VentaConItems,
+  GastoImprevisto,
+  GastoImprevistoInput,
+  CierreCaja,
+  CierreCajaInput,
+  LineaCarrito,
+  ResumenCarrito,
+  CierreInput,
+  CierreResultado,
+} from './pos.types'
