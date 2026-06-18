@@ -2,21 +2,22 @@
 // REQ-POS-1, REQ-POS-3, REQ-POS-4, REQ-POS-24, REQ-POS-46, REQ-POS-49,
 // REQ-POS-50, REQ-POS-54: product management view. Four UX states
 // (loading/empty/error/data — REQ-POS-49), filter by `disponible`,
-// create/edit/delete/toggle dialogs. The actual cart wiring lands
-// in PR3, so the "Agregar al carrito" button on each card is wired
-// to a no-op toast for now (REQ-POS-21/REQ-POS-20 are satisfied in
-// PR3).
+// create/edit/delete/toggle dialogs. The "Agregar al carrito" CTA
+// now wires into `useVentas().agregarAlCarrito` (REQ-POS-7,
+// REQ-POS-20) — PR3 ships the cart store + composable.
 import { computed, onMounted, ref } from 'vue'
 
 import ProductoCard from '@/components/business/ProductoCard.vue'
 import ProductoForm from '@/components/business/ProductoForm.vue'
 import { useProductos } from '@/composables/useProductos'
 import { useRecipes } from '@/composables/useRecipes'
+import { useVentas } from '@/composables/useVentas'
 import type { Producto, ProductoInput } from '@/types'
 
 const { productos, cargando, error, cargarTodas, crear, actualizar, toggleDisponible, eliminar } =
   useProductos()
 const { recetas, cargarTodas: cargarRecetas } = useRecipes()
+const { agregarAlCarrito } = useVentas()
 
 type Dialogo =
   | { tipo: 'cerrado' }
@@ -81,10 +82,10 @@ function abrirEliminar(id: string) {
 }
 
 async function alAgregar(productoId: string) {
-  // PR3 wires the cart store here. PR2 keeps the button enabled so the
-  // user can preview the UX while we land the cart composable.
-  // Intentional no-op.
-  void productoId
+  const producto = productos.value.find((p) => p.id === productoId)
+  if (!producto) return
+  const receta = recetas.value.find((r) => r.id === producto.receta_id)
+  agregarAlCarrito(productoId, receta?.nombre ?? 'Receta', producto.precio_venta)
 }
 
 function cerrarDialogo() {

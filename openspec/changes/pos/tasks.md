@@ -47,16 +47,20 @@ Chain strategy: stacked-to-main
 
 ## PR 3 — Ventas + Cart + Components + PosView
 
-- [ ] 3.1 Write `src/services/ventas.service.spec.ts` (RED) — `listarPorEvento`, `registrarVenta` header+items, item failure rollback
-- [ ] 3.2 Implement `src/services/ventas.service.ts` (GREEN) — Factory with `registrarVenta(input)` chain (insert header → Promise.all items)
-- [ ] 3.3 Write `src/stores/ventas.store.spec.ts` (RED) — Cart state machine: agregar/quitar/vaciar/actualizarCantidad (qty=0 removes, qty≥99 capped) + optimistic registrarVenta + revert-on-failure
-- [ ] 3.4 Implement `src/stores/ventas.store.ts` (GREEN) — Pinia store with carrito ref, `// TODO(offline-sync):` marker, `estadoEsEditable` guard, SIN_EVENTO_ACTIVO
-- [ ] 3.5 Write `src/composables/useVentas.spec.ts` (RED) — Cart math (subtotal, total, itemCount, merge duplicates)
-- [ ] 3.6 Implement `src/composables/useVentas.ts` (GREEN) — `storeToRefs` + cart helper wrappers
-- [ ] 3.7 Write 5 component specs (RED) — ProductoCard, ProductoGrid, CarritoPanel, VentaItem, RegistrarVentaDialog
-- [ ] 3.8 Implement 5 components (GREEN) — Cards (≥48px tap), responsive grid, sidebar/bottom-sheet panel, quantity controls, payment dialog
-- [ ] 3.9 Write `src/views/PosView.spec.ts` (RED) — event picker vs grid, 4-state (loading/error/empty/data), no-evento guard, cerrado read-only
-- [ ] 3.10 Implement `src/views/PosView.vue` (GREEN) — Main POS: eventoEnCurso check, grid+cart+imprevistos section+online-status chip (REQ-POS-49)
+- [x] 3.1 Write `src/services/ventas.service.spec.ts` (RED) — `listarPorEvento`, `registrarVenta` header+items, item failure rollback
+- [x] 3.2 Implement `src/services/ventas.service.ts` (GREEN) — Factory with `registrarVenta(input)` chain (insert header → Promise.all items)
+- [x] 3.3 Write `src/stores/ventas.store.spec.ts` (RED) — Cart state machine: agregar/quitar/vaciar/actualizarCantidad (qty=0 removes, qty≥99 capped) + optimistic registrarVenta + revert-on-failure
+- [x] 3.4 Implement `src/stores/ventas.store.ts` (GREEN) — Pinia store with carrito ref, `// TODO(offline-sync):` marker, `estadoEsEditable` guard, SIN_EVENTO_ACTIVO
+- [x] 3.5 Write `src/composables/useVentas.spec.ts` (RED) — Cart math (subtotal, total, itemCount, merge duplicates)
+- [x] 3.6 Implement `src/composables/useVentas.ts` (GREEN) — `storeToRefs` + cart helper wrappers
+- [x] 3.7 Write 5 component specs (RED) — ProductoCard (PR2), ProductoGrid, CarritoPanel, VentaItem, RegistrarVentaDialog
+- [x] 3.8 Implement 5 components (GREEN) — Cards (≥48px tap), responsive grid, sidebar/bottom-sheet panel, quantity controls, payment dialog
+- [x] 3.9 Write `src/views/PosView.spec.ts` (RED) — event picker vs grid, 4-state (loading/error/empty/data), no-evento guard, cerrado read-only
+- [x] 3.10 Implement `src/views/PosView.vue` (GREEN) — Main POS: eventoEnCurso check, grid+cart+imprevistos section+online-status chip (REQ-POS-49)
+- [x] 3.11 Write `scripts/verify-pr3.mjs` — Puppeteer real browser verification gate
+- [x] 3.12 Add `verify:pr3` script to `package.json`
+- [x] 3.13 Update `src/router/routes.ts` — `/pos` route now points to `PosView.vue` (was the ProductosView placeholder)
+- [x] 3.14 Update `src/views/ProductosView.vue` — Wire "Agregar al carrito" button to `useVentas().agregarAlCarrito`
 
 ## PR 4 — Gastos Imprevistos + Cierre
 

@@ -1,45 +1,86 @@
-// REQ-POS-6, REQ-POS-7..14, REQ-POS-15, REQ-POS-16, REQ-POS-51, REQ-POS-55:
-// PR1 skeleton — full cart state + registrarVenta action lives in
-// PR3 (with optimistic UI and revert-on-failure). PR1 ships the
-// reactive refs and the helpers PR3 will compose. Cross-store READS
-// (eventsStore.eventoEnCurso) happen inside `computed()` — WRITES are
-// forbidden per REQ-POS-51.
+// REQ-POS-6, REQ-POS-7, REQ-POS-8, REQ-POS-9, REQ-POS-10, REQ-POS-11,
+// REQ-POS-12, REQ-POS-13, REQ-POS-14, REQ-POS-15, REQ-POS-16,
+// REQ-POS-17, REQ-POS-39, REQ-POS-44, REQ-POS-51, REQ-POS-55:
+//
+// PR3 full implementation. PR1 shipped the cart helpers and the
+// reactive refs; PR3 wires the optimistic `registrarVenta` action
+// with revert-on-failure (REQ-POS-14) and the cross-store READ for
+// `eventoEnCurso` (REQ-POS-51).
+//
+// `registrarVenta` flow:
+//   1. Empty-cart guard → VENTA_SIN_ITEMS (REQ-POS-15, REQ-POS-17)
+//   2. No evento en_curso → SIN_EVENTO_ACTIVO (REQ-POS-16)
+//   3. Evento cerrado → EVENTO_CERRADO (REQ-POS-39)
+//   4. Snapshot carrito → clear carrito → show success toast (optimistic)
+//   5. Call servicio.registrarVenta()
+//      - success: append venta, keep toast
+//      - failure: restore carrito, swap toast to error
+//
+// // TODO(offline-sync): persistence for carrito — v1 is online-only
+// per REQ-POS-6 / REQ-POS-14. Offline-sync slice will add WAL
+// persistence. The cart lives in Pinia memory only.
 import { computed, inject, ref } from 'vue'
 import { defineStore } from 'pinia'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type {
   Database,
+  Evento,
   LineaCarrito,
+  MetodoPago,
   ServiceError,
   VentaConItems,
 } from '@/types'
+import { estadoEsEditable } from '@/utils/estado'
+import { crearVentasService, type VentasService } from '@/services/ventas.service'
+import { useEventsStore } from './events.store'
 
 const LIMITE_CANTIDAD_MAX = 99
+const MENSAJE_ERROR_CARGA = 'Error al cargar las ventas'
+
 const CODIGO_SIN_EVENTO: ServiceError = {
   code: 'SIN_EVENTO_ACTIVO',
   message: 'No hay un evento en curso',
 }
-const CODIGO_CANTIDAD_INVALIDA: ServiceError = {
-  code: 'CANTIDAD_INVALIDA',
-  message: 'La cantidad debe estar entre 1 y 99',
+const CODIGO_EVENTO_CERRADO: ServiceError = {
+  code: 'EVENTO_CERRADO',
+  message: 'El evento está cerrado',
+}
+const CODIGO_VENTA_SIN_ITEMS: ServiceError = {
+  code: 'VENTA_SIN_ITEMS',
+  message: 'El carrito está vacío',
+}
+
+export type ToastVenta =
+  | { tipo: 'success'; mensaje: string }
+  | { tipo: 'error'; mensaje: string }
+  | null
+
+function redondear2(n: number): number {
+  return Math.round((n + Number.EPSILON) * 100) / 100
 }
 
 export const useVentasStore = defineStore('ventas', () => {
-  // PR1 injects supabase to keep the contract uniform with PR3 — the
-  // real registrarVenta path needs it. PR1 doesn't call Supabase yet.
   const supabaseInyectado = inject<SupabaseClient<Database>>('supabase')
   if (!supabaseInyectado) {
     throw new Error('Supabase client no inyectado — ¿servicesPlugin instalado?')
   }
-  // Suppress unused until PR3 wires registrarVenta — keeps the strict
-  // typed client resolution live.
-  void supabaseInyectado
+  const supabase: SupabaseClient<Database> = supabaseInyectado
+  const servicio: VentasService = crearVentasService(supabase)
 
   const ventas = ref<VentaConItems[]>([])
   const carrito = ref<LineaCarrito[]>([])
   const cargando = ref<boolean>(false)
   const error = ref<string | null>(null)
+  const toast = ref<ToastVenta>(null)
+
+  // REQ-POS-51: cross-store READ inside computed. WRITES are
+  // forbidden — ventas.store.registrarVenta never mutates
+  // eventsStore. The active evento is the first one in `en_curso`.
+  const eventsStore = useEventsStore()
+  const eventoEnCurso = computed<Evento | null>(
+    () => eventsStore.eventos.find((e) => e.estado === 'en_curso') ?? null,
+  )
 
   function agregarAlCarrito(productoId: string, nombre: string, precioUnitario: number): void {
     const existente = carrito.value.find((l) => l.producto_id === productoId)
@@ -47,7 +88,7 @@ export const useVentasStore = defineStore('ventas', () => {
       if (existente.cantidad >= LIMITE_CANTIDAD_MAX) return
       const nuevaCantidad = existente.cantidad + 1
       existente.cantidad = nuevaCantidad
-      existente.subtotal = Math.round((nuevaCantidad * precioUnitario + Number.EPSILON) * 100) / 100
+      existente.subtotal = redondear2(nuevaCantidad * precioUnitario)
       return
     }
     carrito.value = [
@@ -66,7 +107,7 @@ export const useVentasStore = defineStore('ventas', () => {
     if (!linea) return
     const capped = Math.min(cantidad, LIMITE_CANTIDAD_MAX)
     linea.cantidad = capped
-    linea.subtotal = Math.round((capped * linea.precio_unitario + Number.EPSILON) * 100) / 100
+    linea.subtotal = redondear2(capped * linea.precio_unitario)
   }
 
   function quitarDelCarrito(productoId: string): void {
@@ -78,24 +119,108 @@ export const useVentasStore = defineStore('ventas', () => {
   }
 
   const totalCarrito = computed<number>(() =>
-    Math.round((carrito.value.reduce((acc, l) => acc + l.subtotal, 0) + Number.EPSILON) * 100) / 100,
+    redondear2(carrito.value.reduce((acc, l) => acc + l.subtotal, 0)),
   )
   const cantidadItems = computed<number>(() =>
     carrito.value.reduce((acc, l) => acc + l.cantidad, 0),
   )
+
+  async function cargarPorEvento(eventoId: string): Promise<void> {
+    cargando.value = true
+    error.value = null
+    const res = await servicio.listarPorEvento(eventoId)
+    cargando.value = false
+    if (res.error) {
+      error.value = MENSAJE_ERROR_CARGA
+      ventas.value = []
+      return
+    }
+    ventas.value = res.data ?? []
+  }
+
+  function descartarToast(): void {
+    toast.value = null
+  }
+
+  async function registrarVenta(
+    metodoPago: MetodoPago,
+  ): Promise<{ data: VentaConItems | null; error: ServiceError | null }> {
+    // 1) Empty-cart guard (REQ-POS-15, REQ-POS-17).
+    if (carrito.value.length === 0) {
+      const err = CODIGO_VENTA_SIN_ITEMS
+      toast.value = { tipo: 'error', mensaje: err.message }
+      return { data: null, error: err }
+    }
+    // 2) No active evento (REQ-POS-16). When a non-editable evento
+    // exists, surface EVENTO_CERRADO instead — it's the more actionable
+    // message ("this evento is frozen") than "no active evento".
+    const evento = eventoEnCurso.value
+    if (!evento) {
+      const hayCerrado = eventsStore.eventos.some((e) => e.estado === 'cerrado')
+      if (hayCerrado) {
+        toast.value = { tipo: 'error', mensaje: CODIGO_EVENTO_CERRADO.message }
+        return { data: null, error: CODIGO_EVENTO_CERRADO }
+      }
+      toast.value = { tipo: 'error', mensaje: CODIGO_SIN_EVENTO.message }
+      return { data: null, error: CODIGO_SIN_EVENTO }
+    }
+    // 3) Frozen evento (REQ-POS-39).
+    if (!estadoEsEditable(evento.estado)) {
+      toast.value = { tipo: 'error', mensaje: CODIGO_EVENTO_CERRADO.message }
+      return { data: null, error: CODIGO_EVENTO_CERRADO }
+    }
+
+    // 4) Snapshot carrito + clear immediately (REQ-POS-14 optimistic).
+    const snapshot = carrito.value.map((l) => ({ ...l }))
+    const total = totalCarrito.value
+    carrito.value = []
+    toast.value = {
+      tipo: 'success',
+      mensaje: `🎉 Venta registrada: $${total.toFixed(2)}`,
+    }
+
+    // 5) Call service. On failure: restore snapshot + swap toast.
+    const res = await servicio.registrarVenta({
+      evento_id: evento.id,
+      metodo_pago: metodoPago,
+      total,
+      items: snapshot.map((l) => ({
+        producto_id: l.producto_id,
+        cantidad: l.cantidad,
+        precio_unitario: l.precio_unitario,
+        subtotal: l.subtotal,
+      })),
+    })
+    if (res.error || !res.data) {
+      carrito.value = snapshot
+      toast.value = {
+        tipo: 'error',
+        mensaje: '❌ Error al registrar venta — revisá tu conexión',
+      }
+      return { data: null, error: res.error }
+    }
+    ventas.value = [res.data, ...ventas.value]
+    return { data: res.data, error: null }
+  }
 
   return {
     ventas,
     carrito,
     cargando,
     error,
+    toast,
+    eventoEnCurso,
     totalCarrito,
     cantidadItems,
     agregarAlCarrito,
     actualizarCantidad,
     quitarDelCarrito,
     vaciarCarrito,
+    cargarPorEvento,
+    registrarVenta,
+    descartarToast,
     CODIGO_SIN_EVENTO,
-    CODIGO_CANTIDAD_INVALIDA,
+    CODIGO_EVENTO_CERRADO,
+    CODIGO_VENTA_SIN_ITEMS,
   }
 })

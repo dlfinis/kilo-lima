@@ -46,9 +46,9 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/pos',
     name: 'pos',
-    // PosView lands in PR3; PR2 ships the route so the URL is reserved
-    // and the Productos CRUD surface can deep-link from the home page.
-    component: () => import('@/views/ProductosView.vue'),
+    // PosView ships in PR3 — the box-office surface (grid + cart +
+    // registrar venta flow). Lazy-loaded so the chunk stays small.
+    component: () => import('@/views/PosView.vue'),
   },
   {
     path: '/:pathMatch(.*)*',
