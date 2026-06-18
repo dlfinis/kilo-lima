@@ -28,3 +28,17 @@ Supabase Dashboard SQL Editor. No `supabase` CLI required.
 
 After both queries succeed, restart `pnpm dev`. The Eventos list page
 will load data through the anon key.
+
+## Verify
+
+Once the PWA is running, the events slice exposes three lazy routes:
+
+- **`/eventos`** — list page with filter tabs (Todos / Planificación / En curso /
+  Cerrado). Empty state shows "Crear primer evento" until you add data.
+- **`/eventos/:id`** — detail page with gastos fijos, plan link, and the
+  `ProyeccionCostosCard` breakdown.
+- **`/eventos/:id/planificar`** — full-width planning grid. Redirects to the
+  detail page with `?mensaje=evento-cerrado` when the evento is `cerrado`.
+
+To confirm tables were created, run `select * from public.eventos;` in the SQL
+Editor — it should return `0 rows` with no errors.

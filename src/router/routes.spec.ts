@@ -34,6 +34,29 @@ describe('routes', () => {
     })
   })
 
+  describe('events routes', () => {
+    it('registers /eventos with a lazy component', () => {
+      const ruta = encontrar('/eventos')
+      expect(ruta.name).toBe('eventos')
+      expect(typeof ruta.component).toBe('function')
+    })
+
+    it('registers /eventos/:id with a lazy component and :id param', () => {
+      const ruta = encontrar('/eventos/:id')
+      expect(ruta.name).toBe('evento-detalle')
+      expect(typeof ruta.component).toBe('function')
+      expect(ruta.path).toContain(':id')
+    })
+
+    it('registers /eventos/:id/planificar as a nested lazy route', () => {
+      const ruta = encontrar('/eventos/:id/planificar')
+      expect(ruta.name).toBe('planificar-evento')
+      expect(typeof ruta.component).toBe('function')
+      expect(ruta.path).toContain(':id')
+      expect(ruta.path).toContain('planificar')
+    })
+  })
+
   describe('preserved foundation routes', () => {
     it('keeps the home route at /', () => {
       const ruta = encontrar('/')
