@@ -11,6 +11,11 @@ export default [
       '**/node_modules/**',
       '**/pnpm-lock.yaml',
       'public/**',
+      // One-off scratch debug scripts that aren't part of the build —
+      // left on disk by hand during puppeteer sessions.
+      'debug.mjs',
+      'verify.mjs',
+      'verify-routes.mjs',
     ],
   },
   ...pluginVue.configs['flat/essential'],
