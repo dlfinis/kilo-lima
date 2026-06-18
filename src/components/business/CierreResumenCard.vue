@@ -11,7 +11,7 @@
 // between the live computed resumen and the snapshotted cierre row.
 import { computed } from 'vue'
 
-import type { CategoriaGasto, CategoriaImprevisto, CierreResultado, MetodoPago } from '@/types'
+import type { CierreResultado, MetodoPago } from '@/types'
 import { formatearUSD } from '@/utils/format'
 import { formatearDiferencia } from '@/utils/cierre'
 
@@ -24,22 +24,7 @@ const METODOS_ETIQUETA: Record<MetodoPago, string> = {
   mixto: 'Mixto',
 }
 
-const CATEGORIA_FIJA_ETIQUETA: Record<CategoriaGasto, string> = {
-  renta: 'Renta',
-  transporte: 'Transporte',
-  permisos: 'Permisos',
-  publicidad: 'Publicidad',
-  servicios: 'Servicios',
-  otro: 'Otro',
-}
-
-const CATEGORIA_IMPREVISTO_ETIQUETA: Record<CategoriaImprevisto, string> = {
-  insumos_extra: 'Insumos extra',
-  transporte: 'Transporte',
-  reparacion: 'Reparación',
-  propina: 'Propina',
-  otro: 'Otro',
-}
+void METODOS_ETIQUETA
 
 const diferenciaLabel = computed<string | null>(() =>
   props.resumen?.diferencia === null || props.resumen?.diferencia === undefined

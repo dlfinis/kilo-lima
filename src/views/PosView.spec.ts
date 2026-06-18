@@ -1,10 +1,12 @@
 // REQ-POS-7, REQ-POS-14, REQ-POS-15, REQ-POS-16, REQ-POS-20,
-// REQ-POS-24, REQ-POS-25, REQ-POS-28, REQ-POS-39, REQ-POS-46,
-// REQ-POS-49, REQ-POS-54, REQ-POS-55: the POS main view — wires
-// useProductos + useVentas + useEvents + useOnlineStatus. 4-state
-// handling (loading/error/empty/data per REQ-POS-49). Requires
-// evento en_curso selected; without it, surfaces the no-evento
-// guard. Carrito panel + product grid + registrar venta flow.
+// REQ-POS-24, REQ-POS-25, REQ-POS-28, REQ-POS-39, REQ-POS-40,
+// REQ-POS-46, REQ-POS-49, REQ-POS-54, REQ-POS-55: the POS main view
+// — wires useProductos + useVentas + useEvents + useOnlineStatus +
+// useGastosImprevistos. 4-state handling (loading/error/empty/data
+// per REQ-POS-49). Requires evento en_curso selected; without it,
+// surfaces the no-evento guard. Carrito panel + product grid +
+// collapsible Imprevistos section (REQ-POS-40 — deferred from PR3)
+// + registrar venta flow.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -29,6 +31,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Database,
   Evento,
+  GastoImprevisto,
   Producto,
   RecetaConIngredientes,
   VentaConItems,
@@ -277,6 +280,51 @@ describe('PosView', () => {
       const ventas = useVentasStore()
       expect(ventas.carrito).toEqual([])
       expect(ventas.ventas).toHaveLength(1)
+    })
+  })
+
+  it('renders the Imprevistos collapsible section with the total chip (REQ-POS-40)', async () => {
+    sembrarEventoEnCurso()
+    __pushSupabaseResponse<Producto[]>({ data: [], error: null })
+    __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
+
+    await conContexto(async () => {
+      const wrapper = await mountView()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="pos-imprevistos"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="pos-imprevistos-total"]').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Gastos imprevistos de esta feria')
+      // v-show hides the body when collapsed but keeps the DOM node.
+      const emptyNode = wrapper.find('[data-testid="pos-imprevistos-empty"]')
+      expect(emptyNode.exists()).toBe(true)
+      expect(emptyNode.isVisible()).toBe(false)
+    })
+  })
+
+  it('expands the Imprevistos section and loads the list (REQ-POS-40)', async () => {
+    sembrarEventoEnCurso()
+    __pushSupabaseResponse<Producto[]>({ data: [], error: null })
+    __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
+    __pushSupabaseResponse<GastoImprevisto[]>({
+      data: [
+        {
+          id: 'gi-1',
+          evento_id: 'e-1',
+          monto: 50,
+          motivo: 'Más vasos',
+          categoria: 'insumos_extra',
+          created_at: '2026-06-19T11:00:00Z',
+        },
+      ],
+      error: null,
+    })
+
+    await conContexto(async () => {
+      const wrapper = await mountView()
+      await flushPromises()
+      await wrapper.find('[data-testid="pos-imprevistos-titulo"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="pos-imprevistos-lista"]').exists()).toBe(true)
     })
   })
 })
