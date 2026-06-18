@@ -35,6 +35,7 @@ export function useCierreCaja(eventoId: MaybeRefOrGetter<string | null>): {
   cargando: ComputedRef<boolean>
   error: ComputedRef<string | null>
   resumen: ComputedRef<CierreResultado | null>
+  cargarPorEvento: (eventoId: string) => Promise<void>
   registrarCierre: (
     input: CierreCajaInput,
   ) => Promise<{ data: CierreCaja | null; error: ServiceError | null }>
@@ -65,9 +66,14 @@ export function useCierreCaja(eventoId: MaybeRefOrGetter<string | null>): {
         void _items
         return rest
       })
-    const gastosFijos: GastoFijo[] = gastosFijosStore.gastosPorEvento.get(id) ?? []
-    const gastosImprevistos: GastoImprevisto[] =
-      gastosImprevistosStore.gastosPorEvento.get(id) ?? []
+    const gastosFijos: GastoFijo[] = Array.isArray(gastosFijosStore.gastosPorEvento.get(id))
+      ? (gastosFijosStore.gastosPorEvento.get(id) as GastoFijo[])
+      : []
+    const gastosImprevistos: GastoImprevisto[] = Array.isArray(
+      gastosImprevistosStore.gastosPorEvento.get(id),
+    )
+      ? (gastosImprevistosStore.gastosPorEvento.get(id) as GastoImprevisto[])
+      : []
     const input: CierreInput = {
       ventas,
       gastosFijos,
@@ -83,5 +89,9 @@ export function useCierreCaja(eventoId: MaybeRefOrGetter<string | null>): {
     return cierresStore.registrarCierre(input)
   }
 
-  return { cierre, cargando, error, resumen, registrarCierre }
+  async function cargarPorEvento(id: string) {
+    await cierresStore.cargarPorEvento(id)
+  }
+
+  return { cierre, cargando, error, resumen, cargarPorEvento, registrarCierre }
 }

@@ -82,4 +82,12 @@ describe('routes', () => {
       expect(typeof ruta.component).toBe('function')
     })
   })
+
+  describe('pos PR4 routes', () => {
+    it('registers /pos/cierre with a lazy component (REQ-POS-45, REQ-POS-46)', () => {
+      const ruta = encontrar('/pos/cierre')
+      expect(ruta.name).toBe('pos-cierre')
+      expect(typeof ruta.component).toBe('function')
+    })
+  })
 })

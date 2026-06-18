@@ -51,6 +51,14 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/PosView.vue'),
   },
   {
+    path: '/pos/cierre',
+    name: 'pos-cierre',
+    // CierresCajaView ships in PR4 — close review screen with
+    // CierreResumenCard + breakdown + imprevistos list + "Registrar
+    // cierre" action.
+    component: () => import('@/views/CierresCajaView.vue'),
+  },
+  {
     path: '/:pathMatch(.*)*',
     redirect: '/',
   },
