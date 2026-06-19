@@ -125,6 +125,11 @@ try {
     logFail(`pageerror: ${err.message}`)
     verdict = 'FAIL'
   })
+  page.on('console', (msg) => {
+    if (msg.type() === 'log' && msg.text().includes('[useNavegacion]')) {
+      process.stdout.write(`  [browser] ${msg.text()}\n`)
+    }
+  })
 
   logHeader('4/7  Navigate / — assert AppBar present + back hidden')
   await page.goto(URL, { waitUntil: 'networkidle2', timeout: TIMEOUT_MS })
@@ -162,8 +167,25 @@ try {
     verdict = 'FAIL'
   }
 
-  logHeader('5/7  Navigate /materias-primas — back visible + breadcrumb shows both crumbs')
-  await page.goto(`${URL}materias-primas`, { waitUntil: 'networkidle2', timeout: TIMEOUT_MS })
+  logHeader('5/7  Navigate /materias-primas via in-app click — back visible + breadcrumb shows both crumbs')
+  // First return to / (we may already be there from step 4) so the
+  // next navigation is an in-app transition that populates the browser
+  // history stack — required for the AppBar back button to render.
+  await page.goto(URL, { waitUntil: 'networkidle2', timeout: TIMEOUT_MS })
+  await page.waitForSelector('[data-testid="app-bar"]', { timeout: TIMEOUT_MS })
+  // Click the home card "Materias Primas" button on the home view to
+  // navigate via vue-router (which populates history.state.back).
+  await page.waitForSelector('[data-testid="home-btn-materias-primas"]', { timeout: TIMEOUT_MS })
+  await page.click('[data-testid="home-btn-materias-primas"]')
+  await page.waitForFunction(() => location.pathname === '/materias-primas', { timeout: TIMEOUT_MS })
+  // Debug: read history.state after navigation
+  const debugState = await page.evaluate(() => ({
+    historyState: JSON.stringify(history.state),
+    locationPath: location.pathname,
+  }))
+  console.log(`  [debug] ${JSON.stringify(debugState)}`)
+  // Give the v-app-bar a tick to react.
+  await new Promise((r) => setTimeout(r, 300))
   await page.waitForSelector('[data-testid="app-bar-back"]', { timeout: TIMEOUT_MS })
 
   const volverVisibleAnidado = await assertacion(page, 'app-bar-back', true)

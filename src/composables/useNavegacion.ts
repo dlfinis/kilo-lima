@@ -12,7 +12,11 @@
 //   irAtras()   — calls `router.back()` when puedeVolver is true,
 //                 otherwise falls back to `router.push('/')` so the
 //                 global button is never a no-op.
-import { computed } from 'vue'
+//
+// Reactivity note: `router.options.history.state` is a plain object
+// property — not tracked by Vue's reactivity — so the computed uses a
+// watch on `route` to mirror the latest `state.back` into a ref.
+import { computed, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import {
   resolverBreadcrumbDeMeta,
@@ -27,14 +31,21 @@ export function useNavegacion() {
     resolverBreadcrumbDeMeta(route.meta as { breadcrumb?: readonly string[] } | undefined),
   )
 
+  const stackBack = ref<string | null>(
+    (router.options.history.state?.back as string | undefined) ?? null,
+  )
+
+  watch(
+    () => route.fullPath,
+    () => {
+      stackBack.value = (router.options.history.state?.back as string | undefined) ?? null
+    },
+    { immediate: true },
+  )
+
   const puedeVolver = computed<boolean>(() => {
-    // Reference `route` so this computed re-evaluates on every
-    // navigation — `router.options.history.state` is not a reactive
-    // dependency on its own. The stack length is the actual signal.
-    void route
-    const stack = router.options.history.state?.back ?? null
-    if (!stack) return false
-    return (breadcrumbs.value.length ?? 0) > 1
+    if (!stackBack.value) return false
+    return breadcrumbs.value.length > 1
   })
 
   function irAtras(): void {

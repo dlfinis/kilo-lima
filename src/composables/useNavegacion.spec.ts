@@ -3,7 +3,7 @@
 // irAtras() (router.back when guard passes, router.push('/') fallback).
 // Each test drives a real router with createMemoryHistory so the
 // `router.options.history.state.back` semantics are exercised.
-import { describe, expect, it, beforeEach } from 'vitest'
+import { describe, expect, it, beforeEach, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import { defineComponent, h, nextTick } from 'vue'
