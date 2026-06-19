@@ -196,6 +196,11 @@ function irAPlanificar() {
           @click="irAPlanificar">
           Planificar producción
         </v-btn>
+        <v-btn v-if="eventoActual.estado === 'cerrado'" color="success" variant="flat"
+          prepend-icon="mdi-chart-line" data-testid="evento-detalle-ver-reporte"
+          :to="{ name: 'evento-reporte', params: { id: eventoActual.id } }">
+          Ver reporte
+        </v-btn>
         <v-btn v-if="editable" color="error" variant="text"
           data-testid="evento-detalle-eliminar" @click="mostrarDialogoEliminar = true">
           Eliminar evento

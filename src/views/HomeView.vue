@@ -14,8 +14,13 @@
 // The 3 phase cards from foundation PR2 are kept as a SECONDARY
 // navigation surface (smaller, below the new components) so the
 // brief §3.1 Progressive Disclosure model still works.
-import { onMounted } from 'vue'
+//
+// PR-2c (finanzas-evento): Post-evento card is now dynamic — when
+// at least one evento is cerrado, the card links to its reporte;
+// otherwise shows an empty-state hint.
+import { computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app.store'
+import { useEventsStore } from '@/stores/events.store'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useResumen } from '@/composables/useResumen'
 import ContadoresHome from '@/components/business/ContadoresHome.vue'
@@ -23,8 +28,23 @@ import BannerEventoActivo from '@/components/business/BannerEventoActivo.vue'
 import SiguientePasoCta from '@/components/business/SiguientePasoCta.vue'
 
 const app = useAppStore()
+const eventsStore = useEventsStore()
 const { online } = useOnlineStatus()
 const { contadores, cargar } = useResumen()
+
+// REQ-FIN-34 / REQ-REPORTE-6: the most recently finished evento
+// (sort by fecha_fin desc, fall back to fecha). Null when no cerrado
+// evento exists → card shows empty state.
+const ultimoCerrado = computed(() => {
+  const cerrados = eventsStore.eventos
+    .filter((e) => e.estado === 'cerrado')
+    .sort((a, b) => {
+      const fa = a.fecha_fin ?? a.fecha
+      const fb = b.fecha_fin ?? b.fecha
+      return fb.localeCompare(fa) // descending — most recent first
+    })
+  return cerrados[0] ?? null
+})
 
 onMounted(() => {
   // Fire-and-forget — the home shows the skeleton state until
@@ -111,7 +131,8 @@ onMounted(() => {
       <v-col cols="12" md="4">
         <v-card
           data-testid="home-card-post-evento"
-          disabled
+          :disabled="!ultimoCerrado"
+          :to="ultimoCerrado ? { name: 'evento-reporte', params: { id: ultimoCerrado.id } } : undefined"
           variant="tonal"
           color="success"
         >
@@ -120,15 +141,20 @@ onMounted(() => {
               <v-icon icon="mdi-chart-line" />
             </template>
             <v-card-title>Post-evento</v-card-title>
-            <v-card-subtitle>Análisis (próximamente)</v-card-subtitle>
+            <v-card-subtitle>{{ ultimoCerrado ? 'Análisis' : 'Sin eventos cerrados' }}</v-card-subtitle>
           </v-card-item>
           <v-card-text>
             <p class="text-body-2 mb-2">
-              Dashboard de resultados: ventas totales, gastos, ganancia neta
-              y comparativa entre eventos. Llega en el próximo slice.
+              <template v-if="ultimoCerrado">
+                Revisá el reporte de <strong>{{ ultimoCerrado.nombre }}</strong>: ventas,
+                COGS, utilidad bruta y neta, y desglose por día y por producto.
+              </template>
+              <template v-else>
+                Cuando cierres un evento vas a poder ver el análisis de resultados acá.
+              </template>
             </p>
             <p class="text-caption text-medium-emphasis">
-              Slice futuro
+              {{ ultimoCerrado ? 'Ver reporte →' : 'Esperando primer cierre' }}
             </p>
           </v-card-text>
         </v-card>

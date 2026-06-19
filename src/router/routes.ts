@@ -51,6 +51,18 @@ const routes: RouteRecordRaw[] = [
     meta: { breadcrumb: ['Inicio', 'eventos', 'Planificar'] },
   },
   {
+    path: '/eventos/:id/productos',
+    name: 'evento-productos',
+    component: () => import('@/views/EventoProductosView.vue'),
+    meta: { breadcrumb: ['Inicio', 'eventos', 'Productos'] },
+  },
+  {
+    path: '/eventos/:id/reporte',
+    name: 'evento-reporte',
+    component: () => import('@/views/ReporteEventoView.vue'),
+    meta: { breadcrumb: ['Inicio', 'eventos', 'Reporte'] },
+  },
+  {
     path: '/productos',
     name: 'productos',
     component: () => import('@/views/ProductosView.vue'),
