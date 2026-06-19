@@ -24,6 +24,8 @@ const emit = defineEmits<{
 
 const nombre = ref<string>('')
 const fecha = ref<string>('')
+const fechaFin = ref<string>('')
+const margenGanancia = ref<string>('40')
 const ubicacion = ref<string>('')
 const notas = ref<string>('')
 const estado = ref<EventoInput['estado']>('planificacion')
@@ -36,6 +38,8 @@ watch(
     if (!v) {
       nombre.value = ''
       fecha.value = ''
+      fechaFin.value = ''
+      margenGanancia.value = '40'
       ubicacion.value = ''
       notas.value = ''
       estado.value = 'planificacion'
@@ -44,6 +48,11 @@ watch(
     }
     nombre.value = v.nombre
     fecha.value = v.fecha
+    fechaFin.value = v.fecha_fin ?? ''
+    margenGanancia.value =
+      v.margen_ganancia !== null && v.margen_ganancia !== undefined
+        ? String(Math.round(v.margen_ganancia * 100))
+        : '40'
     ubicacion.value = v.ubicacion ?? ''
     notas.value = v.notas ?? ''
     estado.value = v.estado
@@ -70,9 +79,12 @@ function validar(): boolean {
 function onSubmit() {
   if (!props.editable) return
   if (!validar()) return
+  const margenDecimal = Number.parseFloat(margenGanancia.value) / 100
   emit('submit', {
     nombre: nombre.value.trim(),
     fecha: fecha.value,
+    fecha_fin: fechaFin.value === '' ? null : fechaFin.value,
+    margen_ganancia: Number.isFinite(margenDecimal) ? margenDecimal : null,
     ubicacion: ubicacion.value.trim() || null,
     notas: notas.value.trim() || null,
     estado: estado.value,

@@ -20,6 +20,8 @@ const mkEvento = (id: string, overrides: Partial<Evento> = {}): Evento => ({
   id,
   nombre: 'Feria del Sol',
   fecha: '2026-07-15',
+  fecha_fin: null,
+  margen_ganancia: null,
   ubicacion: 'Plaza Central',
   estado: 'planificacion',
   notas: null,
@@ -31,6 +33,8 @@ const mkEvento = (id: string, overrides: Partial<Evento> = {}): Evento => ({
 const mkInput = (overrides: Partial<EventoInput> = {}): EventoInput => ({
   nombre: 'Feria del Sol',
   fecha: '2026-07-15',
+  fecha_fin: null,
+  margen_ganancia: null,
   ubicacion: 'Plaza Central',
   estado: 'planificacion',
   notas: null,

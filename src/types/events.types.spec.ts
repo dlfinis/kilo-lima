@@ -24,6 +24,8 @@ const mkEvento = (overrides: Partial<Evento> = {}): Evento => ({
   id: 'e-1',
   nombre: 'Feria del Sol',
   fecha: '2026-07-15',
+  fecha_fin: null,
+  margen_ganancia: null,
   ubicacion: 'Plaza Central',
   estado: 'planificacion',
   notas: null,
@@ -52,6 +54,8 @@ describe('events.types surface', () => {
     expect(evento.id).toBe('e-1')
     expect(evento.nombre).toBe('Feria del Sol')
     expect(evento.fecha).toBe('2026-07-15')
+    expect(evento.fecha_fin).toBeNull()
+    expect(evento.margen_ganancia).toBeNull()
     expect(evento.ubicacion).toBe('Plaza Central')
     expect(evento.estado).toBe('planificacion')
     expect(evento.notas).toBeNull()
@@ -59,10 +63,23 @@ describe('events.types surface', () => {
     expect(evento.updated_at).toMatch(/^2026-/)
   })
 
+  it('Evento accepts multi-day range when fecha_fin is set (REQ-FIN-1, REQ-FIN-2)', () => {
+    const evento = mkEvento({ fecha: '2026-07-15', fecha_fin: '2026-07-22' })
+    expect(evento.fecha).toBe('2026-07-15')
+    expect(evento.fecha_fin).toBe('2026-07-22')
+  })
+
+  it('Evento carries margen_ganancia as decimal (0..1) (REQ-FIN, PD-1)', () => {
+    const evento = mkEvento({ margen_ganancia: 0.4 })
+    expect(evento.margen_ganancia).toBeCloseTo(0.4, 4)
+  })
+
   it('EventoInput excludes id, created_at, updated_at (REQ-EVENTS-31)', () => {
     const input: EventoInput = {
       nombre: 'Feria del Sol',
       fecha: '2026-07-15',
+      fecha_fin: null,
+      margen_ganancia: 0.4,
       ubicacion: 'Plaza Central',
       estado: 'planificacion',
       notas: null,
@@ -70,6 +87,9 @@ describe('events.types surface', () => {
     expect(input).not.toHaveProperty('id')
     expect(input).not.toHaveProperty('created_at')
     expect(input).not.toHaveProperty('updated_at')
+    // New Fase 1 fields are writable through EventoInput.
+    expect(input.fecha_fin).toBeNull()
+    expect(input.margen_ganancia).toBe(0.4)
   })
 
   it('GastoFijo + GastoFijoInput exclude id and created_at only (REQ-EVENTS-31)', () => {

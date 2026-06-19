@@ -27,6 +27,8 @@ const mkEvento = (id: string, overrides: Partial<Evento> = {}): Evento => ({
   id,
   nombre: 'Feria del Sol',
   fecha: '2026-07-15',
+  fecha_fin: null,
+  margen_ganancia: null,
   ubicacion: 'Plaza Central',
   estado: 'planificacion',
   notas: null,
@@ -38,6 +40,8 @@ const mkEvento = (id: string, overrides: Partial<Evento> = {}): Evento => ({
 const mkInput = (overrides: Partial<EventoInput> = {}): EventoInput => ({
   nombre: 'Feria del Sol',
   fecha: '2026-07-15',
+  fecha_fin: null,
+  margen_ganancia: null,
   ubicacion: 'Plaza Central',
   estado: 'planificacion',
   notas: null,
@@ -125,6 +129,43 @@ describe('useEventsStore', () => {
 
       expect(resultado.error).toBeNull()
       expect(store.eventos[0]?.nombre).toBe('Editado')
+    })
+  })
+
+  it('actualizar forwards fecha_fin through to the service (REQ-FIN-1, REQ-FIN-2)', async () => {
+    const evento = mkEvento('e-1', { fecha: '2026-07-15', fecha_fin: null })
+    const actualizada: Evento = { ...evento, fecha_fin: '2026-07-22' }
+    __pushSupabaseResponse<Evento>({ data: actualizada, error: null })
+    await conContexto(async () => {
+      const store = useEventsStore()
+      store.eventos.push(evento)
+
+      const resultado = await store.actualizar('e-1', {
+        ...mkInput(),
+        fecha: '2026-07-15',
+        fecha_fin: '2026-07-22',
+      })
+
+      expect(resultado.error).toBeNull()
+      expect(store.eventos[0]?.fecha_fin).toBe('2026-07-22')
+    })
+  })
+
+  it('actualizar forwards margen_ganancia through to the service (REQ-FIN, PD-1)', async () => {
+    const evento = mkEvento('e-1', { margen_ganancia: null })
+    const actualizada: Evento = { ...evento, margen_ganancia: 0.55 }
+    __pushSupabaseResponse<Evento>({ data: actualizada, error: null })
+    await conContexto(async () => {
+      const store = useEventsStore()
+      store.eventos.push(evento)
+
+      const resultado = await store.actualizar('e-1', {
+        ...mkInput(),
+        margen_ganancia: 0.55,
+      })
+
+      expect(resultado.error).toBeNull()
+      expect(store.eventos[0]?.margen_ganancia).toBeCloseTo(0.55, 4)
     })
   })
 

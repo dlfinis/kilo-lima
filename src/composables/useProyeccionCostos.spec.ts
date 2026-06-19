@@ -19,6 +19,8 @@ const mkEvento = (id = 'e-1'): Evento => ({
   id,
   nombre: 'Feria',
   fecha: '2026-07-15',
+  fecha_fin: null,
+  margen_ganancia: null,
   ubicacion: null,
   estado: 'planificacion',
   notas: null,

@@ -59,13 +59,14 @@ export function useCierreCaja(eventoId: MaybeRefOrGetter<string | null>): {
   const resumen = computed<CierreResultado | null>(() => {
     const id = toValue(eventoId)
     if (!id) return null
-    const ventas: Venta[] = ventasStore.ventas
-      .filter((v) => v.evento_id === id)
-      .map((v) => {
-        const { items: _items, ...rest } = v
-        void _items
-        return rest
-      })
+    const ventasDelEvento = ventasStore.ventas.filter((v) => v.evento_id === id)
+    const ventas: Venta[] = ventasDelEvento.map((v) => {
+      const { items: _items, ...rest } = v
+      void _items
+      return rest
+    })
+    // REQ-FIN-6: flatten venta_items so the cierre can aggregate COGS.
+    const ventaItems = ventasDelEvento.flatMap((v) => v.items)
     const gastosFijos: GastoFijo[] = Array.isArray(gastosFijosStore.gastosPorEvento.get(id))
       ? (gastosFijosStore.gastosPorEvento.get(id) as GastoFijo[])
       : []
@@ -76,6 +77,7 @@ export function useCierreCaja(eventoId: MaybeRefOrGetter<string | null>): {
       : []
     const input: CierreInput = {
       ventas,
+      ventaItems,
       gastosFijos,
       gastosImprevistos,
       efectivoEsperado: cierre.value?.efectivo_esperado ?? null,

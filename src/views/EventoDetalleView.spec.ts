@@ -21,7 +21,7 @@ import { __pushSupabaseResponse, __resetSupabaseMock } from '../../tests/setup'
 
 import EventoDetalleView from './EventoDetalleView.vue'
 import EventoStatusChip from '@/components/business/EventoStatusChip.vue'
-import type { Evento, GastoFijo } from '@/types'
+import type { Evento, GastoFijo, PlanProduccion } from '@/types'
 
 const vuetify = createVuetify({ components, directives })
 
@@ -29,6 +29,8 @@ const mkEvento = (id: string, overrides: Partial<Evento> = {}): Evento => ({
   id,
   nombre: 'Feria del Sol',
   fecha: '2026-07-15',
+  fecha_fin: null,
+  margen_ganancia: null,
   ubicacion: 'Plaza Central',
   estado: 'planificacion',
   notas: null,
@@ -122,6 +124,100 @@ describe('EventoDetalleView', () => {
     // Intl.NumberFormat uses a NARROW NO-BREAK SPACE (U+202F) between
     // currency code and amount; match against the numeric portion only.
     expect(wrapper.text()).toMatch(/500[.,]00/)
+  })
+
+  it('renders fecha_fin + margen_ganancia edit fields when editable (REQ-FIN-2, REQ-FIN, PD-1)', async () => {
+    const evento = mkEvento('e-1', {
+      estado: 'planificacion',
+      fecha: '2026-07-15',
+      fecha_fin: null,
+      margen_ganancia: 0.4,
+    })
+    await prepararStore(evento)
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="evento-detalle-fecha-fin"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="evento-detalle-margen"]').exists()).toBe(true)
+    // margen input shows the percentage (40 not 0.4).
+    const margenInput = wrapper.find('[data-testid="evento-detalle-margen"] input')
+      .element as HTMLInputElement
+    expect(margenInput.value).toBe('40')
+  })
+
+  it('renders single-day range when fecha_fin is null (REQ-FIN-1, REQ-FIN-4)', async () => {
+    const evento = mkEvento('e-1', { fecha: '2026-07-15', fecha_fin: null })
+    await prepararStore(evento)
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+
+    // Single-day: header shows the start date once, no separator.
+    expect(wrapper.text()).toContain('15/07/2026')
+    expect(wrapper.text()).not.toContain('15/07/2026 – 15/07/2026')
+  })
+
+  it('renders multi-day range when fecha_fin is set (REQ-FIN-4)', async () => {
+    const evento = mkEvento('e-1', { fecha: '2026-07-15', fecha_fin: '2026-07-22' })
+    await prepararStore(evento)
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('15/07/2026')
+    expect(wrapper.text()).toContain('22/07/2026')
+  })
+
+  it('saves fecha_fin + margen_ganancia via the store (REQ-FIN-2, REQ-FIN)', async () => {
+    const evento = mkEvento('e-1', { estado: 'planificacion' })
+    await prepararStore(evento)
+    // The mock queue is FIFO and consumed in order by every fetch:
+    //   1. cargarPorEvento (gastos) → GastoFijo[]
+    //   2. cargarPlan (planes) → PlanProduccion[]
+    //   3. guardarFechasMargen → servicio.actualizar → Evento
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
+    __pushSupabaseResponse<PlanProduccion[]>({ data: [], error: null })
+    __pushSupabaseResponse<Evento>({
+      data: { ...evento, fecha_fin: '2026-07-22', margen_ganancia: 0.5 },
+      error: null,
+    })
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+
+    // Set fecha_fin (the date input value is YYYY-MM-DD).
+    const fechaFinInput = wrapper.find('[data-testid="evento-detalle-fecha-fin"] input')
+      .element as HTMLInputElement
+    fechaFinInput.value = '2026-07-22'
+    await wrapper.find('[data-testid="evento-detalle-fecha-fin"] input').trigger('input')
+    await flushPromises()
+    // Set margen to 50.
+    const margenInput = wrapper.find('[data-testid="evento-detalle-margen"] input')
+      .element as HTMLInputElement
+    margenInput.value = '50'
+    await wrapper.find('[data-testid="evento-detalle-margen"] input').trigger('input')
+    await flushPromises()
+
+    await wrapper.find('[data-testid="evento-detalle-guardar-fechas"]').trigger('click')
+    await flushPromises()
+
+    // After save, eventoActual reflects the change.
+    expect(wrapper.text()).toContain('22/07/2026')
+    // Margen input shows 50.
+    const margenValue = (wrapper.find('[data-testid="evento-detalle-margen"] input')
+      .element as HTMLInputElement).value
+    expect(margenValue).toBe('50')
+  })
+
+  it('hides fecha_fin + margen_ganancia edit fields when cerrado (REQ-FIN-2)', async () => {
+    const evento = mkEvento('e-1', { estado: 'cerrado' })
+    await prepararStore(evento)
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+
+    // Edit fields exist for display, but the save button is hidden in read-only mode.
+    expect(wrapper.find('[data-testid="evento-detalle-guardar-fechas"]').exists()).toBe(false)
   })
 
   it('shows transition buttons for planificacion → en_curso and cancel (REQ-EVENTS-22)', async () => {

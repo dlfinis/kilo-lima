@@ -27,6 +27,8 @@ const mkEvento = (id: string, overrides: Partial<Evento> = {}): Evento => ({
   id,
   nombre: 'Feria del Sol',
   fecha: '2026-07-15',
+  fecha_fin: null,
+  margen_ganancia: null,
   ubicacion: null,
   estado: 'planificacion',
   notas: null,

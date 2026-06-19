@@ -17,6 +17,10 @@ export interface Evento {
   id: string
   nombre: string
   fecha: string
+  // REQ-FIN-1: nullable — NULL means single day, treated as fecha at the UI layer.
+  fecha_fin: string | null
+  // REQ-FIN, PD-1: per-evento margin decimal 0..1. SQL default 0.40.
+  margen_ganancia: number | null
   ubicacion: string | null
   estado: EstadoEvento
   notas: string | null

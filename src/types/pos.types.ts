@@ -47,10 +47,27 @@ export interface VentaItem {
   cantidad: number
   precio_unitario: number
   subtotal: number
+  // REQ-FIN-12: COGS snapshot columns. Nullable for legacy ventas
+  // (PD-4: no historical backfill). `costo_unitario ?? 0` in COGS math.
+  costo_unitario: number | null
+  margen_aplicado: number | null
   created_at: string
 }
 
-export type VentaItemInput = Omit<VentaItem, 'id' | 'venta_id' | 'created_at'>
+// VentaItemInput carries the columns the caller wants to insert. The
+// COGS snapshot columns (costo_unitario, margen_aplicado) are optional
+// in the Input shape — the DB row (VentaItem) keeps them as nullable
+// for legacy rows, but the Insert from cart/sale code may legitimately
+// omit them (Fase 1: the cart snapshot still produces null until Fase 2
+// wires evento_producto lookups). Service layer forwards `?? null`.
+export interface VentaItemInput {
+  producto_id: string
+  cantidad: number
+  precio_unitario: number
+  subtotal: number
+  costo_unitario?: number | null
+  margen_aplicado?: number | null
+}
 
 export interface VentaConItems extends Venta {
   items: VentaItem[]
@@ -103,26 +120,60 @@ export interface ResumenCarrito {
 }
 
 // Input shape for the pure `calcularCierre` helper. Consumes ventas
-// (with `metodo_pago`) + gastos fijos + imprevistos + optional cash
-// count. Returns a CierreResultado (matches the cierre view's needs).
+// (with `metodo_pago`) + their items (for COGS aggregation per REQ-FIN-6)
+// + gastos fijos + imprevistos + optional cash count. Returns a
+// CierreResultado (matches the cierre view's needs).
 export interface CierreInput {
   ventas: Venta[]
+  // REQ-FIN-6: required for COGS computation. The caller (useCierreCaja)
+  // flattens items from each venta; pasarVenta items is enough.
+  ventaItems: VentaItem[]
   gastosFijos: GastoFijo[]
   gastosImprevistos: GastoImprevisto[]
   efectivoEsperado: number | null
   efectivoReal: number | null
 }
 
+// Per-producto aggregation row (Fase 2 surface — Fase 1 returns []).
+// Living here so the CierreResultado shape is stable across phases.
+export interface DesgloseProducto {
+  productoId: string
+  productoNombre: string
+  unidades: number
+  ingresoTotal: number
+  cogsTotal: number
+  margenReal: number
+  utilidadBruta: number
+}
+
+// Per-day aggregation row (Fase 2 surface — Fase 1 returns []).
+export interface DesgloseDia {
+  fecha: string
+  ventas: number
+  cantidad: number
+  cogs: number
+  utilidadBruta: number
+  utilidadNeta: number
+}
+
 export interface CierreResultado {
   totalVentas: number
+  // REQ-FIN-5: Σ(cantidad × costo_unitario ?? 0) across all items.
+  totalCogs: number
   totalGastosFijos: number
   totalGastosImprevistos: number
+  // REQ-FIN-6: utilidadBruta = totalVentas − COGS (corrected formula).
   utilidadBruta: number
+  // REQ-FIN-7: utilidadNeta = utilidadBruta − gastosFijos − imprevistos.
+  utilidadNeta: number
   efectivoEsperado: number | null
   efectivoReal: number | null
   diferencia: number | null
   ventasPorMetodoPago: Record<MetodoPago, number>
   cantidadVentas: number
+  // Fase 1: empty arrays. Fase 2 fills these from venta_items aggregations.
+  desgloseProductos: DesgloseProducto[]
+  desgloseDias: DesgloseDia[]
 }
 
 // Re-export the events' GastoFijo so consumers can import CierreInput

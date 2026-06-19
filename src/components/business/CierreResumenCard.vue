@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// REQ-POS-31, REQ-POS-34, REQ-POS-54: read-only review card for the
-// cierre. Four sections (REQ-POS-34):
+// REQ-POS-31, REQ-POS-34, REQ-POS-54, REQ-FIN-6, REQ-FIN-7, REQ-FIN-11:
+// read-only review card for the cierre. Five sections (REQ-FIN-11):
 //   1. Ventas — count + total + per-metodo_pago breakdown
 //   2. Gastos — fijos + imprevistos with category breakdown
-//   3. Utilidad bruta
-//   4. Diferencia — yellow v-alert when diferencia !== 0
+//   3. Utilidad bruta (ventas − COGS, color-coded)
+//   4. Utilidad neta (utilidadBruta − gastosOp)
+//   5. Diferencia — yellow v-alert when diferencia !== 0
 //
 // Receives the pre-computed `CierreResultado` via prop (no service /
 // store calls — pure presentation component) so the view can swap
@@ -32,9 +33,14 @@ const diferenciaLabel = computed<string | null>(() =>
     : formatearDiferencia(props.resumen.diferencia),
 )
 
-const utilidadColor = computed<string>(() => {
+const utilidadBrutaColor = computed<string>(() => {
   if (!props.resumen) return 'text-medium-emphasis'
   return props.resumen.utilidadBruta >= 0 ? 'text-success' : 'text-error'
+})
+
+const utilidadNetaColor = computed<string>(() => {
+  if (!props.resumen) return 'text-medium-emphasis'
+  return props.resumen.utilidadNeta >= 0 ? 'text-success' : 'text-error'
 })
 </script>
 
@@ -66,11 +72,19 @@ const utilidadColor = computed<string>(() => {
       </p>
     </div>
 
-    <!-- Utilidad bruta -->
+    <!-- Utilidad bruta — REQ-FIN-6: ventas − COGS -->
     <div class="mb-3" data-testid="cierre-utilidad">
       <h3 class="text-subtitle-1">Utilidad bruta</h3>
-      <p class="text-h5" :class="utilidadColor">
+      <p class="text-h5" :class="utilidadBrutaColor">
         {{ formatearUSD(resumen.utilidadBruta) }}
+      </p>
+    </div>
+
+    <!-- Utilidad neta — REQ-FIN-7, REQ-FIN-11: utilidadBruta − gastosOp -->
+    <div class="mb-3" data-testid="cierre-utilidad-neta">
+      <h3 class="text-subtitle-1">Utilidad neta</h3>
+      <p class="text-h6" :class="utilidadNetaColor">
+        {{ formatearUSD(resumen.utilidadNeta) }}
       </p>
     </div>
 
