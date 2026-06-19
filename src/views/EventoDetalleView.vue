@@ -155,6 +155,11 @@ function irAPlanificar() {
     router.push({ name: 'planificar-evento', params: { id: eventoId.value } })
   }
 }
+function irAReporte() {
+  if (eventoId.value) {
+    router.push({ name: 'evento-reporte', params: { id: eventoId.value } })
+  }
+}
 </script>
 
 <template>
@@ -198,7 +203,7 @@ function irAPlanificar() {
         </v-btn>
         <v-btn v-if="eventoActual.estado === 'cerrado'" color="success" variant="flat"
           prepend-icon="mdi-chart-line" data-testid="evento-detalle-ver-reporte"
-          :to="{ name: 'evento-reporte', params: { id: eventoActual.id } }">
+          @click="irAReporte">
           Ver reporte
         </v-btn>
         <v-btn v-if="editable" color="error" variant="text"

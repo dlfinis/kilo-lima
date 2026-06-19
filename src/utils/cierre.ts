@@ -151,19 +151,23 @@ export function calcularDesglosePorDia(
     }
   }
 
+  // Build a venta_id → day map so item-level COGS can be assigned
+  // to the correct date without requiring the caller to pre-group.
+  const ventaIdToDay = new Map<string, string>()
+  for (const v of ventas) {
+    ventaIdToDay.set(v.id, v.created_at.slice(0, 10))
+  }
+
   for (const it of items) {
-    // COGS per item: cantidad × (costo_unitario ?? 0). We don't have
-    // created_at on VentaItem directly — use the parent venta's date
-    // via a join. For the pure util, we tag each item with its venta
-    // date externally via `asignarDiaAItems` before calling.
-    // Here we process items that already carry their date context.
+    // Map the item to its parent venta's day via venta_id. Without
+    // this join, COGS can't be assigned to a specific date.
+    const dia = ventaIdToDay.get(it.venta_id)
+    if (!dia) continue
     const cogs = redondearCentavos((it.costo_unitario ?? 0) * it.cantidad)
-    // Items don't carry their parent venta's date in this pure util.
-    // The caller (useReporteEvento) groups items by venta date; for
-    // the pure function we use a simple approach: match items to the
-    // first venta sharing the same venta_id, or fall back to "unknown".
-    // In practice the composable pre-joins so items arrive with day context.
-    // We contribute each item's COGS to the map keyed by its venta's date.
+    const entry = diaMap.get(dia)
+    if (entry) {
+      entry.cogs = redondearCentavos(entry.cogs + cogs)
+    }
   }
 
   const result: DesgloseDia[] = []
@@ -210,7 +214,9 @@ export function calcularDesglosePorProducto(
       : 0
     result.push({
       productoId,
-      productoNombre: '', // filled by caller (useReporteEvento) from catalogo store
+      // Fallback to productoId when the catalog name isn't joined yet
+      // (caller — useReporteEvento — fills the real name when available).
+      productoNombre: productoId,
       unidades: p.unidades,
       ingresoTotal: p.ingresoTotal,
       cogsTotal: p.cogsTotal,

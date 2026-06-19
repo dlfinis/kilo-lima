@@ -156,14 +156,14 @@ describe('useReporteEvento', () => {
       // Range covers all 3 days (Dec 18, 19, 20). Dec 20 has zero ventas.
       expect(r.reportePorDia.value).toHaveLength(3)
       expect(r.reportePorDia.value[0]?.fecha).toBe('2026-12-18')
-      expect(r.reportePorDia.value[0]?.ventas).toBe(1)
+      expect(r.reportePorDia.value[0]?.cantidad).toBe(1)
       expect(r.reportePorDia.value[0]?.cogs).toBe(20)
       expect(r.reportePorDia.value[0]?.utilidadBruta).toBe(30)
-      expect(r.reportePorDia.value[1]?.ventas).toBe(1)
+      expect(r.reportePorDia.value[1]?.cantidad).toBe(1)
       expect(r.reportePorDia.value[1]?.cogs).toBe(15)
       expect(r.reportePorDia.value[1]?.utilidadBruta).toBe(15)
       // Dec 20: zero ventas, cogs 0, utilidadBruta 0.
-      expect(r.reportePorDia.value[2]?.ventas).toBe(0)
+      expect(r.reportePorDia.value[2]?.cantidad).toBe(0)
       expect(r.reportePorDia.value[2]?.cogs).toBe(0)
     })
   })
@@ -245,7 +245,7 @@ describe('useReporteEvento', () => {
     conContexto(() => {
       const r = useReporteEvento('e-1')
       expect(r.reportePorDia.value).toHaveLength(3) // 3 days in range
-      expect(r.reportePorDia.value.every((d) => d.ventas === 0)).toBe(true)
+      expect(r.reportePorDia.value.every((d) => d.cantidad === 0)).toBe(true)
       expect(r.reportePorProducto.value).toEqual([])
     })
   })
