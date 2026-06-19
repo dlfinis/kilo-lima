@@ -90,4 +90,36 @@ describe('routes', () => {
       expect(typeof ruta.component).toBe('function')
     })
   })
+
+  // REQ-UX-7: every route registers `meta.breadcrumb` so the AppBar
+  // can render the navigation trail. Catch-all redirect has no
+  // breadcrumb (it is never rendered).
+  describe('breadcrumb meta (REQ-UX-7)', () => {
+    it('registers / with breadcrumb ["Inicio"]', () => {
+      expect(encontrar('/').meta?.breadcrumb).toEqual(['Inicio'])
+    })
+    it('registers /materias-primas with ["Inicio", "materias-primas"]', () => {
+      expect(encontrar('/materias-primas').meta?.breadcrumb).toEqual([
+        'Inicio',
+        'materias-primas',
+      ])
+    })
+    it('registers /recetas/:id with ["Inicio", "recetas", "Detalle"]', () => {
+      expect(encontrar('/recetas/:id').meta?.breadcrumb).toEqual([
+        'Inicio',
+        'recetas',
+        'Detalle',
+      ])
+    })
+    it('registers /eventos/:id with ["Inicio", "eventos", "Detalle"]', () => {
+      expect(encontrar('/eventos/:id').meta?.breadcrumb).toEqual([
+        'Inicio',
+        'eventos',
+        'Detalle',
+      ])
+    })
+    it('registers /pos with ["Inicio", "pos"]', () => {
+      expect(encontrar('/pos').meta?.breadcrumb).toEqual(['Inicio', 'pos'])
+    })
+  })
 })
