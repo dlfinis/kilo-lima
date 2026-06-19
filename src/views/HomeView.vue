@@ -1,13 +1,37 @@
 <script setup lang="ts">
+// REQ-UX-9..19 + REQ-UX-25: HomeView rewrite. PR2 of ux-improvements
+// adds three new presentational components that turn the home from a
+// passive landing page into an action-oriented context surface:
+//
+//   - ContadoresHome: live snapshot of the 6 domain counters (links
+//     to each route).
+//   - BannerEventoActivo: warning banner when an evento is en_curso
+//     (drives the user to /pos).
+//   - SiguientePasoCta: the recommended next step computed by
+//     `obtenerSiguientePaso(contadores)`. Hidden when no step is
+//     recommended (user is in motion).
+//
+// The 3 phase cards from foundation PR2 are kept as a SECONDARY
+// navigation surface (smaller, below the new components) so the
+// brief §3.1 Progressive Disclosure model still works.
+import { onMounted } from 'vue'
 import { useAppStore } from '@/stores/app.store'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import { useResumen } from '@/composables/useResumen'
+import ContadoresHome from '@/components/business/ContadoresHome.vue'
+import BannerEventoActivo from '@/components/business/BannerEventoActivo.vue'
+import SiguientePasoCta from '@/components/business/SiguientePasoCta.vue'
 
-// HomeView is the business hub: orients the user, shows the 3 phases of
-// the feriante's workflow (brief §3.1 Progressive Disclosure), and gives
-// direct CTAs to the next action. Per design §15, the home must be a
-// navigation surface — not a passive landing page.
 const app = useAppStore()
 const { online } = useOnlineStatus()
+const { contadores, cargar } = useResumen()
+
+onMounted(() => {
+  // Fire-and-forget — the home shows the skeleton state until
+  // `cargado` flips true. The Promise.allSettled design ensures
+  // partial failures don't blank the home.
+  void cargar()
+})
 </script>
 
 <template>
@@ -17,8 +41,20 @@ const { online } = useOnlineStatus()
       Costos y ventas de postres en ferias
     </p>
 
+    <!-- Top: live counters (REQs UX-9..12) -->
+    <ContadoresHome :contadores="contadores" />
+
+    <!-- Active business state (REQs UX-13..16) -->
+    <BannerEventoActivo />
+
+    <!-- Recommended next step (REQs UX-17..19). Hidden on null. -->
+    <SiguientePasoCta :contadores="contadores" />
+
+    <v-divider class="my-6" />
+
+    <!-- Secondary: 3 phase cards from foundation PR2 — kept smaller -->
+    <h2 class="text-h6 mb-3">Fases del negocio</h2>
     <v-row dense>
-      <!-- Fase 1: Pre-evento (planificación) -->
       <v-col cols="12" md="4">
         <v-card
           data-testid="home-card-pre-evento"
@@ -28,7 +64,7 @@ const { online } = useOnlineStatus()
         >
           <v-card-item>
             <template #prepend>
-              <v-icon icon="mdi-clipboard-list-outline" size="large" />
+              <v-icon icon="mdi-clipboard-list-outline" />
             </template>
             <v-card-title>Pre-evento</v-card-title>
             <v-card-subtitle>Planificación</v-card-subtitle>
@@ -45,7 +81,6 @@ const { online } = useOnlineStatus()
         </v-card>
       </v-col>
 
-      <!-- Fase 2: Durante evento (ventas) -->
       <v-col cols="12" md="4">
         <v-card
           data-testid="home-card-durante-evento"
@@ -55,7 +90,7 @@ const { online } = useOnlineStatus()
         >
           <v-card-item>
             <template #prepend>
-              <v-icon icon="mdi-cart-outline" size="large" />
+              <v-icon icon="mdi-cart-outline" />
             </template>
             <v-card-title>Durante evento</v-card-title>
             <v-card-subtitle>Ventas en vivo</v-card-subtitle>
@@ -73,7 +108,6 @@ const { online } = useOnlineStatus()
         </v-card>
       </v-col>
 
-      <!-- Fase 3: Post-evento (análisis) -->
       <v-col cols="12" md="4">
         <v-card
           data-testid="home-card-post-evento"
@@ -83,7 +117,7 @@ const { online } = useOnlineStatus()
         >
           <v-card-item>
             <template #prepend>
-              <v-icon icon="mdi-chart-line" size="large" />
+              <v-icon icon="mdi-chart-line" />
             </template>
             <v-card-title>Post-evento</v-card-title>
             <v-card-subtitle>Análisis (próximamente)</v-card-subtitle>
@@ -91,8 +125,7 @@ const { online } = useOnlineStatus()
           <v-card-text>
             <p class="text-body-2 mb-2">
               Dashboard de resultados: ventas totales, gastos, ganancia neta
-              y comparativa entre eventos. Llega en el próximo slice (Phase 5
-              del brief).
+              y comparativa entre eventos. Llega en el próximo slice.
             </p>
             <p class="text-caption text-medium-emphasis">
               Slice futuro
