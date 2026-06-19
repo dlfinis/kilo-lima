@@ -13,7 +13,7 @@
 // utils/moneda.ts so cierre totals and venta_items subtotals share the
 // same rounding policy (no cumulative ±$0.01 drift).
 import { describe, expect, it } from 'vitest'
-import type { CierreCaja, GastoFijo, GastoImprevisto, Venta } from '@/types'
+import type { CierreCaja, GastoFijo, GastoImprevisto, Venta, VentaItem } from '@/types'
 import { calcularCierre, formatearDiferencia } from './cierre'
 
 const mkVenta = (overrides: Partial<Venta> = {}): Venta => ({
@@ -24,6 +24,25 @@ const mkVenta = (overrides: Partial<Venta> = {}): Venta => ({
   metodo_pago: overrides.metodo_pago ?? 'efectivo',
   created_at: '2026-06-19T10:00:00Z',
   ...overrides,
+})
+
+const mkItem = (
+  overrides: {
+    id?: string
+    productoId?: string
+    cantidad?: number
+    costo_unitario?: number | null
+  } = {},
+): VentaItem => ({
+  id: overrides.id ?? 'vi-1',
+  venta_id: 'v-1',
+  producto_id: overrides.productoId ?? 'p-1',
+  cantidad: overrides.cantidad ?? 1,
+  precio_unitario: 5,
+  subtotal: 5 * (overrides.cantidad ?? 1),
+  costo_unitario: overrides.costo_unitario ?? null,
+  margen_aplicado: null,
+  created_at: '2026-06-19T10:00:00Z',
 })
 
 const mkGastoFijo = (overrides: Partial<GastoFijo> = {}): GastoFijo => ({
@@ -47,18 +66,21 @@ const mkImprevisto = (overrides: Partial<GastoImprevisto> = {}): GastoImprevisto
 })
 
 describe('calcularCierre', () => {
-  it('returns zero totals for an empty evento (REQ-POS-31)', () => {
+  it('returns zero totals for an empty evento (REQ-POS-31, REQ-FIN-6)', () => {
     const resumen = calcularCierre({
       ventas: [],
+      ventaItems: [],
       gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: null,
       efectivoReal: null,
     })
     expect(resumen.totalVentas).toBe(0)
+    expect(resumen.totalCogs).toBe(0)
     expect(resumen.totalGastosFijos).toBe(0)
     expect(resumen.totalGastosImprevistos).toBe(0)
     expect(resumen.utilidadBruta).toBe(0)
+    expect(resumen.utilidadNeta).toBe(0)
     expect(resumen.cantidadVentas).toBe(0)
     expect(resumen.ventasPorMetodoPago).toEqual({
       efectivo: 0,
@@ -67,24 +89,31 @@ describe('calcularCierre', () => {
       mixto: 0,
     })
     expect(resumen.diferencia).toBeNull()
+    expect(resumen.desgloseProductos).toEqual([])
+    expect(resumen.desgloseDias).toEqual([])
   })
 
-  it('breaks ventas down by metodo_pago (REQ-POS-31)', () => {
+  it('breaks ventas down by metodo_pago (REQ-POS-31, REQ-FIN-6)', () => {
     const resumen = calcularCierre({
       ventas: [
         mkVenta({ id: 'v-1', total: 10, metodo_pago: 'efectivo' }),
         mkVenta({ id: 'v-2', total: 15, metodo_pago: 'tarjeta' }),
         mkVenta({ id: 'v-3', total: 5, metodo_pago: 'efectivo' }),
       ],
+      ventaItems: [],
       gastosFijos: [mkGastoFijo({ monto: 5 })],
       gastosImprevistos: [mkImprevisto({ monto: 3 })],
       efectivoEsperado: null,
       efectivoReal: null,
     })
     expect(resumen.totalVentas).toBe(30)
+    expect(resumen.totalCogs).toBe(0)
     expect(resumen.totalGastosFijos).toBe(5)
     expect(resumen.totalGastosImprevistos).toBe(3)
-    expect(resumen.utilidadBruta).toBe(22)
+    // New formula: utilidadBruta = ventas − COGS (0) = 30.
+    expect(resumen.utilidadBruta).toBe(30)
+    // utilidadNeta = utilidadBruta − gastosFijos − imprevistos = 30 − 5 − 3 = 22.
+    expect(resumen.utilidadNeta).toBe(22)
     expect(resumen.cantidadVentas).toBe(3)
     expect(resumen.ventasPorMetodoPago.efectivo).toBe(15)
     expect(resumen.ventasPorMetodoPago.tarjeta).toBe(15)
@@ -92,20 +121,72 @@ describe('calcularCierre', () => {
     expect(resumen.ventasPorMetodoPago.mixto).toBe(0)
   })
 
-  it('computes utilidadBruta = totalVentas − gastosFijos − imprevistos (REQ-POS-31)', () => {
+  it('computes utilidadBruta = totalVentas − COGS (corrected formula, REQ-FIN-6)', () => {
+    // ventas=200, items with costo_unitario * cantidad summing to 100
     const resumen = calcularCierre({
-      ventas: [mkVenta({ total: 100 })],
+      ventas: [mkVenta({ total: 200 })],
+      ventaItems: [
+        mkItem({ id: 'vi-1', cantidad: 2, costo_unitario: 30 }),
+        mkItem({ id: 'vi-2', cantidad: 4, costo_unitario: 10 }),
+      ],
+      gastosFijos: [],
+      gastosImprevistos: [],
+      efectivoEsperado: null,
+      efectivoReal: null,
+    })
+    // COGS = 2*30 + 4*10 = 100. utilidadBruta = 200 - 100 = 100.
+    expect(resumen.totalCogs).toBe(100)
+    expect(resumen.utilidadBruta).toBe(100)
+  })
+
+  it('computes utilidadNeta = utilidadBruta − gastosFijos − imprevistos (REQ-FIN-7)', () => {
+    const resumen = calcularCierre({
+      ventas: [mkVenta({ total: 200 })],
+      ventaItems: [mkItem({ cantidad: 2, costo_unitario: 50 })],
       gastosFijos: [mkGastoFijo({ monto: 30 })],
       gastosImprevistos: [mkImprevisto({ monto: 20 })],
       efectivoEsperado: null,
       efectivoReal: null,
     })
-    expect(resumen.utilidadBruta).toBe(50)
+    // utilidadBruta = 200 - 100 = 100. utilidadNeta = 100 - 30 - 20 = 50.
+    expect(resumen.utilidadBruta).toBe(100)
+    expect(resumen.utilidadNeta).toBe(50)
+  })
+
+  it('treats NULL costo_unitario as 0 in COGS — legacy-safe (REQ-FIN-8)', () => {
+    const resumen = calcularCierre({
+      ventas: [mkVenta({ total: 100 })],
+      ventaItems: [
+        mkItem({ id: 'vi-1', cantidad: 2, costo_unitario: null }),
+        mkItem({ id: 'vi-2', cantidad: 1, costo_unitario: 25 }),
+      ],
+      gastosFijos: [],
+      gastosImprevistos: [],
+      efectivoEsperado: null,
+      efectivoReal: null,
+    })
+    expect(resumen.totalCogs).toBe(25)
+    expect(resumen.utilidadBruta).toBe(75)
+  })
+
+  it('computes utilidadBruta = totalVentas when COGS is 0 (REQ-FIN-6)', () => {
+    const resumen = calcularCierre({
+      ventas: [mkVenta({ total: 100 })],
+      ventaItems: [mkItem({ cantidad: 5, costo_unitario: null })],
+      gastosFijos: [mkGastoFijo({ monto: 30 })],
+      gastosImprevistos: [mkImprevisto({ monto: 20 })],
+      efectivoEsperado: null,
+      efectivoReal: null,
+    })
+    expect(resumen.totalCogs).toBe(0)
+    expect(resumen.utilidadBruta).toBe(100)
+    expect(resumen.utilidadNeta).toBe(50)
   })
 
   it('computes diferencia = efectivoReal − efectivoEsperado (REQ-POS-31)', () => {
     const resumen = calcularCierre({
       ventas: [],
+      ventaItems: [],
       gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: 100,
@@ -117,6 +198,7 @@ describe('calcularCierre', () => {
   it('computes diferencia = 0 when cash count is exact (REQ-POS-31)', () => {
     const resumen = calcularCierre({
       ventas: [],
+      ventaItems: [],
       gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: 100,
@@ -128,6 +210,7 @@ describe('calcularCierre', () => {
   it('computes positive diferencia (sobrante) (REQ-POS-31)', () => {
     const resumen = calcularCierre({
       ventas: [],
+      ventaItems: [],
       gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: 100,
@@ -139,6 +222,7 @@ describe('calcularCierre', () => {
   it('returns diferencia = null when efectivoEsperado is null (REQ-POS-31)', () => {
     const resumen = calcularCierre({
       ventas: [],
+      ventaItems: [],
       gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: null,
@@ -150,6 +234,7 @@ describe('calcularCierre', () => {
   it('returns diferencia = null when efectivoReal is null (REQ-POS-31)', () => {
     const resumen = calcularCierre({
       ventas: [],
+      ventaItems: [],
       gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: 100,
@@ -161,6 +246,7 @@ describe('calcularCierre', () => {
   it('rounds float-drift total to 2 decimals (REQ-POS-31, REQ-POS-13)', () => {
     const resumen = calcularCierre({
       ventas: [mkVenta({ total: 0.1 }), mkVenta({ id: 'v-2', total: 0.2 })],
+      ventaItems: [],
       gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: null,
@@ -169,21 +255,39 @@ describe('calcularCierre', () => {
     expect(resumen.totalVentas).toBe(0.3)
   })
 
+  it('rounds COGS float-drift to 2 decimals across 100 items (REQ-FIN-16, REQ-FIN-6)', () => {
+    const items = Array.from({ length: 100 }, (_, i) =>
+      mkItem({ id: `vi-${i}`, cantidad: 1, costo_unitario: 1.67 }),
+    )
+    const resumen = calcularCierre({
+      ventas: [mkVenta({ total: 200 })],
+      ventaItems: items,
+      gastosFijos: [],
+      gastosImprevistos: [],
+      efectivoEsperado: null,
+      efectivoReal: null,
+    })
+    expect(resumen.totalCogs).toBe(167)
+  })
+
   it('rounds utilidadBruta correctly with float-drift ventas (REQ-POS-31)', () => {
     const resumen = calcularCierre({
       ventas: [mkVenta({ total: 0.1 }), mkVenta({ id: 'v-2', total: 0.2 })],
-      gastosFijos: [mkGastoFijo({ monto: 0.1 })],
+      ventaItems: [mkItem({ cantidad: 1, costo_unitario: 0 })],
+      gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: null,
       efectivoReal: null,
     })
     expect(resumen.totalVentas).toBe(0.3)
-    expect(resumen.utilidadBruta).toBe(0.2)
+    expect(resumen.totalCogs).toBe(0)
+    expect(resumen.utilidadBruta).toBe(0.3)
   })
 
   it('rounds diferencia to 2 decimals (REQ-POS-31)', () => {
     const resumen = calcularCierre({
       ventas: [],
+      ventaItems: [],
       gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: 100,
@@ -195,6 +299,7 @@ describe('calcularCierre', () => {
   it('passes efectivoEsperado/efectivoReal through to the resumen (REQ-POS-31)', () => {
     const resumen = calcularCierre({
       ventas: [],
+      ventaItems: [],
       gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: 100,
@@ -211,6 +316,7 @@ describe('calcularCierre', () => {
         mkVenta({ id: 'v-2', total: 7, metodo_pago: 'transferencia' }),
         mkVenta({ id: 'v-3', total: 8, metodo_pago: 'mixto' }),
       ],
+      ventaItems: [],
       gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: null,
@@ -223,9 +329,10 @@ describe('calcularCierre', () => {
     expect(resumen.totalVentas).toBe(20)
   })
 
-  it('returns the same shape (CierreResumen) for empty and full input (REQ-POS-31)', () => {
+  it('returns the same shape (CierreResumen) for empty and full input (REQ-POS-31, REQ-FIN-5..8)', () => {
     const vacio = calcularCierre({
       ventas: [],
+      ventaItems: [],
       gastosFijos: [],
       gastosImprevistos: [],
       efectivoEsperado: null,
@@ -233,21 +340,26 @@ describe('calcularCierre', () => {
     })
     const lleno = calcularCierre({
       ventas: [mkVenta({ total: 50 })],
+      ventaItems: [mkItem({ cantidad: 1, costo_unitario: 10 })],
       gastosFijos: [mkGastoFijo({ monto: 10 })],
       gastosImprevistos: [mkImprevisto({ monto: 5 })],
-      efectivoEsperado: 35,
-      efectivoReal: 33,
+      efectivoEsperado: 25,
+      efectivoReal: 23,
     })
     for (const k of [
       'totalVentas',
+      'totalCogs',
       'totalGastosFijos',
       'totalGastosImprevistos',
       'utilidadBruta',
+      'utilidadNeta',
       'efectivoEsperado',
       'efectivoReal',
       'diferencia',
       'ventasPorMetodoPago',
       'cantidadVentas',
+      'desgloseProductos',
+      'desgloseDias',
     ] as const) {
       expect(vacio).toHaveProperty(k)
       expect(lleno).toHaveProperty(k)
@@ -259,6 +371,9 @@ describe('calcularCierre', () => {
     }
     expect(cierreRow.total_ventas).toBe(50)
     expect(cierreRow.diferencia).toBe(-2)
+    // full: utilidadBruta = 50 - 10 = 40; utilidadNeta = 40 - 10 - 5 = 25.
+    expect(lleno.utilidadBruta).toBe(40)
+    expect(lleno.utilidadNeta).toBe(25)
   })
 })
 

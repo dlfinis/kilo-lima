@@ -53,6 +53,8 @@ const mkVentaItem = (overrides: Partial<VentaItem> = {}): VentaItem => ({
   cantidad: 2,
   precio_unitario: 5,
   subtotal: 10,
+  costo_unitario: null,
+  margen_aplicado: null,
   created_at: '2026-06-19T10:00:00Z',
   ...overrides,
 })
@@ -146,6 +148,28 @@ describe('pos.types surface', () => {
     expect(input).not.toHaveProperty('created_at')
   })
 
+  it('VentaItem carries the COGS snapshot columns nullable (REQ-FIN-12)', () => {
+    const item = mkVentaItem({ costo_unitario: 3.5, margen_aplicado: 0.4 })
+    expect(item.costo_unitario).toBe(3.5)
+    expect(item.margen_aplicado).toBeCloseTo(0.4, 4)
+    const itemNull: VentaItem = mkVentaItem({ costo_unitario: null, margen_aplicado: null })
+    expect(itemNull.costo_unitario).toBeNull()
+    expect(itemNull.margen_aplicado).toBeNull()
+  })
+
+  it('VentaItemInput accepts optional COGS snapshot fields (REQ-FIN-12)', () => {
+    const input: VentaItemInput = {
+      producto_id: 'p-1',
+      cantidad: 2,
+      precio_unitario: 5,
+      subtotal: 10,
+      costo_unitario: 3.5,
+      margen_aplicado: 0.4,
+    }
+    expect(input.costo_unitario).toBe(3.5)
+    expect(input.margen_aplicado).toBeCloseTo(0.4, 4)
+  })
+
   it('VentaConItems extends Venta with items array (REQ-POS-44)', () => {
     const ventaConItems: VentaConItems = {
       ...mkVenta(),
@@ -208,6 +232,7 @@ describe('pos.types surface', () => {
   it('CierreInput and CierreResultado are the cierre pure-function shapes (REQ-POS-44, REQ-POS-31)', () => {
     const input: CierreInput = {
       ventas: [mkVenta()],
+      ventaItems: [mkVentaItem({ costo_unitario: 3, cantidad: 2, subtotal: 10 })],
       gastosFijos: [],
       gastosImprevistos: [mkGastoImprevisto()],
       efectivoEsperado: null,
@@ -215,16 +240,24 @@ describe('pos.types surface', () => {
     }
     const resultado: CierreResultado = {
       totalVentas: 10,
+      totalCogs: 6,
       totalGastosFijos: 0,
       totalGastosImprevistos: 50,
-      utilidadBruta: -40,
+      utilidadBruta: 4,
+      utilidadNeta: -46,
       efectivoEsperado: null,
       efectivoReal: null,
       diferencia: null,
       ventasPorMetodoPago: { efectivo: 10, transferencia: 0, tarjeta: 0, mixto: 0 },
       cantidadVentas: 1,
+      desgloseProductos: [],
+      desgloseDias: [],
     }
-    expect(resultado.utilidadBruta).toBe(-40)
+    expect(resultado.utilidadBruta).toBe(4)
+    expect(resultado.utilidadNeta).toBe(-46)
     expect(input.ventas).toHaveLength(1)
+    expect(input.ventaItems).toHaveLength(1)
+    expect(resultado.desgloseProductos).toEqual([])
+    expect(resultado.desgloseDias).toEqual([])
   })
 })

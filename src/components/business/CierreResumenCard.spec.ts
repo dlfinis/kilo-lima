@@ -14,9 +14,11 @@ const vuetify = createVuetify({ components, directives })
 
 const mkResumen = (overrides: Partial<CierreResultado> = {}): CierreResultado => ({
   totalVentas: 100,
+  totalCogs: 0,
   totalGastosFijos: 30,
   totalGastosImprevistos: 20,
-  utilidadBruta: 50,
+  utilidadBruta: 100,
+  utilidadNeta: 50,
   efectivoEsperado: null,
   efectivoReal: null,
   diferencia: null,
@@ -27,6 +29,8 @@ const mkResumen = (overrides: Partial<CierreResultado> = {}): CierreResultado =>
     mixto: 0,
   },
   cantidadVentas: 5,
+  desgloseProductos: [],
+  desgloseDias: [],
   ...overrides,
 })
 
@@ -37,7 +41,7 @@ const mountCard = (resumen: CierreResultado | null) =>
   })
 
 describe('CierreResumenCard', () => {
-  it('renders the four sections with values from the resumen (REQ-POS-34)', () => {
+  it('renders the four sections with values from the resumen (REQ-POS-34, REQ-FIN-11)', () => {
     const wrapper = mountCard(mkResumen())
 
     expect(wrapper.text()).toContain('Resumen del cierre')
@@ -49,7 +53,22 @@ describe('CierreResumenCard', () => {
     expect(wrapper.text()).toContain('Imprevistos')
     expect(wrapper.text()).toContain('20.00')
     expect(wrapper.text()).toContain('Utilidad bruta')
+    // utilidadBruta = ventas - COGS = 100 - 0 = 100.
+    expect(wrapper.text()).toContain('100.00')
+    // REQ-FIN-11: utilidadNeta = utilidadBruta - gastosOp = 100 - 30 - 20 = 50.
+    expect(wrapper.text()).toContain('Utilidad neta')
     expect(wrapper.text()).toContain('50.00')
+  })
+
+  it('renders utilidadBruta from ventas - COGS (corrected formula, REQ-FIN-6, REQ-FIN-11)', () => {
+    const wrapper = mountCard(
+      mkResumen({ totalVentas: 200, totalCogs: 100, utilidadBruta: 100, utilidadNeta: 70 }),
+    )
+
+    expect(wrapper.text()).toContain('Utilidad bruta')
+    expect(wrapper.text()).toContain('100.00')
+    expect(wrapper.text()).toContain('Utilidad neta')
+    expect(wrapper.text()).toContain('70.00')
   })
 
   it('shows the per-metodo_pago breakdown (REQ-POS-34)', () => {

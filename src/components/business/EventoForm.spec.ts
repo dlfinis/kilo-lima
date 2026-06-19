@@ -19,6 +19,8 @@ const vuetify = createVuetify({ components, directives })
 const mkInput = (overrides: Partial<EventoInput> = {}): EventoInput => ({
   nombre: 'Feria del Sol',
   fecha: '2026-07-15',
+  fecha_fin: null,
+  margen_ganancia: 0.4,
   ubicacion: 'Plaza Central',
   estado: 'planificacion',
   notas: null,

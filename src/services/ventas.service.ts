@@ -95,6 +95,9 @@ export function crearVentasService(supabase: SupabaseClient<Database>): VentasSe
       const venta = insercion.data as VentaConItems
 
       // 2) Items insert — Promise.all so the first failure short-circuits.
+      // REQ-FIN-12: forward costo_unitario + margen_aplicado (nullable,
+      // legacy-safe — null = "no snapshot at sale time", contributes 0
+      // to COGS via `?? 0` in utils/cierre.ts per REQ-FIN-8 / PD-4).
       const itemsConVentaId: Database['public']['Tables']['venta_items']['Insert'][] =
         input.items.map((it) => ({
           venta_id: venta.id,
@@ -102,6 +105,8 @@ export function crearVentasService(supabase: SupabaseClient<Database>): VentasSe
           cantidad: it.cantidad,
           precio_unitario: it.precio_unitario,
           subtotal: it.subtotal,
+          costo_unitario: it.costo_unitario ?? null,
+          margen_aplicado: it.margen_aplicado ?? null,
         }))
       const inserciones = await Promise.all(
         itemsConVentaId.map((it) =>

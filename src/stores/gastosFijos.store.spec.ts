@@ -24,6 +24,8 @@ const mkEvento = (id: string, estado: Evento['estado'] = 'planificacion'): Event
   id,
   nombre: 'Feria',
   fecha: '2026-07-15',
+  fecha_fin: null,
+  margen_ganancia: null,
   ubicacion: null,
   estado,
   notas: null,

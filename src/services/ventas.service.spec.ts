@@ -34,6 +34,8 @@ const mkItem = (overrides: Partial<VentaItem> = {}): VentaItem => ({
   cantidad: 1,
   precio_unitario: 5,
   subtotal: 5,
+  costo_unitario: null,
+  margen_aplicado: null,
   created_at: '2026-06-19T00:00:00Z',
   ...overrides,
 })
@@ -89,6 +91,71 @@ describe('ventas.service — registrarVenta (REQ-POS-12, REQ-POS-13)', () => {
     // Items should be tagged with the new venta_id from the header insert.
     expect(res.data?.items[0]?.venta_id).toBe('v-1')
     expect(res.data?.items[1]?.venta_id).toBe('v-1')
+  })
+
+  it('forwards costo_unitario + margen_aplicado to the venta_items insert (REQ-FIN-12, REQ-FIN-31)', async () => {
+    const header = mkVenta({ id: 'v-1', total: 10 })
+    const insertedItem = mkItem({
+      id: 'vi-1',
+      venta_id: 'v-1',
+      producto_id: 'p-1',
+      cantidad: 2,
+      precio_unitario: 5,
+      subtotal: 10,
+      costo_unitario: 3.5,
+      margen_aplicado: 0.4,
+    })
+    __pushSupabaseResponse<VentaConItems>({ data: header, error: null })
+    __pushSupabaseResponse<VentaItem[]>({ data: [insertedItem], error: null })
+
+    const res = await servicio.registrarVenta({
+      evento_id: 'e-1',
+      metodo_pago: 'efectivo',
+      total: 10,
+      items: [
+        {
+          producto_id: 'p-1',
+          cantidad: 2,
+          precio_unitario: 5,
+          subtotal: 10,
+          costo_unitario: 3.5,
+          margen_aplicado: 0.4,
+        },
+      ],
+    })
+
+    expect(res.error).toBeNull()
+    expect(res.data?.items[0]?.costo_unitario).toBe(3.5)
+    expect(res.data?.items[0]?.margen_aplicado).toBeCloseTo(0.4, 4)
+    // Verify the actual Supabase insert payload carried the new columns.
+    const llamadas = __getSupabaseMockCalls()
+    const insertLlamadas = llamadas.filter((l) => l.metodo === 'insert')
+    // Last insert is the item — its arg shape is the item payload object.
+    const itemInsert = insertLlamadas[insertLlamadas.length - 1]
+    const payload = itemInsert?.args[0] as Record<string, unknown>
+    expect(payload.costo_unitario).toBe(3.5)
+    expect(payload.margen_aplicado).toBeCloseTo(0.4, 4)
+  })
+
+  it('forwards null COGS snapshot when not provided (legacy-safe, REQ-FIN-8)', async () => {
+    const header = mkVenta({ id: 'v-1', total: 5 })
+    const insertedItem = mkItem({ id: 'vi-1', costo_unitario: null, margen_aplicado: null })
+    __pushSupabaseResponse<VentaConItems>({ data: header, error: null })
+    __pushSupabaseResponse<VentaItem[]>({ data: [insertedItem], error: null })
+
+    await servicio.registrarVenta({
+      evento_id: 'e-1',
+      metodo_pago: 'efectivo',
+      total: 5,
+      items: [mkItemInput()],
+    })
+
+    const llamadas = __getSupabaseMockCalls()
+    const insertLlamadas = llamadas.filter((l) => l.metodo === 'insert')
+    const itemInsert = insertLlamadas[insertLlamadas.length - 1]
+    const payload = itemInsert?.args[0] as Record<string, unknown>
+    expect(payload.costo_unitario).toBeNull()
+    expect(payload.margen_aplicado).toBeNull()
   })
 
   it('rejects when the cart has zero items (REQ-POS-17)', async () => {

@@ -86,6 +86,8 @@ export interface Database {
           id: string
           nombre: string
           fecha: string
+          fecha_fin: string | null
+          margen_ganancia: number | null
           ubicacion: string | null
           estado: 'planificacion' | 'en_curso' | 'cerrado'
           notas: string | null
@@ -96,6 +98,8 @@ export interface Database {
           id?: string
           nombre: string
           fecha: string
+          fecha_fin?: string | null
+          margen_ganancia?: number | null
           ubicacion?: string | null
           estado?: 'planificacion' | 'en_curso' | 'cerrado'
           notas?: string | null
@@ -227,6 +231,8 @@ export interface Database {
           cantidad: number
           precio_unitario: number
           subtotal: number
+          costo_unitario: number | null
+          margen_aplicado: number | null
           created_at: string
         }
         Insert: {
@@ -236,6 +242,8 @@ export interface Database {
           cantidad: number
           precio_unitario: number
           subtotal: number
+          costo_unitario?: number | null
+          margen_aplicado?: number | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['venta_items']['Insert']>
@@ -290,6 +298,9 @@ export interface Database {
           total_gastos_fijos: number
           total_gastos_imprevistos: number
           utilidad_bruta: number
+          total_cogs: number
+          total_utilidad_bruta: number
+          total_utilidad_neta: number
           efectivo_esperado: number | null
           efectivo_real: number | null
           diferencia: number | null
@@ -304,6 +315,9 @@ export interface Database {
           total_gastos_fijos: number
           total_gastos_imprevistos: number
           utilidad_bruta: number
+          total_cogs?: number
+          total_utilidad_bruta?: number
+          total_utilidad_neta?: number
           efectivo_esperado?: number | null
           efectivo_real?: number | null
           diferencia?: number | null

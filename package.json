@@ -24,6 +24,7 @@
     "verify:ux-pr1": "node scripts/verify-ux-pr1.mjs",
     "verify:ux-pr2": "node scripts/verify-ux-pr2.mjs",
     "verify:ux-pr3": "node scripts/verify-ux-pr3.mjs",
+    "verify:finanzas-pr1": "node scripts/verify-finanzas-pr1.mjs",
     "verify:all": "node scripts/verify-all.mjs"
   },
   "dependencies": {

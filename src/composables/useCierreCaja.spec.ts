@@ -132,7 +132,11 @@ describe('useCierreCaja — PR1 reactive bridge (REQ-POS-30, REQ-POS-31)', () =>
       expect(resumen.value?.totalVentas).toBe(50)
       expect(resumen.value?.totalGastosFijos).toBe(10)
       expect(resumen.value?.totalGastosImprevistos).toBe(5)
-      expect(resumen.value?.utilidadBruta).toBe(35)
+      // REQ-FIN-6: utilidadBruta = ventas − COGS = 50 − 0 = 50
+      // (items has no costo_unitario so COGS=0 per REQ-FIN-8).
+      expect(resumen.value?.utilidadBruta).toBe(50)
+      // REQ-FIN-7: utilidadNeta = utilidadBruta − gastosOp = 50 − 10 − 5 = 35.
+      expect(resumen.value?.utilidadNeta).toBe(35)
       expect(resumen.value?.ventasPorMetodoPago.efectivo).toBe(50)
     })
   })

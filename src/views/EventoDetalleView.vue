@@ -1,17 +1,24 @@
 <script setup lang="ts">
 // REQ-EVENTS-3, REQ-EVENTS-4, REQ-EVENTS-7, REQ-EVENTS-11,
 // REQ-EVENTS-14, REQ-EVENTS-22, REQ-EVENTS-27, REQ-EVENTS-36,
-// REQ-EVENTS-38, REQ-EVENTS-39: detail view. Composes events +
-// gastos stores + projection composable. `estadoEsEditable` is the
-// single source of truth for the read-only mode (REQ-EVENTS-25):
-// when the evento is cerrado, all mutating controls disappear and
-// a v-alert explains why (REQ-EVENTS-27). PR3 swaps the compact
-// projection summary for the full ProyeccionCostosCard.
+// REQ-EVENTS-38, REQ-EVENTS-39, REQ-FIN-1, REQ-FIN-2, REQ-FIN-4,
+// REQ-FIN, PD-1: detail view. Composes events + gastos stores +
+// projection composable. `estadoEsEditable` is the single source of
+// truth for the read-only mode (REQ-EVENTS-25): when the evento is
+// cerrado, all mutating controls disappear and a v-alert explains why
+// (REQ-EVENTS-27). PR3 swaps the compact projection summary for the
+// full ProyeccionCostosCard.
+//
+// Fase 1 (finanzas-evento):
+//   - Inline edit fields for fecha_fin (multi-day) + margen_ganancia.
+//     Save action reuses the events store's actualizar().
+//   - Header date range: single-day "15/07/2026" when fecha_fin is null,
+//     multi-day "15/07/2026 – 22/07/2026" otherwise.
 //
 // REQ-UX-28: the local "Volver" button was removed — the global
 // AppBar back button replaces it. The view no longer needs to wire
 // its own back handler.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import EventoStatusChip from '@/components/business/EventoStatusChip.vue'
@@ -33,7 +40,7 @@ const eventoId = computed<string | null>(() => {
   return typeof value === 'string' ? value : Array.isArray(value) ? value[0] ?? null : null
 })
 
-const { eventoActual, cargando, error, cargarPorId, cambiarEstado, eliminar } = useEvents()
+const { eventoActual, cargando, error, cargarPorId, cambiarEstado, eliminar, actualizar } = useEvents()
 const { gastosPorEvento, cargando: cargandoGastos, error: errorGastos, cargarPorEvento, agregar, eliminar: eliminarGasto } = useGastosFijos()
 const { cargarPorEvento: cargarPlan } = usePlans()
 const proyeccion = useProyeccionCostos(eventoId)
@@ -72,6 +79,44 @@ const transicionesVisibles = computed<Transicion[]>(() => {
 function formatearFecha(iso: string): string {
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
+}
+
+// REQ-FIN-1, REQ-FIN-4: single-day shows the start date once; multi-day
+// shows "start – end". fecha_fin null/empty = single day.
+function formatearFechaRango(inicio: string, fin: string | null): string {
+  if (!fin || fin === inicio) return formatearFecha(inicio)
+  return `${formatearFecha(inicio)} – ${formatearFecha(fin)}`
+}
+
+// REQ-FIN-2, REQ-FIN, PD-1: inline edit fields for fecha_fin and
+// margen_ganancia. margen is stored as decimal 0..1 but rendered as a
+// percentage 0..100 — the conversion lives here so the input is
+// user-friendly.
+const fechaFinBorrador = ref<string>('')
+const margenPorcentajeBorrador = ref<string>('')
+
+function cargarBorradoresDesdeEvento(): void {
+  if (!eventoActual.value) return
+  fechaFinBorrador.value = eventoActual.value.fecha_fin ?? ''
+  margenPorcentajeBorrador.value = eventoActual.value.margen_ganancia !== null
+    ? String(Math.round(eventoActual.value.margen_ganancia * 100))
+    : '40'
+}
+watch(() => eventoActual.value?.id, cargarBorradoresDesdeEvento, { immediate: true })
+
+async function guardarFechasMargen(): Promise<void> {
+  if (!eventoActual.value || !eventoId.value) return
+  const ev = eventoActual.value
+  const margenDecimal = Number.parseFloat(margenPorcentajeBorrador.value) / 100
+  await actualizar(eventoId.value, {
+    nombre: ev.nombre,
+    fecha: ev.fecha,
+    fecha_fin: fechaFinBorrador.value === '' ? null : fechaFinBorrador.value,
+    margen_ganancia: Number.isFinite(margenDecimal) ? margenDecimal : null,
+    ubicacion: ev.ubicacion,
+    estado: ev.estado,
+    notas: ev.notas,
+  })
 }
 
 onMounted(() => {
@@ -131,8 +176,8 @@ function irAPlanificar() {
         <h1 data-testid="evento-detalle-titulo">{{ eventoActual.nombre }}</h1>
         <EventoStatusChip :estado="eventoActual.estado" />
       </div>
-      <p class="mb-4 text-medium-emphasis">
-        {{ formatearFecha(eventoActual.fecha) }}
+      <p class="mb-4 text-medium-emphasis" data-testid="evento-detalle-fechas">
+        {{ formatearFechaRango(eventoActual.fecha, eventoActual.fecha_fin) }}
         <template v-if="eventoActual.ubicacion"> · {{ eventoActual.ubicacion }}</template>
       </p>
 
@@ -156,6 +201,48 @@ function irAPlanificar() {
           Eliminar evento
         </v-btn>
       </div>
+
+      <!-- REQ-FIN-2: inline edit fields for fecha_fin (multi-day) and
+           margen_ganancia (PD-1). Hidden in read-only mode so a cerrado
+           evento can't be mutated. -->
+      <v-card v-if="editable" class="pa-4 mb-4" data-testid="evento-detalle-fechas-card">
+        <div class="d-flex ga-3 align-end flex-wrap">
+          <v-text-field
+            v-model="fechaFinBorrador"
+            type="date"
+            label="Fecha fin (opcional)"
+            data-testid="evento-detalle-fecha-fin"
+            density="compact"
+            hide-details
+            clearable
+            style="max-width: 220px"
+          />
+          <v-text-field
+            v-model.number="margenPorcentajeBorrador"
+            type="number"
+            label="Margen (%)"
+            data-testid="evento-detalle-margen"
+            density="compact"
+            hide-details
+            min="0"
+            max="90"
+            step="1"
+            suffix="%"
+            style="max-width: 160px"
+          />
+          <v-btn
+            color="primary"
+            variant="flat"
+            data-testid="evento-detalle-guardar-fechas"
+            @click="guardarFechasMargen"
+          >
+            Guardar
+          </v-btn>
+        </div>
+        <p v-if="!eventoActual.fecha_fin" class="text-caption text-medium-emphasis mt-2">
+          Evento de un solo día — fecha fin vacía se trata como igual a fecha de inicio.
+        </p>
+      </v-card>
 
       <div class="mb-4" data-testid="evento-detalle-proyeccion">
         <ProyeccionCostosCard :proyeccion="proyeccion" />
