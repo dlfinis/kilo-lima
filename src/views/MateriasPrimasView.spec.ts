@@ -37,7 +37,10 @@ beforeEach(() => {
 })
 
 const montarVista = () =>
-  mount(MateriasPrimasView, {
+  mount({
+    components: { MateriasPrimasView },
+    template: '<v-app><MateriasPrimasView /></v-app>',
+  }, {
     attachTo: document.body,
     global: {
       plugins: [vuetify],
@@ -94,10 +97,10 @@ describe('MateriasPrimasView', () => {
     expect(wrapper.text()).toContain('Azúcar')
   })
 
-  it('opens the create dialog when the header CTA is clicked', async () => {
+  it('opens the create dialog when the FAB is clicked (REQ-UX-21)', async () => {
     const wrapper = montarVista()
     await esperarCargaInicial()
-    await wrapper.find('[data-testid="mp-nueva"]').trigger('click')
+    await wrapper.find('[data-testid="materia-prima-fab-nuevo"]').trigger('click')
     await flushPromises()
 
     // v-dialog teleports content to document.body; check there.
@@ -107,10 +110,18 @@ describe('MateriasPrimasView', () => {
     expect(document.querySelector('form.materia-prima-form')).not.toBeNull()
   })
 
+  it('renders the FAB with the spec-locked testid and aria-label (REQ-UX-21)', async () => {
+    const wrapper = montarVista()
+    await esperarCargaInicial()
+    const fab = wrapper.find('[data-testid="materia-prima-fab-nuevo"]')
+    expect(fab.exists()).toBe(true)
+    expect(fab.attributes('aria-label')).toBe('Nueva materia prima')
+  })
+
   it('emits create flow: dialog → submit → store.crear is called', async () => {
     const wrapper = montarVista()
     await esperarCargaInicial()
-    await wrapper.find('[data-testid="mp-nueva"]').trigger('click')
+    await wrapper.find('[data-testid="materia-prima-fab-nuevo"]').trigger('click')
     await flushPromises()
 
     // Pre-load two responses the service consumes in order:

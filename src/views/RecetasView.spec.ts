@@ -49,7 +49,10 @@ const router = createRouter({
 const montarVista = async () => {
   router.push('/recetas')
   await router.isReady()
-  return mount(RecetasView, {
+  return mount({
+    components: { RecetasView },
+    template: '<v-app><RecetasView /></v-app>',
+  }, {
     attachTo: document.body,
     global: {
       plugins: [vuetify, router],
@@ -101,12 +104,13 @@ describe('RecetasView', () => {
     expect(wrapper.text()).toContain('Reintentar')
   })
 
-  it('opens the create dialog when the header CTA is clicked', async () => {
+  it('opens the create dialog when the FAB is clicked (REQ-UX-22)', async () => {
     const wrapper = await montarVista()
     await flushPromises()
-    const boton = wrapper.find('[data-testid="receta-nueva"]')
-    expect(boton.exists()).toBe(true)
-    await boton.trigger('click')
+    const fab = wrapper.find('[data-testid="receta-fab-nuevo"]')
+    expect(fab.exists()).toBe(true)
+    expect(fab.attributes('aria-label')).toBe('Nueva receta')
+    await fab.trigger('click')
     await flushPromises()
 
     expect(document.body.textContent ?? '').toContain('Nueva receta')
@@ -125,7 +129,7 @@ describe('RecetasView', () => {
       created_at: '2026-01-01T00:00:00Z',
       updated_at: '2026-01-01T00:00:00Z',
     })
-    await wrapper.find('[data-testid="receta-nueva"]').trigger('click')
+    await wrapper.find('[data-testid="receta-fab-nuevo"]').trigger('click')
     await flushPromises()
 
     const creada = mkReceta('r-new', { nombre: 'Galleta' })

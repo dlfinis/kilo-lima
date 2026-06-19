@@ -6,6 +6,7 @@
 // the list-item stays presentational (REQ-CATALOG-41).
 import { computed, onMounted, ref } from 'vue'
 
+import FabNuevo from '@/components/business/FabNuevo.vue'
 import MateriaPrimaForm from '@/components/business/MateriaPrimaForm.vue'
 import MateriaPrimaListItem from '@/components/business/MateriaPrimaListItem.vue'
 import { useIngredients } from '@/composables/useIngredients'
@@ -74,16 +75,13 @@ function cerrarDialogo() {
   <v-container>
     <div class="d-flex align-center justify-space-between mb-4">
       <h1>Materias primas</h1>
-      <v-btn
-        v-if="materiasPrimas.length > 0 || !cargando"
-        color="primary"
-        prepend-icon="mdi-plus"
-        data-testid="mp-nueva"
-        @click="abrirCrear"
-      >
-        Nueva materia prima
-      </v-btn>
     </div>
+
+    <FabNuevo
+      testid="materia-prima-fab-nuevo"
+      ariaLabel="Nueva materia prima"
+      @click="abrirCrear"
+    />
 
     <v-progress-linear v-if="cargando" indeterminate color="primary" data-testid="mp-loading" />
 

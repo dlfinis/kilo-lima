@@ -8,6 +8,7 @@
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import FabNuevo from '@/components/business/FabNuevo.vue'
 import RecetaForm from '@/components/business/RecetaForm.vue'
 import { useRecipes } from '@/composables/useRecipes'
 import { useIngredients } from '@/composables/useIngredients'
@@ -88,16 +89,13 @@ function cerrarDialogo() {
   <v-container>
     <div class="d-flex align-center justify-space-between mb-4">
       <h1>Recetas</h1>
-      <v-btn
-        v-if="recetas.length > 0 || !cargando"
-        color="primary"
-        prepend-icon="mdi-plus"
-        data-testid="receta-nueva"
-        @click="abrirCrear"
-      >
-        Nueva receta
-      </v-btn>
     </div>
+
+    <FabNuevo
+      testid="receta-fab-nuevo"
+      ariaLabel="Nueva receta"
+      @click="abrirCrear"
+    />
 
     <v-progress-linear v-if="cargando" indeterminate color="primary" data-testid="receta-loading" />
 
