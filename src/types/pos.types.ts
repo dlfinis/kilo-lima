@@ -60,6 +60,9 @@ export interface VentaItem {
 // for legacy rows, but the Insert from cart/sale code may legitimately
 // omit them (Fase 1: the cart snapshot still produces null until Fase 2
 // wires evento_producto lookups). Service layer forwards `?? null`.
+//
+// evento_producto_id links back to the pricing config active at sale
+// time (REQ-FIN-9 follow-up). Optional — legacy paths omit it.
 export interface VentaItemInput {
   producto_id: string
   cantidad: number
@@ -67,6 +70,7 @@ export interface VentaItemInput {
   subtotal: number
   costo_unitario?: number | null
   margen_aplicado?: number | null
+  evento_producto_id?: string | null
 }
 
 export interface VentaConItems extends Venta {
@@ -110,6 +114,11 @@ export type CierreCajaInput = Omit<CierreCaja, 'id' | 'fecha_cierre' | 'created_
 // `margen_aplicado` are FROZEN at add-to-cart time. They travel with
 // the line through `registrarVenta` so the closure-time COGS
 // aggregation never depends on receta costs changing after the sale.
+//
+// REQ-FIN-9 (follow-up gap fix): `evento_producto_id` links the cart
+// line back to the evento_productos row that was active at sale time.
+// Without this, the cierre backfill can't match a venta_item to its
+// pricing config. Nullable — Fase 1 ventas have no link.
 export interface LineaCarrito {
   producto_id: string
   nombre: string
@@ -121,6 +130,9 @@ export interface LineaCarrito {
   costo_unitario: number | null
   // Snapshot of the effective margen (evento_producto.margen ?? evento.margen_ganancia).
   margen_aplicado: number | null
+  // Link to the evento_productos pricing row active at sale time.
+  // Null for legacy ventas and productos without evento_productos config.
+  evento_producto_id: string | null
 }
 
 export interface ResumenCarrito {

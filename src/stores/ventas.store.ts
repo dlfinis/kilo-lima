@@ -131,6 +131,10 @@ export const useVentasStore = defineStore('ventas', () => {
       subtotal: redondear2(cantidad * precio_unitario),
       costo_unitario,
       margen_aplicado,
+      // Link back to the pricing config active at sale time so the
+      // cierre backfill (REQ-FIN-9) can match venta_items to their
+      // evento_productos row. Null when the producto has no config.
+      evento_producto_id: ep?.id ?? null,
     }
   }
 
@@ -246,6 +250,7 @@ export const useVentasStore = defineStore('ventas', () => {
         subtotal: l.subtotal,
         costo_unitario: l.costo_unitario,
         margen_aplicado: l.margen_aplicado,
+        evento_producto_id: l.evento_producto_id,
       })),
     })
     if (res.error || !res.data) {

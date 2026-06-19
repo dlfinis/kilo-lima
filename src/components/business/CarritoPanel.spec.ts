@@ -23,6 +23,7 @@ const mkLinea = (overrides: Partial<LineaCarrito> = {}): LineaCarrito => ({
   subtotal: 10,
   costo_unitario: null,
   margen_aplicado: null,
+  evento_producto_id: null,
   ...overrides,
 })
 
