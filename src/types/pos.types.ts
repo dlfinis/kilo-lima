@@ -133,6 +133,10 @@ export interface ResumenCarrito {
 // (with `metodo_pago`) + their items (for COGS aggregation per REQ-FIN-6)
 // + gastos fijos + imprevistos + optional cash count. Returns a
 // CierreResultado (matches the cierre view's needs).
+//
+// REQ-FIN-21 / REQ-REPORTE-1: when fechaInicio and fechaFin are
+// provided, `calcularCierre` populates `desgloseDias` with the per-day
+// aggregation. When omitted, returns [] (Fase 1 compatibility).
 export interface CierreInput {
   ventas: Venta[]
   // REQ-FIN-6: required for COGS computation. The caller (useCierreCaja)
@@ -142,6 +146,10 @@ export interface CierreInput {
   gastosImprevistos: GastoImprevisto[]
   efectivoEsperado: number | null
   efectivoReal: number | null
+  // Optional date range for per-day aggregation (REQ-REPORTE-1).
+  // Fase 1 callers omit these → desgloseDias stays [].
+  fechaInicio?: string
+  fechaFin?: string
 }
 
 // Per-producto aggregation row (Fase 2 surface — Fase 1 returns []).
