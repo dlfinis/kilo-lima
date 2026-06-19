@@ -45,6 +45,8 @@ export type {
   ResumenCarrito,
   CierreInput,
   CierreResultado,
+  DesgloseDia,
+  DesgloseProducto,
 } from './pos.types'
 export type {
   EventoProducto,

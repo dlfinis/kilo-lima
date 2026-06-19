@@ -40,3 +40,52 @@ alter table public.cierres_caja
 
 alter table public.cierres_caja
   add column if not exists total_utilidad_neta numeric(10,2) not null default 0;
+
+-- ============================================================
+-- Fase 2a DDL: evento_productos (REQ-FIN-13)
+-- ============================================================
+
+-- Per-event product pricing configuration. Each row maps a
+-- producto to an evento with optional pricing overrides. The
+-- UNIQUE(evento_id, producto_id) constraint ensures at most
+-- one config row per product per event.
+create table if not exists public.evento_productos (
+  id            uuid primary key default gen_random_uuid(),
+  evento_id     uuid not null references public.eventos(id)
+                  on delete cascade,
+  producto_id   uuid not null references public.productos(id),
+  precio_venta  numeric(10,2),   -- null = auto-calc from margen
+  margen        numeric(5,4),    -- null = inherit evento.margen_ganancia
+  incluido      boolean not null default true,
+  created_at    timestamptz not null default now(),
+  updated_at    timestamptz not null default now(),
+
+  unique(evento_id, producto_id)
+);
+
+-- Index for per-evento lookups (EventoProductosView, POS filtering).
+create index if not exists idx_evento_productos_evento
+  on public.evento_productos(evento_id);
+
+-- Fase 2b: link venta_items to the pricing row that was active
+-- at sale time. Nullable — legacy rows and Fase 1 ventas have
+-- no link; Fase 2 sales populate it. Without this FK, backfill
+-- (REQ-FIN-9) can't match a venta_item to its evento_producto.
+alter table public.venta_items
+  add column if not exists evento_producto_id uuid
+  references public.evento_productos(id);
+
+-- ============================================================
+-- RLS policies
+-- ============================================================
+
+-- Development mode: allow all (matches existing seed.sql pattern).
+-- Production would use per-user policies; the current Supabase
+-- project has RLS disabled via dev_* migrations.
+alter table public.evento_productos enable row level security;
+
+create policy "Allow all operations on evento_productos"
+  on public.evento_productos
+  for all
+  using (true)
+  with check (true);
