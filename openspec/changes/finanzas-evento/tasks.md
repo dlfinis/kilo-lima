@@ -78,9 +78,9 @@ Legend: ─→ = "depends on"
 
 | # | Layer | File(s) | REQ-FIN | TDD File (write first) | Deps | Est. | Description |
 |---|-------|---------|---------|------------------------|------|------|-------------|
-| [ ] 2b.1 | **Stores** | `src/stores/ventas.store.ts` (MODIFY) | 31 | `src/stores/ventas.store.spec.ts` (extend) | 2a.6, 2a.7 | 35 | `registrarVenta`: snapshot `costo_unitario` (from producto), `margen_aplicado`, `evento_producto_id` on each `venta_item`. Cross-store READ from `eventoProductosStore` + `productosStore`. |
-| [ ] 2b.2 | **Services** | `src/services/ventas.service.ts` (MODIFY) | 31 | `src/services/ventas.service.spec.ts` (extend) | 2a.5 | 20 | Extend `VentaItemInput` to accept `costo_unitario`, `margen_aplicado`, `evento_producto_id`. Forward to Supabase insert. |
-| [ ] 2b.3 | **Views** | `src/views/PosView.vue` (MODIFY) | 28, 29, 30, 32 | `src/views/PosView.spec.ts` (extend) | 2b.1, 2b.2 | 65 | Grid sourced from `eventoProductosStore.productosDelEvento` (incluido=true). Price = `ep.precio_venta`. Cerrado guard: show message, hide grid. `manejarAgregar` uses evento price. |
+| [x] 2b.1 | **Stores** | `src/stores/ventas.store.ts` (MODIFY) | 31 | `src/stores/ventas.store.spec.ts` (extend) | 2a.6, 2a.7 | 35 | `registrarVenta`: snapshot `costo_unitario` (from producto), `margen_aplicado`, `evento_producto_id` on each `venta_item`. Cross-store READ from `eventoProductosStore` + `productosStore`. |
+| [x] 2b.2 | **Services** | `src/services/ventas.service.ts` (MODIFY) | 31 | `src/services/ventas.service.spec.ts` (extend) | 2a.5 | 20 | Extend `VentaItemInput` to accept `costo_unitario`, `margen_aplicado`, `evento_producto_id`. Forward to Supabase insert. |
+| [x] 2b.3 | **Views** | `src/views/PosView.vue` (MODIFY) | 28, 29, 30, 32 | `src/views/PosView.spec.ts` (extend) | 2b.1, 2b.2 | 65 | Grid sourced from `eventoProductosStore.productosDelEvento` (incluido=true). Price = `ep.precio_venta`. Cerrado guard: show message, hide grid. `manejarAgregar` uses evento price. |
 
 ---
 

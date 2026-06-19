@@ -105,12 +105,22 @@ export type CierreCajaInput = Omit<CierreCaja, 'id' | 'fecha_cierre' | 'created_
 // (Pinia) and NEVER hits Supabase — v1 is online-only per
 // REQ-POS-6 / REQ-POS-14. `nombre` is denormalized so the cart can
 // render without re-reading `productos`.
+//
+// REQ-FIN-31 (PR-2b sale-time COGS snapshot): `costo_unitario` and
+// `margen_aplicado` are FROZEN at add-to-cart time. They travel with
+// the line through `registrarVenta` so the closure-time COGS
+// aggregation never depends on receta costs changing after the sale.
 export interface LineaCarrito {
   producto_id: string
   nombre: string
   precio_unitario: number
   cantidad: number
   subtotal: number
+  // Snapshot of receta.costoPorUnidad at add-to-cart time. Null when
+  // the producto has no computable receta cost (legacy-safe).
+  costo_unitario: number | null
+  // Snapshot of the effective margen (evento_producto.margen ?? evento.margen_ganancia).
+  margen_aplicado: number | null
 }
 
 export interface ResumenCarrito {

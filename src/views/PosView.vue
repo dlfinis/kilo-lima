@@ -1,17 +1,31 @@
 <script setup lang="ts">
 // REQ-POS-7, REQ-POS-14, REQ-POS-15, REQ-POS-16, REQ-POS-20,
 // REQ-POS-24, REQ-POS-25, REQ-POS-28, REQ-POS-39, REQ-POS-40,
-// REQ-POS-46, REQ-POS-49, REQ-POS-54, REQ-POS-55: POS main view.
+// REQ-POS-46, REQ-POS-49, REQ-POS-54, REQ-POS-55,
+// REQ-FIN-28, REQ-FIN-29, REQ-FIN-30, REQ-FIN-32 (PR-2b POS integration):
 //
-// Wires useProductos + useVentas + useEvents + useGastosImprevistos.
-// 4-state handling (loading/error/empty/data per REQ-POS-49).
-// Requires evento en_curso selected; without it, surfaces the
-// no-evento guard. Carrito panel + product grid + registrar venta
-// flow + collapsible Imprevistos section (REQ-POS-40 — deferred
-// from PR3 so the cierre card has the same data source).
+// POS main view. Wires useProductos + useVentas + useEvents +
+// useGastosImprevistos + usePreciosEvento + useEventoProductosStore.
 //
-// Online status chip (REQ-POS-49: cross-slice visibility).
+// PR-2b changes:
+//   - The product grid is sourced from `usePreciosEvento(eventoEnCurso)`,
+//     filtered by `incluido = true` AND `costo_unitario > 0`
+//     (computable from the receta). Products whose receta has no
+//     ingredients are excluded — they would render as $0 and the
+//     operator can't sell them (REQ-FIN-30).
+//   - The empty state for "no productos configured for this evento"
+//     surfaces a `Configurar productos` button that routes to
+//     `/eventos/:id/productos` (REQ-FIN-30).
+//   - A `Margen: {evento.margen_ganancia * 100}%` badge reflects the
+//     active evento's default margin (REQ-FIN-29).
+//   - `agregarAlCarrito` calls the store with (productoId, 1) — the
+//     store derives precio + costo + margen via usePreciosEvento.
+//   - The PR-2b event-cerrado guard is the existing EVENTO_CERRADO
+//     path: when eventoEnCurso is null and a cerrado evento exists,
+//     `useVentas().registrarVenta` short-circuits before reaching
+//     this view (REQ-FIN-32, REQ-POS-39).
 import { computed, onMounted, ref } from 'vue'
+import { useRouter } from 'vue-router'
 
 import CarritoPanel from '@/components/business/CarritoPanel.vue'
 import GastoImprevistoForm from '@/components/business/GastoImprevistoForm.vue'
@@ -20,13 +34,15 @@ import ProductoCardGrid from '@/components/business/ProductoCardGrid.vue'
 import RegistrarVentaDialog from '@/components/business/RegistrarVentaDialog.vue'
 import { useEvents } from '@/composables/useEvents'
 import { useGastosImprevistos } from '@/composables/useGastosImprevistos'
+import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useProductos } from '@/composables/useProductos'
 import { useRecipes } from '@/composables/useRecipes'
 import { useVentas } from '@/composables/useVentas'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import type { GastoImprevistoInput, Producto, RecetaConIngredientes } from '@/types'
 
-const { productos, cargando, error, cargarTodas } = useProductos()
+const router = useRouter()
+const { cargando: cargandoProductos, error: errorProductos, cargarTodas } = useProductos()
 const { recetas, cargarTodas: cargarRecetas } = useRecipes()
 const { carrito, totalCarrito, eventoEnCurso, agregarAlCarrito, vaciarCarrito, registrarVenta } =
   useVentas()
@@ -40,20 +56,68 @@ const {
 } = useGastosImprevistos()
 const { online } = useOnlineStatus()
 
+// REQ-FIN-28, REQ-FIN-29: the POS grid source. Reactive on the
+// active evento id — switching eventos re-evaluates without a manual
+// refresh. `productosDelEvento` already filters `incluido = true`; we
+// additionally filter out rows whose costo_unitario is 0 (receta has
+// no ingredients) so the POS never shows unsellable $0 cards.
+const { productosDelEvento } = usePreciosEvento(() => eventoEnCurso.value?.id ?? null)
+const productosParaGrid = computed(() =>
+  productosDelEvento.value.filter((ep) => ep.costo_unitario > 0),
+)
+// ProductoCardGrid is a presentational component that takes
+// Producto[] + RecetaConIngredientes[]; map the joined shape into
+// the legacy types so we keep the existing card surface without a
+// breaking change to ProductoCardGrid (REQ-FIN-29).
+const productosMapeados = computed<Producto[]>(() =>
+  productosParaGrid.value.map((ep) => ({
+    id: ep.producto_id,
+    receta_id: ep.receta_id,
+    precio_venta: ep.precio_final,
+    disponible: true,
+    orden: 0,
+    created_at: ep.created_at,
+    updated_at: ep.updated_at,
+  })),
+)
+const recetasParaGrid = computed<RecetaConIngredientes[]>(() =>
+  productosParaGrid.value.map((ep) => ({
+    id: ep.receta_id,
+    nombre: ep.producto_nombre,
+    descripcion: null,
+    rendimiento_unidades: 1,
+    notas: null,
+    ingredientes: [],
+    created_at: ep.created_at,
+    updated_at: ep.updated_at,
+  })),
+)
+
+// REQ-FIN-30: empty-state gating. Empty means "the active evento has
+// no included productos with computable costo" — either the operator
+// never configured the evento, or every producto is excluded / has no
+// receta cost. We surface the configurator instead of a generic empty.
+const hayProductosParaVender = computed(() => productosParaGrid.value.length > 0)
+
+// REQ-FIN-29: badge text. evento.margen_ganancia is the default
+// margin (nullable in DB; falls back to "—" when unset).
+const margenBadge = computed(() => {
+  const m = eventoEnCurso.value?.margen_ganancia
+  if (m === null || m === undefined) return null
+  return `${Math.round(m * 100)}%`
+})
+
 const imprevistosAbierto = ref(false)
 const dialogoCrearImprevisto = ref(false)
 
 const busqueda = ref('')
 const dialogoRegistrarAbierto = ref(false)
 
-const productosComoArray = computed<Producto[]>(() => productos.value as Producto[])
-const recetasComoArray = computed<RecetaConIngredientes[]>(
-  () => recetas.value as RecetaConIngredientes[],
-)
-
 // CargarEventos ensures eventoEnCurso is computed. The view fetches
-// eventos independientemente so the guard works even if the user lands
-// on /pos without first visiting /eventos.
+// eventos, productos, and recetas independently so the guard works
+// even if the user lands on /pos without first visiting /eventos or
+// /productos. usePreciosEvento (PR-2b) joins all three to compute
+// precio_final + costo_unitario for the POS grid.
 onMounted(async () => {
   await cargarEventos()
   await cargarTodas()
@@ -100,16 +164,16 @@ function toggleImprevistos() {
   if (imprevistosAbierto.value) alExpandirImprevistos()
 }
 
-function buscarNombre(productoId: string): string {
-  const producto = productos.value.find((p) => p.id === productoId)
-  if (!producto) return 'Receta'
-  return recetas.value.find((r) => r.id === producto.receta_id)?.nombre ?? 'Receta'
+// REQ-FIN-31 (PR-2b): delegate everything to the store. The store
+// snapshots precio + costo + margen from usePreciosEvento so we don't
+// re-read the catalogo or evento_productos here.
+function manejarAgregar(productoId: string) {
+  agregarAlCarrito(productoId, 1)
 }
 
-function manejarAgregar(productoId: string) {
-  const producto = productos.value.find((p) => p.id === productoId)
-  if (!producto) return
-  agregarAlCarrito(productoId, buscarNombre(productoId), producto.precio_venta)
+function irAConfigurarProductos() {
+  if (!eventoEnCurso.value) return
+  router.push(`/eventos/${eventoEnCurso.value.id}/productos`)
 }
 
 function abrirDialogoRegistrar() {
@@ -131,13 +195,24 @@ function reintentar() {
   <v-container>
     <div class="d-flex align-center justify-space-between mb-4">
       <h1 data-testid="pos-titulo">POS</h1>
-      <v-chip
-        :color="online ? 'success' : 'error'"
-        size="small"
-        data-testid="pos-online"
-      >
-        {{ online ? 'En línea' : 'Sin conexión' }}
-      </v-chip>
+      <div class="d-flex align-center ga-2">
+        <v-chip
+          v-if="margenBadge"
+          size="small"
+          color="primary"
+          variant="tonal"
+          data-testid="pos-margen-badge"
+        >
+          Margen: {{ margenBadge }}
+        </v-chip>
+        <v-chip
+          :color="online ? 'success' : 'error'"
+          size="small"
+          data-testid="pos-online"
+        >
+          {{ online ? 'En línea' : 'Sin conexión' }}
+        </v-chip>
+      </div>
     </div>
 
     <!-- REQ-POS-16 / REQ-POS-39: no evento en_curso guard -->
@@ -167,33 +242,54 @@ function reintentar() {
         />
       </div>
 
-      <!-- REQ-POS-49: loading state -->
+      <!-- REQ-POS-49: loading state. PR-2b keeps the productos store
+           fetch as a hint (cargando); the grid is driven by
+           usePreciosEvento. -->
       <v-progress-linear
-        v-if="cargando"
+        v-if="cargandoProductos"
         indeterminate
         color="primary"
         class="mb-2"
         data-testid="pos-cargando"
       />
 
-      <!-- REQ-POS-49: error state -->
+      <!-- REQ-POS-49: error state from the catalogo fetch. -->
       <v-alert
-        v-if="error && !cargando"
+        v-if="errorProductos && !cargandoProductos"
         type="error"
         class="mb-4"
         data-testid="pos-error"
       >
-        {{ error }}
+        {{ errorProductos }}
         <template #append>
           <v-btn variant="text" @click="reintentar">Reintentar</v-btn>
         </template>
       </v-alert>
 
-      <v-row v-if="!cargando && !error">
+      <!-- REQ-FIN-30: empty-state — direct the operator to the
+           EventoProductosView instead of showing a blank grid. -->
+      <v-alert
+        v-if="!hayProductosParaVender && !cargandoProductos && !errorProductos"
+        type="info"
+        class="mb-4"
+        data-testid="pos-evento-sin-productos"
+      >
+        <p class="text-h6 mb-2">No hay productos configurados para este evento</p>
+        <p class="mb-3">Activá los productos y los márgenes antes de empezar a vender.</p>
+        <v-btn
+          color="primary"
+          data-testid="pos-configurar-productos"
+          @click="irAConfigurarProductos"
+        >
+          Configurar productos
+        </v-btn>
+      </v-alert>
+
+      <v-row v-else-if="!cargandoProductos && !errorProductos">
         <v-col cols="12" md="8" data-testid="pos-grid-col">
           <ProductoCardGrid
-            :productos="productosComoArray"
-            :recetas="recetasComoArray"
+            :productos="productosMapeados"
+            :recetas="recetasParaGrid"
             :busqueda="busqueda"
             @agregar="manejarAgregar"
           />

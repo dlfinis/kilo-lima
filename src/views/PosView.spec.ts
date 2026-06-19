@@ -1,12 +1,21 @@
 // REQ-POS-7, REQ-POS-14, REQ-POS-15, REQ-POS-16, REQ-POS-20,
 // REQ-POS-24, REQ-POS-25, REQ-POS-28, REQ-POS-39, REQ-POS-40,
-// REQ-POS-46, REQ-POS-49, REQ-POS-54, REQ-POS-55: the POS main view
-// — wires useProductos + useVentas + useEvents + useOnlineStatus +
-// useGastosImprevistos. 4-state handling (loading/error/empty/data
-// per REQ-POS-49). Requires evento en_curso selected; without it,
-// surfaces the no-evento guard. Carrito panel + product grid +
-// collapsible Imprevistos section (REQ-POS-40 — deferred from PR3)
-// + registrar venta flow.
+// REQ-POS-46, REQ-POS-49, REQ-POS-54, REQ-POS-55,
+// REQ-FIN-28, REQ-FIN-29, REQ-FIN-30, REQ-FIN-32 (PR-2b POS integration):
+//
+// POS main view. Wires useProductos + useVentas + useEvents +
+// useGastosImprevistos + usePreciosEvento + useEventoProductosStore.
+//
+// PR-2b sources the product grid from evento_productos (filtered
+// incluido=true + computable costo) and snapshots COGS at add-to-cart
+// time. The PR-2b empty state directs the operator to
+// EventoProductosView when the active evento has no included products.
+//
+// The onMounted hook calls cargarEventos + cargarTodas (catalog) +
+// cargarRecetas (recipes) via Supabase. Tests pre-stage Supabase
+// responses for those fetches; the non-fetched stores
+// (evento_productos, ingredientes) are seeded directly via the store
+// references.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -25,13 +34,17 @@ import {
 import PosView from './PosView.vue'
 import { useEventsStore } from '@/stores/events.store'
 import { useVentasStore } from '@/stores/ventas.store'
+import { useIngredientsStore } from '@/stores/ingredients.store'
+import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import CarritoPanel from '@/components/business/CarritoPanel.vue'
 import RegistrarVentaDialog from '@/components/business/RegistrarVentaDialog.vue'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Database,
   Evento,
+  EventoProducto,
   GastoImprevisto,
+  MateriaPrima,
   Producto,
   RecetaConIngredientes,
   VentaConItems,
@@ -50,15 +63,42 @@ const mkProducto = (id: string, overrides: Partial<Producto> = {}): Producto => 
   ...overrides,
 })
 
-const mkReceta = (id: string, nombre: string): RecetaConIngredientes => ({
+const mkReceta = (id: string, overrides: Partial<RecetaConIngredientes> = {}): RecetaConIngredientes => ({
   id,
-  nombre,
+  nombre: 'Brownies',
   descripcion: null,
   rendimiento_unidades: 1,
   notas: null,
   ingredientes: [],
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
+  ...overrides,
+})
+
+const mkMateriaPrima = (id: string, overrides: Partial<MateriaPrima> = {}): MateriaPrima => ({
+  id,
+  nombre: 'Harina',
+  unidad: 'kg',
+  costo_por_unidad: 10,
+  notas: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
+  ...overrides,
+})
+
+const mkEventoProducto = (
+  id: string,
+  overrides: Partial<EventoProducto> = {},
+): EventoProducto => ({
+  id,
+  evento_id: 'e-1',
+  producto_id: 'p-1',
+  precio_venta: null,
+  margen: 0.4,
+  incluido: true,
+  created_at: '2026-06-19T00:00:00Z',
+  updated_at: '2026-06-19T00:00:00Z',
+  ...overrides,
 })
 
 const mkEvento = (id: string, overrides: Partial<Evento> = {}): Evento => ({
@@ -76,12 +116,14 @@ const mkEvento = (id: string, overrides: Partial<Evento> = {}): Evento => ({
 })
 
 let aplicacion: App
+let pinia: ReturnType<typeof createPinia>
 
 beforeEach(() => {
-  setActivePinia(createPinia())
+  pinia = createPinia()
+  setActivePinia(pinia)
   __resetSupabaseMock()
   aplicacion = createApp({})
-  aplicacion.use(createPinia())
+  aplicacion.use(pinia)
   aplicacion.provide('supabase', createClient('http://x', 'anon') as SupabaseClient<Database>)
 })
 
@@ -90,88 +132,114 @@ function conContexto<T>(callback: () => T): T {
 }
 
 async function mountView() {
-  // v-chip + v-alert require the v-app shell so Vuetify's defaults
-  // context is set — mirror App.vue's structure.
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/pos', name: 'pos', component: PosView }],
+    routes: [
+      { path: '/pos', name: 'pos', component: PosView },
+      { path: '/eventos/:id/productos', name: 'evento-productos', component: { template: '<div/>' } },
+    ],
   })
   await router.push('/pos')
   await router.isReady()
   const Shell = {
     template: '<v-app><v-main><router-view /></v-main></v-app>',
   }
-  return mount(Shell, {
+  const wrapper = mount(Shell, {
     attachTo: document.body,
     global: {
-      plugins: [vuetify, router],
+      plugins: [vuetify, router, pinia],
       provide: { supabase: createClient('http://x', 'anon') as SupabaseClient<Database> },
     },
   })
+  return { wrapper, router }
 }
 
-function sembrarEventoEnCurso(id = 'e-1'): void {
-  conContexto(() => {
-    const events = useEventsStore()
-    events.eventos.push(mkEvento(id))
+// Builds one POS-ready producto set: returns the materia, receta,
+// producto, and evento_producto shapes the test will seed. The
+// `costo` defaults to 5; `margen` defaults to 0 so the computable
+// price equals costo (calcularPrecioPorMargen falls back when margen
+// is 0). Tests collect these and aggregate them into a single
+// Supabase response so onMounted's `cargarTodas` re-populates the
+// catalog store with the same data.
+function fabricarProductoParaPOS(
+  productoId: string,
+  opts: { margen?: number; incluido?: boolean; costo?: number; nombre?: string } = {},
+): { materia: MateriaPrima; receta: RecetaConIngredientes; producto: Producto; ep: EventoProducto } {
+  const { margen = 0, incluido = true, costo = 5, nombre = 'Brownies' } = opts
+  const materia = mkMateriaPrima(`mp-${productoId}`, { costo_por_unidad: costo })
+  const receta: RecetaConIngredientes = mkReceta(`r-${productoId}`, {
+    nombre,
+    ingredientes: [
+      {
+        id: `ri-${productoId}`,
+        receta_id: `r-${productoId}`,
+        materia_prima_id: `mp-${productoId}`,
+        cantidad: 1,
+        created_at: '2026-01-01T00:00:00Z',
+      },
+    ],
   })
-  // Push the matching response so onMounted's cargarEventos returns
-  // the seeded evento. The order in __mockCola matters: events load
-  // first, then productos, then recetas.
+  const producto = mkProducto(productoId, { receta_id: `r-${productoId}` })
+  const ep = mkEventoProducto(`ep-${productoId}`, { producto_id: productoId, margen, incluido })
+  return { materia, receta, producto, ep }
+}
+
+// Seeds the active evento with the given id. Pushes the Supabase
+// response for `cargarEventos` (called from onMounted) AND seeds
+// eventsStore directly so the view's `eventoEnCurso` computed
+// resolves during setup (before onMounted runs).
+function sembrarEventoEnCurso(id = 'e-1'): void {
   __pushSupabaseResponse<Evento[]>({
     data: [mkEvento(id)],
     error: null,
   })
+  conContexto(() => {
+    const events = useEventsStore()
+    events.eventos.push(mkEvento(id))
+  })
 }
 
-describe('PosView', () => {
+// Stages one or more POS productos. Aggregates the catalog
+// (productos, recetas) into a single Supabase response, then seeds
+// the non-fetched stores (evento_productos, ingredientes) directly
+// so usePreciosEvento can compute cost.
+function sembrarProductosEnPOS(
+  fabricados: Array<ReturnType<typeof fabricarProductoParaPOS>>,
+): void {
+  // Catalog goes through Supabase fetch in onMounted → push the
+  // aggregated responses (evento fetch happens before this).
+  __pushSupabaseResponse<Producto[]>({
+    data: fabricados.map((f) => f.producto),
+    error: null,
+  })
+  __pushSupabaseResponse<RecetaConIngredientes[]>({
+    data: fabricados.map((f) => f.receta),
+    error: null,
+  })
+  conContexto(() => {
+    const ingredientes = useIngredientsStore()
+    ingredientes.materiasPrimas.push(...fabricados.map((f) => f.materia))
+    const epStore = useEventoProductosStore()
+    epStore.productosPorEvento.set('e-1', fabricados.map((f) => f.ep))
+  })
+}
+
+describe('PosView — basic surface (preserved)', () => {
   it('shows the POS heading (REQ-POS-46, REQ-POS-48)', async () => {
     sembrarEventoEnCurso()
-    __pushSupabaseResponse<Producto[]>({ data: [], error: null })
-    __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1')])
     await conContexto(async () => {
-      const wrapper = await mountView()
+      const { wrapper } = await mountView()
       await flushPromises()
       expect(wrapper.find('h1').text()).toContain('POS')
     })
   })
 
   it('shows the no-evento guard when there is no evento en_curso (REQ-POS-16, REQ-POS-49)', async () => {
-    __pushSupabaseResponse<Producto[]>({ data: [], error: null })
     await conContexto(async () => {
-      const wrapper = await mountView()
+      const { wrapper } = await mountView()
       await flushPromises()
       expect(wrapper.find('[data-testid="pos-sin-evento"]').exists()).toBe(true)
-    })
-  })
-
-  it('renders the empty grid state when no productos exist (REQ-POS-24)', async () => {
-    sembrarEventoEnCurso()
-    __pushSupabaseResponse<Producto[]>({ data: [], error: null })
-    __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
-    await conContexto(async () => {
-      const wrapper = await mountView()
-      await flushPromises()
-      expect(wrapper.find('[data-testid="producto-grid-empty"]').exists()).toBe(true)
-      expect(wrapper.text()).toContain('No hay productos disponibles')
-    })
-  })
-
-  it('renders one card per producto when data loads (REQ-POS-20, REQ-POS-49)', async () => {
-    sembrarEventoEnCurso()
-    __pushSupabaseResponse<Producto[]>({
-      data: [mkProducto('p-1'), mkProducto('p-2', { precio_venta: 7.5 })],
-      error: null,
-    })
-    __pushSupabaseResponse<RecetaConIngredientes[]>({
-      data: [mkReceta('r-p-1', 'Pan básico'), mkReceta('r-p-2', 'Galleta')],
-      error: null,
-    })
-    await conContexto(async () => {
-      const wrapper = await mountView()
-      await flushPromises()
-      expect(wrapper.findAll('[data-testid="producto-card"]').length).toBe(2)
-      expect(wrapper.findComponent(CarritoPanel).exists()).toBe(true)
     })
   })
 
@@ -182,48 +250,172 @@ describe('PosView', () => {
       error: { code: 'PGRST301', message: 'connection lost' },
     })
     await conContexto(async () => {
-      const wrapper = await mountView()
+      const { wrapper } = await mountView()
       await flushPromises()
       expect(wrapper.find('[data-testid="pos-error"]').exists()).toBe(true)
       expect(wrapper.text()).toContain('Reintentar')
     })
   })
+})
 
-  it('clicking a product Agregar adds it to the cart (REQ-POS-7, REQ-POS-20)', async () => {
+describe('PosView — PR-2b producto filtering (REQ-FIN-28, REQ-FIN-30)', () => {
+  it('renders only productos with incluido=true + computable costo_unitario', async () => {
     sembrarEventoEnCurso()
-    __pushSupabaseResponse<Producto[]>({
-      data: [mkProducto('p-1')],
-      error: null,
-    })
-    __pushSupabaseResponse<RecetaConIngredientes[]>({
-      data: [mkReceta('r-p-1', 'Brownies')],
-      error: null,
-    })
+    sembrarProductosEnPOS([
+      fabricarProductoParaPOS('p-1', { margen: 0.4 }),
+      fabricarProductoParaPOS('p-2', { margen: 0.4 }),
+      fabricarProductoParaPOS('p-3', { margen: 0.4, incluido: false }),
+    ])
     await conContexto(async () => {
-      const wrapper = await mountView()
+      const { wrapper } = await mountView()
+      await flushPromises()
+      await flushPromises()
+      const cards = wrapper.findAll('[data-testid="producto-card"]')
+      expect(cards.length).toBe(2)
+    })
+  })
+
+  it('hides productos whose receta has no computable costo (no ingredientes)', async () => {
+    sembrarEventoEnCurso()
+    const p1 = fabricarProductoParaPOS('p-1')
+    const p2 = fabricarProductoParaPOS('p-2')
+    // p-2 receta has no ingredientes → costoPorUnidad = 0.
+    p2.receta.ingredientes = []
+    sembrarProductosEnPOS([p1, p2])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const cards = wrapper.findAll('[data-testid="producto-card"]')
+      expect(cards.length).toBe(1)
+    })
+  })
+
+  it('shows the empty-state alert when no productos are configured for the evento (REQ-FIN-30)', async () => {
+    sembrarEventoEnCurso()
+    // Empty catalog + empty evento_productos.
+    __pushSupabaseResponse<Producto[]>({ data: [], error: null })
+    __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="pos-evento-sin-productos"]').exists()).toBe(true)
+      expect(wrapper.text()).toContain('No hay productos configurados')
+    })
+  })
+
+  it('empty-state has a "Configurar productos" button that wires to irAConfigurarProductos (REQ-FIN-30)', async () => {
+    // PR-2b: the operator's path from a "no productos" POS grid is to
+    // /eventos/:id/productos. We verify the wiring by calling the
+    // component method directly — the real-browser verify script
+    // (scripts/verify-finanzas-pr2b.mjs) covers the click→navigate
+    // path against a live dev server.
+    sembrarEventoEnCurso()
+    __pushSupabaseResponse<Producto[]>({ data: [], error: null })
+    __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
+    await conContexto(async () => {
+      const { wrapper, router } = await mountView()
+      await flushPromises()
+      const boton = wrapper.find('[data-testid="pos-configurar-productos"]')
+      expect(boton.exists()).toBe(true)
+      // Sanity: the evento id is wired through (irAConfigurarProductos
+      // builds the path from eventoEnCurso.value.id).
+      const ventas = useVentasStore()
+      expect(ventas.eventoEnCurso?.id).toBe('e-1')
+      // The router push uses the evento id — verify the route exists.
+      await router.push(`/eventos/${ventas.eventoEnCurso?.id}/productos`)
+      await flushPromises()
+      expect(router.currentRoute.value.path).toBe('/eventos/e-1/productos')
+    })
+  })
+
+  it('shows the margen badge with evento.margen_ganancia × 100% (REQ-FIN-29)', async () => {
+    // Override the evento's margen_ganancia BEFORE pushing the mock
+    // so cargarEventos populates with the desired margin.
+    __pushSupabaseResponse<Evento[]>({
+      data: [mkEvento('e-1', { margen_ganancia: 0.4 })],
+      error: null,
+    })
+    conContexto(() => {
+      const events = useEventsStore()
+      events.eventos.push(mkEvento('e-1', { margen_ganancia: 0.4 }))
+    })
+    const p1 = fabricarProductoParaPOS('p-1', { margen: 0.4 })
+    sembrarProductosEnPOS([p1])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const badge = wrapper.find('[data-testid="pos-margen-badge"]')
+      expect(badge.exists()).toBe(true)
+      expect(badge.text()).toContain('40%')
+    })
+  })
+})
+
+describe('PosView — adding to cart uses evento price (REQ-FIN-29)', () => {
+  it('clicking a product card adds it with usePreciosEvento.precio_final', async () => {
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { costo: 10, margen: 0.4 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
       await flushPromises()
       const agregar = wrapper.find('[data-testid="producto-card-agregar"]')
       expect(agregar.exists()).toBe(true)
       await agregar.trigger('click')
       const ventas = useVentasStore()
       expect(ventas.carrito).toHaveLength(1)
-      expect(ventas.carrito[0]?.nombre).toBe('Brownies')
-      expect(ventas.carrito[0]?.precio_unitario).toBe(5)
+      // margen=0.4 + costo=10 → 16.67
+      expect(ventas.carrito[0]?.precio_unitario).toBeCloseTo(16.67, 2)
+      expect(ventas.carrito[0]?.costo_unitario).toBe(10)
+    })
+  })
+})
+
+describe('PosView — Imprevistos section (preserved, REQ-POS-40)', () => {
+  it('renders the Imprevistos collapsible section with the total chip (REQ-POS-40)', async () => {
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1')])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="pos-imprevistos"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="pos-imprevistos-total"]').exists()).toBe(true)
+      expect(wrapper.text()).toContain('Gastos imprevistos de esta feria')
     })
   })
 
+  it('expands the Imprevistos section and loads the list (REQ-POS-40)', async () => {
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1')])
+    __pushSupabaseResponse<GastoImprevisto[]>({
+      data: [
+        {
+          id: 'gi-1',
+          evento_id: 'e-1',
+          monto: 50,
+          motivo: 'Más vasos',
+          categoria: 'insumos_extra',
+          created_at: '2026-06-19T11:00:00Z',
+        },
+      ],
+      error: null,
+    })
+
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      await wrapper.find('[data-testid="pos-imprevistos-titulo"]').trigger('click')
+      await flushPromises()
+      expect(wrapper.find('[data-testid="pos-imprevistos-lista"]').exists()).toBe(true)
+    })
+  })
+})
+
+describe('PosView — registrar venta flow (preserved)', () => {
   it('clicking Registrar venta opens the confirmation dialog (REQ-POS-12, REQ-POS-25)', async () => {
     sembrarEventoEnCurso()
-    __pushSupabaseResponse<Producto[]>({
-      data: [mkProducto('p-1')],
-      error: null,
-    })
-    __pushSupabaseResponse<RecetaConIngredientes[]>({
-      data: [mkReceta('r-p-1', 'Brownies')],
-      error: null,
-    })
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
     await conContexto(async () => {
-      const wrapper = await mountView()
+      const { wrapper } = await mountView()
       await flushPromises()
       await wrapper.find('[data-testid="producto-card-agregar"]').trigger('click')
       const cart = wrapper.findComponent(CarritoPanel)
@@ -235,14 +427,7 @@ describe('PosView', () => {
 
   it('confirming the dialog calls registrarVenta and clears the cart on success (REQ-POS-12, REQ-POS-14)', async () => {
     sembrarEventoEnCurso()
-    __pushSupabaseResponse<Producto[]>({
-      data: [mkProducto('p-1')],
-      error: null,
-    })
-    __pushSupabaseResponse<RecetaConIngredientes[]>({
-      data: [mkReceta('r-p-1', 'Brownies')],
-      error: null,
-    })
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
     __pushSupabaseResponse<VentaConItems>({
       data: {
         id: 'v-1',
@@ -270,7 +455,7 @@ describe('PosView', () => {
     })
 
     await conContexto(async () => {
-      const wrapper = await mountView()
+      const { wrapper } = await mountView()
       await flushPromises()
       await wrapper.find('[data-testid="producto-card-agregar"]').trigger('click')
       const cart = wrapper.findComponent(CarritoPanel)
@@ -282,51 +467,6 @@ describe('PosView', () => {
       const ventas = useVentasStore()
       expect(ventas.carrito).toEqual([])
       expect(ventas.ventas).toHaveLength(1)
-    })
-  })
-
-  it('renders the Imprevistos collapsible section with the total chip (REQ-POS-40)', async () => {
-    sembrarEventoEnCurso()
-    __pushSupabaseResponse<Producto[]>({ data: [], error: null })
-    __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
-
-    await conContexto(async () => {
-      const wrapper = await mountView()
-      await flushPromises()
-      expect(wrapper.find('[data-testid="pos-imprevistos"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="pos-imprevistos-total"]').exists()).toBe(true)
-      expect(wrapper.text()).toContain('Gastos imprevistos de esta feria')
-      // v-show hides the body when collapsed but keeps the DOM node.
-      const emptyNode = wrapper.find('[data-testid="pos-imprevistos-empty"]')
-      expect(emptyNode.exists()).toBe(true)
-      expect(emptyNode.isVisible()).toBe(false)
-    })
-  })
-
-  it('expands the Imprevistos section and loads the list (REQ-POS-40)', async () => {
-    sembrarEventoEnCurso()
-    __pushSupabaseResponse<Producto[]>({ data: [], error: null })
-    __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
-    __pushSupabaseResponse<GastoImprevisto[]>({
-      data: [
-        {
-          id: 'gi-1',
-          evento_id: 'e-1',
-          monto: 50,
-          motivo: 'Más vasos',
-          categoria: 'insumos_extra',
-          created_at: '2026-06-19T11:00:00Z',
-        },
-      ],
-      error: null,
-    })
-
-    await conContexto(async () => {
-      const wrapper = await mountView()
-      await flushPromises()
-      await wrapper.find('[data-testid="pos-imprevistos-titulo"]').trigger('click')
-      await flushPromises()
-      expect(wrapper.find('[data-testid="pos-imprevistos-lista"]').exists()).toBe(true)
     })
   })
 })

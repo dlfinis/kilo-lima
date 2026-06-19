@@ -132,7 +132,7 @@ function volver() {
         density="comfortable"
         data-testid="evento-productos-tabla"
       >
-        <template v-slot:item.incluido="{ item }">
+        <template #[`item.incluido`]="{ item }">
           <v-checkbox-btn
             :model-value="item.incluido"
             :disabled="!editable"
@@ -140,10 +140,10 @@ function volver() {
             @update:model-value="alToggleIncluido(item)"
           />
         </template>
-        <template v-slot:item.costo_unitario="{ item }">
+        <template #[`item.costo_unitario`]="{ item }">
           {{ formatearUSD(item.costo_unitario) }}
         </template>
-        <template v-slot:item.margen_efectivo="{ item }">
+        <template #[`item.margen_efectivo`]="{ item }">
           <MargenSlider
             :model-value="item.margen_efectivo"
             :costo="item.costo_unitario"
@@ -151,10 +151,10 @@ function volver() {
             @update:model-value="(m) => alCambiarMargen(item, m)"
           />
         </template>
-        <template v-slot:item.precio_sugerido="{ item }">
+        <template #[`item.precio_sugerido`]="{ item }">
           {{ formatearUSD(item.precio_sugerido) }}
         </template>
-        <template v-slot:item.precio_final="{ item }">
+        <template #[`item.precio_final`]="{ item }">
           <v-text-field
             :model-value="item.precio_final"
             type="number"
