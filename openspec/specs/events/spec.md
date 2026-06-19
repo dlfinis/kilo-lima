@@ -25,21 +25,23 @@ new tests land before implementation across 4 chained PRs.
 
 ### 1. Eventos CRUD
 
-#### REQ-EVENTS-1: List eventos with name, date, location, status
+#### REQ-EVENTS-1: List eventos with name, date range, location, status
 
-The system SHALL display a list of all `eventos` ordered by `fecha` descending
-(newest first), with each row showing `nombre`, `fecha` (formatted), `ubicacion`,
-and an `EventoStatusChip` component.
+The system SHALL display a list of all `eventos` ordered by `fecha_inicio`
+descending (newest first), with each row showing `nombre`, the date range
+`fecha_inicio` – `fecha_fin` (formatted), `ubicacion`, and an `EventoStatusChip`
+component.
 
 **Rationale**: Mirrors catalog's `MateriaPrimaListItem` pattern. Users need a
-quick overview of all events before drilling into detail.
+quick overview of all events before drilling into detail. Events are now multi-day
+so the list shows a date range instead of a single date.
 
-**Scenario: List shows eventos ordered by date desc**
+**Scenario: List shows eventos ordered by fecha_inicio desc**
 
-- GIVEN eventos exist for "Feria Abril" (2026-04-15), "Feria Marzo" (2026-03-10), "Feria Mayo" (2026-05-20)
+- GIVEN eventos exist for "Feria Abril" (2026-04-15 to 2026-04-16), "Feria Marzo" (2026-03-10 to 2026-03-12), "Feria Mayo" (2026-05-20 to 2026-05-22)
 - WHEN the user navigates to `/eventos`
 - THEN "Feria Mayo" appears first, "Feria Abril" second, "Feria Marzo" third
-- AND each row shows `nombre`, formatted `fecha`, `ubicacion`, and an `EventoStatusChip`
+- AND each row shows `nombre`, formatted date range, `ubicacion`, and an `EventoStatusChip`
 
 **Scenario: Empty list shows friendly message**
 
@@ -49,22 +51,30 @@ quick overview of all events before drilling into detail.
 
 ---
 
-#### REQ-EVENTS-2: Create evento with validation
+#### REQ-EVENTS-2: Create evento with date range validation
 
 The system SHALL allow creating a new `evento` with fields: `nombre` (non-empty,
-max 200 chars), `fecha` (valid ISO date), `ubicacion` (optional, max 500 chars),
-`notas` (optional, max 2000 chars). The system MUST validate all fields before
-submission and reject invalid input with Spanish error messages.
+max 200 chars), `fecha_inicio` (valid ISO date, required), `fecha_fin` (valid ISO
+date, required, CHECK `fecha_fin >= fecha_inicio`), `ubicacion` (optional, max 500
+chars), `notas` (optional, max 2000 chars). The system MUST validate all fields
+before submission and reject invalid input with Spanish error messages.
 
-**Rationale**: Core create flow. Validation prevents empty names and garbage
-dates from reaching Supabase.
+**Rationale**: Core create flow. Events are now multi-day, so two required dates
+with range validation replace the single `fecha` field.
 
-**Scenario: Successful creation with required fields**
+**Scenario: Successful creation with date range**
 
 - GIVEN the user opens the create-evento form
-- WHEN the user enters nombre "Feria del Sol", selects fecha "2026-07-15", and submits
+- WHEN the user enters nombre "Feria del Sol", fecha_inicio "2026-07-15", fecha_fin "2026-07-17", and submits
 - THEN a new `evento` is saved to Supabase with `estado` defaulting to `planificacion`
 - AND the evento appears in the list
+
+**Scenario: Validation rejects fecha_fin < fecha_inicio**
+
+- GIVEN the user opens the create-evento form
+- WHEN the user enters fecha_inicio "2026-07-15" and fecha_fin "2026-07-10"
+- THEN the form shows "La fecha de fin debe ser mayor o igual a la fecha de inicio"
+- AND no Supabase call is made
 
 **Scenario: Validation rejects empty name**
 
@@ -73,27 +83,14 @@ dates from reaching Supabase.
 - THEN the form shows "El nombre es obligatorio"
 - AND no Supabase call is made
 
-**Scenario: Validation rejects invalid date**
-
-- GIVEN the user opens the create-evento form
-- WHEN the user submits with `fecha` not a valid date string
-- THEN the form shows "La fecha no es válida"
-- AND no Supabase call is made
-
-**Scenario: Validation rejects missing ubicacion**
-
-- GIVEN the user opens the create-evento form
-- WHEN the user submits with `ubicacion` empty or whitespace-only
-- THEN the form shows "La ubicación es obligatoria"
-- AND no Supabase call is made
-
 ---
 
 #### REQ-EVENTS-3: Edit evento (allowed only if estado !== 'cerrado')
 
-The system SHALL allow editing an `evento`'s `nombre`, `fecha`, `ubicacion`, and
-`notas` only when `estado !== 'cerrado'`. When `estado === 'cerrado'`, the edit
-action MUST be disabled and the form displayed in read-only mode.
+The system SHALL allow editing an `evento`'s `nombre`, `fecha_inicio`, `fecha_fin`,
+`ubicacion`, and `notas` only when `estado !== 'cerrado'`. When `estado ===
+'cerrado'`, the edit action MUST be disabled and the form displayed in read-only
+mode.
 
 **Rationale**: Matches the brief's "post-evento: análisis" phase — closed events
 are historical records. Unified via `estadoEsEditable()` helper.
@@ -101,9 +98,9 @@ are historical records. Unified via `estadoEsEditable()` helper.
 **Scenario: Edit succeeds when evento is in planificacion**
 
 - GIVEN an evento with `estado = 'planificacion'`
-- WHEN the user opens the edit form, changes `nombre` and submits
+- WHEN the user opens the edit form, changes `nombre` and `fecha_fin` and submits
 - THEN the evento is updated in Supabase
-- AND the list reflects the new name reactively
+- AND the list reflects the new name and date range reactively
 
 **Scenario: Edit is blocked when evento is cerrado**
 
@@ -263,17 +260,17 @@ app with <100 eventos.
 
 ---
 
-#### REQ-EVENTS-9: Sort by fecha (default desc)
+#### REQ-EVENTS-9: Sort by fecha_inicio (default desc)
 
-The eventos list SHALL default to ordering by `fecha` descending (newest first).
-The system MAY offer ascending sort as a user-toggleable option.
+The eventos list SHALL default to ordering by `fecha_inicio` descending (newest
+first). The system MAY offer ascending sort as a user-toggleable option.
 
 **Rationale**: Users typically care about upcoming/future events more than past
-ones. The DB index `idx_eventos_fecha` on `(fecha desc)` supports this.
+ones. The DB index on `fecha_inicio desc` supports this.
 
-**Scenario: Default sort is fecha desc**
+**Scenario: Default sort is fecha_inicio desc**
 
-- GIVEN eventos with fechas "2026-03-10", "2026-07-20", "2026-05-15"
+- GIVEN eventos with fecha_inicio "2026-03-10", "2026-07-20", "2026-05-15"
 - WHEN the user navigates to `/eventos`
 - THEN the order is "2026-07-20", "2026-05-15", "2026-03-10"
 
@@ -853,16 +850,24 @@ pattern.
 
 The router SHALL define a `/eventos/:id` route that lazy-loads
 `EventoDetalleView.vue`. The route name SHALL be `'evento-detalle'`. The `:id`
-param SHALL be passed to the view to load the specific evento.
+param SHALL be passed to the view to load the specific evento. The detail view
+SHALL display `fecha_inicio` and `fecha_fin` as two date pickers, a "PRODUCTOS
+DEL EVENTO" section linking to `/eventos/:id/productos` (gated by
+`estadoEsEditable`), and a "REPORTE" section linking to `/eventos/:id/reporte`
+(visible only when `estado === 'cerrado'`).
 
-**Rationale**: Detail view for gastos + plan + projection per evento.
+**Rationale**: Detail view for gastos + plan + projection per evento. The
+PRODUCTOS section links to the per-evento pricing configurator. The REPORTE
+section provides post-evento financial reports.
 
 **Scenario: Navigating to /eventos/:id renders the detail page**
 
 - GIVEN an evento with id "abc-123" exists
 - WHEN the user navigates to `/eventos/abc-123`
 - THEN `EventoDetalleView.vue` is loaded
-- AND the evento's name, date, status, gastos, and projection are displayed
+- AND the evento's name, date range, status, gastos, and projection are displayed
+- AND the PRODUCTOS DEL EVENTO section is visible (gated by editability)
+- AND the REPORTE section is visible only when estado === 'cerrado'
 
 ---
 
@@ -1177,6 +1182,57 @@ one function changes.
 - GIVEN `src/utils/estado.spec.ts`
 - WHEN tests are run
 - THEN 3 assertions verify: `planificacion → true`, `en_curso → true`, `cerrado → false`
+
+---
+
+### 11. EventoDetalleView Sections (finanzas-evento)
+
+#### REQ-EVENTS-47: "PRODUCTOS DEL EVENTO" Section on EventoDetalleView
+
+The system SHALL render a "PRODUCTOS DEL EVENTO" section within `EventoDetalleView`.
+When `estadoEsEditable(evento.estado)` is true, the section SHALL show the count
+of `evento_productos` and a link to `/eventos/:id/productos`. When `estado ===
+'cerrado'`, the section SHALL be read-only (count only, no link).
+
+**Rationale**: Links EventoDetalleView to the per-evento pricing configurator
+(EventoProductosView). Gated by editability to prevent navigation to a config
+that cannot be changed.
+
+**Scenario: Active evento shows product link**
+
+- GIVEN evento "ev-1" with estado = 'planificacion' and 5 evento_productos
+- WHEN EventoDetalleView renders
+- THEN "PRODUCTOS DEL EVENTO (5)" is displayed with link to `/eventos/ev-1/productos`
+
+**Scenario: Cerrado evento shows count only**
+
+- GIVEN evento "ev-1" with estado = 'cerrado' and 8 evento_productos
+- WHEN EventoDetalleView renders
+- THEN "PRODUCTOS DEL EVENTO (8)" is displayed without a navigation link
+
+---
+
+#### REQ-EVENTS-48: "REPORTE" Section on EventoDetalleView (cerrado only)
+
+The system SHALL render a "REPORTE" section within `EventoDetalleView` ONLY when
+`evento.estado === 'cerrado'`. The section SHALL display a "Ver reporte financiero"
+button linking to `/eventos/:id/reporte`. When `estado !== 'cerrado'`, the section
+SHALL NOT be rendered.
+
+**Rationale**: The post-evento financial report is only meaningful after closure.
+Showing the section only when cerrado prevents navigation to an empty report.
+
+**Scenario: Cerrado evento shows report link**
+
+- GIVEN evento "ev-1" with estado = 'cerrado'
+- WHEN EventoDetalleView renders
+- THEN a "Ver reporte financiero" button is displayed linking to `/eventos/ev-1/reporte`
+
+**Scenario: Non-cerrado evento hides report section**
+
+- GIVEN evento "ev-1" with estado = 'en_curso'
+- WHEN EventoDetalleView renders
+- THEN no "REPORTE" section or "Ver reporte financiero" button is rendered
 
 ---
 

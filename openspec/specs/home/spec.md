@@ -93,6 +93,41 @@ The home context delivers a rich landing experience: counter cards aggregated fr
 
 ---
 
+### 5. Post-Evento Card (finanzas-evento)
+
+| ID | Requirement (SHALL) | Rationale |
+|----|--------------------|-----------|
+| REQ-HOME-FIN-1 | Post-evento card enabled when ≥1 cerrado evento exists. Shows latest cerrado evento's `nombre` (by `fecha_fin DESC`), links to `/eventos/:id/reporte`. | Enables the previously-disabled post-evento card, the last dead screen from the brief's 3-phase UX flow. |
+| REQ-HOME-FIN-2 | Post-evento card stays `disabled` when zero cerrado eventos. | Preserves current first-run and active-only behavior. |
+
+#### Scenario: Card enabled with latest cerrado evento (REQ-HOME-FIN-1)
+
+- GIVEN 2 eventos are cerrado: "Feria Mayo" (fecha_fin 2026-05-22) and "Feria Abril" (fecha_fin 2026-04-15)
+- WHEN `HomeView` renders
+- THEN the post-evento card is enabled (NOT `disabled`)
+- AND it shows "Feria Mayo" with a link to `/eventos/f-mayo/reporte`
+
+#### Scenario: Card navigates to report on click (REQ-HOME-FIN-1)
+
+- GIVEN evento "Feria Mayo" (ev-1) is the latest cerrado
+- WHEN the user clicks the enabled post-evento card
+- THEN navigation goes to `/eventos/ev-1/reporte`
+
+#### Scenario: Card disabled with zero cerrado eventos (REQ-HOME-FIN-2)
+
+- GIVEN 0 eventos have estado = 'cerrado' (all are planificacion or en_curso)
+- WHEN `HomeView` renders
+- THEN the post-evento card is `disabled` with its current disabled-text
+- AND clicking it has no effect
+
+#### Scenario: Card disabled on fresh install (REQ-HOME-FIN-2)
+
+- GIVEN a fresh install with zero eventos in the database
+- WHEN `HomeView` renders
+- THEN the post-evento card is `disabled`
+
+---
+
 ### 4. Cross-cutting
 
 | ID | Requirement (MUST) | Rationale |
