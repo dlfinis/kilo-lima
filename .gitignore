@@ -150,6 +150,9 @@ sdd/
 # Vite PWA dev artifacts
 dev-dist/
 
+# Git worktrees
+.worktrees/
+
 # Local scratch verification scripts (Puppeteer one-offs)
 verify-*.mjs
 quick-verify.mjs
