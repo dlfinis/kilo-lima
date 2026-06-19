@@ -14,8 +14,11 @@
 // current receta. After a successful create, the button switches
 // to "Editar precio de venta" which opens the same dialog in edit
 // mode against the existing producto.
+//
+// REQ-UX-29: the local "Volver" button was removed — the global
+// AppBar back button replaces it.
 import { computed, onMounted, ref } from 'vue'
-import { useRoute, useRouter } from 'vue-router'
+import { useRoute } from 'vue-router'
 
 import ProductoForm from '@/components/business/ProductoForm.vue'
 import RecetaCostoDesglose from '@/components/business/RecetaCostoDesglose.vue'
@@ -25,7 +28,6 @@ import { useCalculoReceta } from '@/composables/useCalculoReceta'
 import type { Producto, ProductoInput } from '@/types'
 
 const route = useRoute()
-const router = useRouter()
 const { recetas, cargarTodas } = useRecipes()
 const { productos, cargarPorReceta, crear, actualizar } = useProductos()
 
@@ -52,10 +54,6 @@ onMounted(() => {
   if (recetaId.value) cargarPorReceta(recetaId.value)
 })
 
-function volver() {
-  router.push({ name: 'recetas' })
-}
-
 function abrirDialogoVenta() {
   dialogoVenta.value = true
 }
@@ -72,17 +70,6 @@ async function manejarSubmitProducto(input: ProductoInput) {
 
 <template>
   <v-container>
-    <v-btn
-      v-if="receta"
-      variant="text"
-      prepend-icon="mdi-arrow-left"
-      class="mb-2"
-      data-testid="receta-detalle-volver"
-      @click="volver"
-    >
-      Volver
-    </v-btn>
-
     <v-progress-linear v-if="!receta && recetas.length === 0" indeterminate color="primary" />
 
     <v-alert
