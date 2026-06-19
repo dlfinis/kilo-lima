@@ -212,13 +212,15 @@ describe('pos.types surface', () => {
     expect(input).not.toHaveProperty('created_at')
   })
 
-  it('LineaCarrito and ResumenCarrito are the cart shapes (REQ-POS-44, REQ-POS-6)', () => {
+  it('LineaCarrito and ResumenCarrito are the cart shapes (REQ-POS-44, REQ-POS-6, REQ-FIN-31)', () => {
     const linea: LineaCarrito = {
       producto_id: 'p-1',
       nombre: 'Brownies',
       precio_unitario: 5,
       cantidad: 2,
       subtotal: 10,
+      costo_unitario: 2.5,
+      margen_aplicado: 0.4,
     }
     expect(linea.subtotal).toBe(10)
     const resumen: ResumenCarrito = {

@@ -153,6 +153,10 @@ dev-dist/
 # Git worktrees
 .worktrees/
 
-# Local scratch verification scripts (Puppeteer one-offs)
+# Local scratch verification scripts (Puppeteer one-offs).
+# Per-PR verify scripts (verify-finanzas-pr*.mjs,
+# verify-ux-pr*.mjs, etc.) ARE tracked so reviewers can re-run them
+# from main. The glob below excludes one-off scratch scripts only.
 verify-*.mjs
 quick-verify.mjs
+!verify-finanzas-pr*.mjs

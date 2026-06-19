@@ -233,6 +233,7 @@ export interface Database {
           subtotal: number
           costo_unitario: number | null
           margen_aplicado: number | null
+          evento_producto_id: string | null
           created_at: string
         }
         Insert: {
@@ -244,6 +245,7 @@ export interface Database {
           subtotal: number
           costo_unitario?: number | null
           margen_aplicado?: number | null
+          evento_producto_id?: string | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['venta_items']['Insert']>
@@ -256,6 +258,49 @@ export interface Database {
           },
           {
             foreignKeyName: 'venta_items_producto_id_fkey'
+            columns: ['producto_id']
+            referencedRelation: 'productos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'venta_items_evento_producto_id_fkey'
+            columns: ['evento_producto_id']
+            referencedRelation: 'evento_productos'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      evento_productos: {
+        Row: {
+          id: string
+          evento_id: string
+          producto_id: string
+          precio_venta: number | null
+          margen: number | null
+          incluido: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          evento_id: string
+          producto_id: string
+          precio_venta?: number | null
+          margen?: number | null
+          incluido?: boolean
+          created_at?: string
+          updated_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['evento_productos']['Insert']>
+        Relationships: [
+          {
+            foreignKeyName: 'evento_productos_evento_id_fkey'
+            columns: ['evento_id']
+            referencedRelation: 'eventos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'evento_productos_producto_id_fkey'
             columns: ['producto_id']
             referencedRelation: 'productos'
             referencedColumns: ['id']

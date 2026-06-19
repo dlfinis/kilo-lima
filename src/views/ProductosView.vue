@@ -84,8 +84,10 @@ function abrirEliminar(id: string) {
 async function alAgregar(productoId: string) {
   const producto = productos.value.find((p) => p.id === productoId)
   if (!producto) return
-  const receta = recetas.value.find((r) => r.id === producto.receta_id)
-  agregarAlCarrito(productoId, receta?.nombre ?? 'Receta', producto.precio_venta)
+  // REQ-FIN-31 (PR-2b): the store derives precio/costo/margen from
+  // usePreciosEvento internally. The caller only passes the productoId
+  // and the cantidad to add.
+  agregarAlCarrito(productoId, 1)
 }
 
 function cerrarDialogo() {
