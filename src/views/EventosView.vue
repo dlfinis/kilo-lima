@@ -9,6 +9,7 @@ import { computed, onMounted, ref } from 'vue'
 
 import EventoForm from '@/components/business/EventoForm.vue'
 import EventoListItem from '@/components/business/EventoListItem.vue'
+import FabNuevo from '@/components/business/FabNuevo.vue'
 import { useEvents } from '@/composables/useEvents'
 import type { Evento, EventoInput, EstadoEvento } from '@/types'
 
@@ -21,6 +22,12 @@ type Dialogo =
 
 const dialogo = ref<Dialogo>({ tipo: 'cerrado' })
 const filtro = ref<EstadoEvento | 'todos'>('todos')
+
+// REQ-UX-24: keep the FAB visible while the list is short to keep
+// the primary action discoverable; once the list grows past 5 the
+// FAB becomes clutter and the inline "+ Nuevo evento" button takes
+// over to avoid overlapping the dense list of cards.
+const fabVisible = computed<boolean>(() => eventos.value.length < 5)
 
 const eventosFiltrados = computed<Evento[]>(() => {
   const lista = filtro.value === 'todos' ? eventos.value : eventos.value.filter((e) => e.estado === filtro.value)
@@ -66,7 +73,7 @@ function seleccionarFiltro(value: EstadoEvento | 'todos') {
     <div class="d-flex align-center justify-space-between mb-4">
       <h1>Eventos</h1>
       <v-btn
-        v-if="eventos.length > 0 || !cargando"
+        v-if="!fabVisible"
         color="primary"
         prepend-icon="mdi-plus"
         data-testid="evento-nuevo"
@@ -75,6 +82,13 @@ function seleccionarFiltro(value: EstadoEvento | 'todos') {
         Nuevo evento
       </v-btn>
     </div>
+
+    <FabNuevo
+      v-if="fabVisible"
+      testid="evento-fab-nuevo"
+      ariaLabel="Nuevo evento"
+      @click="abrirCrear"
+    />
 
     <v-tabs v-model="filtro" color="primary" class="mb-4">
       <v-tab value="todos" @click="seleccionarFiltro('todos')">Todos</v-tab>

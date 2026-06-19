@@ -39,7 +39,10 @@ beforeEach(() => {
 })
 
 const montarVista = () =>
-  mount(EventosView, {
+  mount({
+    components: { EventosView },
+    template: '<v-app><EventosView /></v-app>',
+  }, {
     attachTo: document.body,
     global: {
       plugins: [vuetify],
@@ -116,16 +119,57 @@ describe('EventosView', () => {
     expect(wrapper.find('[data-testid="evento-row-e-3"]').exists()).toBe(false)
   })
 
-  it('opens the create dialog when the header CTA is clicked', async () => {
+  it('opens the create dialog when the FAB is clicked (REQ-UX-23)', async () => {
     __pushSupabaseResponse<Evento[]>({ data: [], error: null })
     const wrapper = montarVista()
     await flushPromises()
 
-    await wrapper.find('[data-testid="evento-nuevo"]').trigger('click')
+    const fab = wrapper.find('[data-testid="evento-fab-nuevo"]')
+    expect(fab.exists()).toBe(true)
+    expect(fab.attributes('aria-label')).toBe('Nuevo evento')
+    await fab.trigger('click')
     await flushPromises()
 
     const texto = document.body.textContent ?? ''
     expect(texto).toContain('Nuevo evento')
+  })
+
+  it('shows the FAB when there are fewer than 5 eventos (REQ-UX-24, visibility rule)', async () => {
+    __pushSupabaseResponse<Evento[]>({
+      data: [
+        mkEvento('e-1', { nombre: 'Feria 1' }),
+        mkEvento('e-2', { nombre: 'Feria 2' }),
+        mkEvento('e-3', { nombre: 'Feria 3' }),
+      ],
+      error: null,
+    })
+    const wrapper = montarVista()
+    await flushPromises()
+
+    // eventos.length === 3 → FAB visible, inline button hidden.
+    expect(wrapper.find('[data-testid="evento-fab-nuevo"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="evento-nuevo"]').exists()).toBe(false)
+  })
+
+  it('hides the FAB and uses the inline button when there are 5 or more eventos (REQ-UX-24, visibility rule)', async () => {
+    __pushSupabaseResponse<Evento[]>({
+      data: [
+        mkEvento('e-1', { nombre: 'Feria 1' }),
+        mkEvento('e-2', { nombre: 'Feria 2' }),
+        mkEvento('e-3', { nombre: 'Feria 3' }),
+        mkEvento('e-4', { nombre: 'Feria 4' }),
+        mkEvento('e-5', { nombre: 'Feria 5' }),
+        mkEvento('e-6', { nombre: 'Feria 6' }),
+      ],
+      error: null,
+    })
+    const wrapper = montarVista()
+    await flushPromises()
+
+    // eventos.length === 6 → FAB hidden, inline button visible.
+    expect(wrapper.find('[data-testid="evento-fab-nuevo"]').exists()).toBe(false)
+    const inline = wrapper.find('[data-testid="evento-nuevo"]')
+    expect(inline.exists()).toBe(true)
   })
 
   it('opens the delete confirmation dialog when the row delete button is clicked (REQ-EVENTS-39)', async () => {
