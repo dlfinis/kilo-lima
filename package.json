@@ -21,6 +21,7 @@
     "verify:pr2": "node scripts/verify-pr2.mjs",
     "verify:pr3": "node scripts/verify-pr3.mjs",
     "verify:pr4": "node scripts/verify-pr4.mjs",
+    "verify:ux-pr1": "node scripts/verify-ux-pr1.mjs",
     "verify:all": "node scripts/verify-all.mjs"
   },
   "dependencies": {

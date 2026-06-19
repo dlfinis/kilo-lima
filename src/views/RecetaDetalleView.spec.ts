@@ -139,6 +139,21 @@ describe('RecetaDetalleView', () => {
   // detail view shows a "Vender esta receta" button that opens a
   // quick-create dialog. The actual crear call lands via the productos
   // store; for the spec we only assert the button + dialog surface.
+
+  // REQ-UX-29: the local Volver button is gone — the global AppBar
+  // back button owns that affordance. Asserting the testid is absent
+  // guards against accidental re-introduction.
+  it('does not render the local volver button (REQ-UX-29)', async () => {
+    const wrapper = await montarVista('r-1')
+    const { useRecipesStore } = await import('@/stores/recipes.store')
+    await aplicacion.runWithContext(() => {
+      useRecipesStore().recetas.push(mkReceta('r-1'))
+    })
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="receta-detalle-volver"]').exists()).toBe(false)
+  })
+
   it('shows "Vender esta receta" when the receta has no producto yet (REQ-POS-47)', async () => {
     const wrapper = await montarVista('r-1')
     const { useRecipesStore } = await import('@/stores/recipes.store')

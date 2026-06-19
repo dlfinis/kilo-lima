@@ -88,6 +88,19 @@ const montarVista = async (id: string) => {
 }
 
 describe('EventoDetalleView', () => {
+  // REQ-UX-28: the local "Volver" button is gone — the global AppBar
+  // back button owns that affordance. Asserting the testid is absent
+  // guards against accidental re-introduction.
+  it('does not render the local volver button (REQ-UX-28)', async () => {
+    const evento = mkEvento('e-1')
+    await prepararStore(evento)
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="evento-detalle-volver"]').exists()).toBe(false)
+  })
+
   it('renders header (name, date, status chip, location) and the gastos + projection (REQ-EVENTS-3, REQ-EVENTS-11, REQ-EVENTS-14, REQ-EVENTS-22)', async () => {
     const evento = mkEvento('e-1', { nombre: 'Feria del Sol', fecha: '2026-07-15', ubicacion: 'Plaza Central' })
     await prepararStore(evento, [mkGasto('g-1', { monto: 500 })])

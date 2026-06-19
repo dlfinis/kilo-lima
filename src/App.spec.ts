@@ -1,22 +1,36 @@
 import { describe, it, expect } from 'vitest'
 import { mount } from '@vue/test-utils'
+import { createPinia } from 'pinia'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
+import { createRouter, createMemoryHistory } from 'vue-router'
 import App from './App.vue'
 
-// Trivial smoke test added during PR1 verify (sdd-verify foundation PR1,
-// SUGGESTION #1) so `pnpm test` exits 0 before the richer HomeView smoke
-// test lands in PR4 Task 4.5. App.vue wraps its content in <v-app><v-main>,
-// so we install a local Vuetify instance in the test's global plugins —
-// mirroring what main.ts does at runtime, without touching src/main.ts.
+// REQ-UX-1: App.vue mounts <AppBar> globally above the <router-view>
+// so every route renders the same navigation surface. The previous
+// inline <h1>Kilo-Lima</h1> was removed because the AppBar title now
+// carries the brand. The smoke test still asserts the brand is visible
+// (now via the AppBar title).
 const vuetify = createVuetify({ components, directives })
 
+const mkRouter = async () => {
+  const router = createRouter({
+    history: createMemoryHistory(),
+    routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }],
+  })
+  await router.push('/')
+  await router.isReady()
+  return router
+}
+
 describe('App', () => {
-  it('renders the Kilo-Lima heading', () => {
+  it('renders the AppBar with the Kilo-Lima title on mount', async () => {
+    const router = await mkRouter()
     const wrapper = mount(App, {
-      global: { plugins: [vuetify] },
+      global: { plugins: [createPinia(), vuetify, router] },
     })
-    expect(wrapper.find('h1').text()).toContain('Kilo-Lima')
+    expect(wrapper.find('[data-testid="app-bar"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="app-bar-title"]').text()).toBe('Kilo-Lima')
   })
 })

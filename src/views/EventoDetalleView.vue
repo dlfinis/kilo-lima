@@ -7,6 +7,10 @@
 // when the evento is cerrado, all mutating controls disappear and
 // a v-alert explains why (REQ-EVENTS-27). PR3 swaps the compact
 // projection summary for the full ProyeccionCostosCard.
+//
+// REQ-UX-28: the local "Volver" button was removed — the global
+// AppBar back button replaces it. The view no longer needs to wire
+// its own back handler.
 import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
@@ -110,11 +114,6 @@ function irAPlanificar() {
 
 <template>
   <v-container>
-    <v-btn variant="text" prepend-icon="mdi-arrow-left" class="mb-2"
-      data-testid="evento-detalle-volver" @click="router.push({ name: 'eventos' })">
-      Volver
-    </v-btn>
-
     <v-progress-linear v-if="cargando || cargandoGastos" indeterminate color="primary" />
 
     <v-alert v-if="(error || errorGastos) && !cargando && !cargandoGastos"
