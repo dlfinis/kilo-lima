@@ -106,6 +106,7 @@ function crearBuilder(): Record<string, unknown> {
     select: registrar('select'),
     insert: registrar('insert'),
     update: registrar('update'),
+    upsert: registrar('upsert'),
     delete: registrar('delete'),
     eq: registrar('eq'),
     order: registrar('order'),

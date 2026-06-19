@@ -46,3 +46,9 @@ export type {
   CierreInput,
   CierreResultado,
 } from './pos.types'
+export type {
+  EventoProducto,
+  EventoProductoConDetalle,
+  CrearEventoProductoInput,
+  ActualizarMargenInput,
+} from './evento_productos.types'
