@@ -30,9 +30,10 @@ import PricingAlert from '@/components/business/PricingAlert.vue'
 import { useEvents } from '@/composables/useEvents'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
-import { formatearUSD } from '@/utils/format'
 import { estadoEsEditable } from '@/utils/estado'
-import type { EventoProducto } from '@/types'
+import { formatearUSD } from '@/utils/format'
+import { calcularContribucionUnitaria, calcularPrecioDesdeContribucion } from '@/utils/contribucion'
+import type { EventoProducto, EventoProductoConDetalle } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -78,6 +79,15 @@ async function alToggleIncluido(ep: EventoProducto) {
 async function alCambiarPrecio(ep: EventoProducto, valor: number) {
   if (!eventoId.value) return
   await epStore.actualizarPrecio(eventoId.value, ep.producto_id, valor, ep.margen ?? 0)
+}
+
+// REQ-CON (Type A calculator): when the operator edits the contribution
+// field, the price is derived automatically. precio = costo + contribucion.
+async function alCambiarContribucion(ep: EventoProductoConDetalle, contribucionDeseada: number) {
+  if (!eventoId.value) return
+  const costo = ep.costo_unitario
+  const nuevoPrecio = calcularPrecioDesdeContribucion(costo, contribucionDeseada)
+  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, ep.margen ?? 0)
 }
 
 async function alCambiarMargen(ep: EventoProducto, margen: number) {
@@ -205,6 +215,19 @@ function volver() {
               :data-testid="`evento-productos-precio-${item.producto_id}`"
               style="max-width: 120px"
               @update:model-value="(v) => alCambiarPrecio(item, Number(v))"
+            />
+            <!-- Contribución editable: si el usuario cambia la contribución,
+                 el precio se recalcula automáticamente (Type A calculator). -->
+            <v-text-field
+              :model-value="calcularContribucionUnitaria(item.precio_final, item.costo_unitario)"
+              type="number"
+              density="compact"
+              hide-details
+              label="Contribución $"
+              :disabled="!editable"
+              :data-testid="`evento-productos-contribucion-${item.producto_id}`"
+              style="max-width: 120px; margin-top: 4px"
+              @update:model-value="(v) => alCambiarContribucion(item, Number(v))"
             />
             <!-- REQ-CON-7 (PR-2): inline PricingAlert. Advisory only
                  — saving the new price still proceeds. The alert

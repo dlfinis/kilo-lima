@@ -84,6 +84,32 @@ export function calcularPrecioMinimoBreakEven(
  *   margen:  0.30..0.60
  *   premium: > 0.60    high margin, low-volume product
  */
+
+/**
+ * Reverse calculator (Type A): given a desired contribution per unit,
+ * returns the price the operator should set.
+ *   precio = costoProduccion + contribucionDeseada
+ *
+ * If contribucionDeseada < 0 the result is clamped to costoProduccion
+ * (selling at cost is the floor — selling at loss requires a manual
+ * price override).
+ */
+export function calcularPrecioDesdeContribucion(
+  costoProduccion: number,
+  contribucionDeseada: number,
+): number {
+  const precio = costoProduccion + contribucionDeseada
+  // Floor at cost — the operator can override below via the editable
+  // precio field (the alert will warn them).
+  return redondearCentavos(Math.max(precio, costoProduccion))
+}
+
+/**
+ * 3-tier contribution classifier (PR-1 brief):
+ *   entrada: <= 0.30   low margin, high-volume product
+ *   margen:  0.30..0.60
+ *   premium: > 0.60    high margin, low-volume product
+ */
 export type CategoriaContribucion = 'entrada' | 'margen' | 'premium'
 
 const UMBRAL_MARGEN = 0.3
