@@ -40,7 +40,8 @@ function categoria(c: CategoriaGasto): string {
       proyeccion &&
       (proyeccion.costosFijos > 0 ||
         proyeccion.costosVariables > 0 ||
-        proyeccion.lineas.some((l) => l.advertencia))
+        proyeccion.lineas.some((l) => l.advertencia) ||
+        proyeccion.breakEvenUnidades !== null)
     "
     class="pa-4"
     data-testid="proyeccion-card"

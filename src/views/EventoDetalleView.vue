@@ -29,6 +29,7 @@ import { useEvents } from '@/composables/useEvents'
 import { useGastosFijos } from '@/composables/useGastosFijos'
 import { usePlans } from '@/composables/usePlans'
 import { useProyeccionCostos } from '@/composables/useProyeccionCostos'
+import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { estadoEsEditable } from '@/utils/estado'
 import type { EstadoEvento, GastoFijoInput } from '@/types'
 
@@ -43,6 +44,7 @@ const eventoId = computed<string | null>(() => {
 const { eventoActual, cargando, error, cargarPorId, cambiarEstado, eliminar, actualizar } = useEvents()
 const { gastosPorEvento, cargando: cargandoGastos, error: errorGastos, cargarPorEvento, agregar, eliminar: eliminarGasto } = useGastosFijos()
 const { cargarPorEvento: cargarPlan } = usePlans()
+const epStore = useEventoProductosStore()
 const proyeccion = useProyeccionCostos(eventoId)
 
 const gastos = computed(() => (eventoId.value ? gastosPorEvento.value.get(eventoId.value) ?? [] : []))
@@ -124,6 +126,7 @@ onMounted(() => {
     void cargarPorId(eventoId.value)
     void cargarPorEvento(eventoId.value)
     void cargarPlan(eventoId.value)
+    void epStore.cargarPorEvento(eventoId.value)
   }
 })
 
