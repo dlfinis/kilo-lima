@@ -49,6 +49,7 @@ const proyeccion = useProyeccionCostos(eventoId)
 
 const gastos = computed(() => (eventoId.value ? gastosPorEvento.value.get(eventoId.value) ?? [] : []))
 const editable = computed(() => (eventoActual.value ? estadoEsEditable(eventoActual.value.estado) : false))
+const productosCount = computed(() => (eventoId.value ? (epStore.productosPorEvento.get(eventoId.value) ?? []).length : 0))
 
 // REQ-EVENTS-22: 3-state machine transitions visible from the detail
 // view. Each row carries the target estado + the testid the spec
@@ -260,6 +261,27 @@ function irAReporte() {
       <div class="mb-4" data-testid="evento-detalle-proyeccion">
         <ProyeccionCostosCard :proyeccion="proyeccion" />
       </div>
+
+      <!-- Productos del evento (REQ-FIN-20): badge + link a EventoProductosView -->
+      <v-card class="pa-4 mb-4" data-testid="evento-detalle-productos">
+        <div class="d-flex align-center justify-space-between">
+          <div>
+            <h3 class="text-subtitle-1">Productos del evento</h3>
+            <p class="text-body-2 text-medium-emphasis">
+              {{ productosCount > 0 ? `${productosCount} producto(s) configurado(s)` : 'Sin productos configurados' }}
+            </p>
+          </div>
+          <v-btn
+            :color="productosCount > 0 ? 'primary' : 'success'"
+            variant="flat"
+            prepend-icon="mdi-package-variant"
+            data-testid="evento-detalle-ir-productos"
+            @click="router.push({ name: 'evento-productos', params: { id: eventoId } })"
+          >
+            {{ productosCount > 0 ? 'Configurar productos' : 'Inicializar desde catálogo' }}
+          </v-btn>
+        </div>
+      </v-card>
 
       <div class="d-flex align-center justify-space-between mb-2">
         <h2>Gastos fijos</h2>
