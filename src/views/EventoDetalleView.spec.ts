@@ -21,7 +21,7 @@ import { __pushSupabaseResponse, __resetSupabaseMock } from '../../tests/setup'
 
 import EventoDetalleView from './EventoDetalleView.vue'
 import EventoStatusChip from '@/components/business/EventoStatusChip.vue'
-import type { Evento, EventoProducto, GastoFijo, PlanProduccion } from '@/types'
+import type { Evento, EventoProducto, GastoFijo, MateriaPrima, PlanProduccion, RecetaConIngredientes } from '@/types'
 
 const vuetify = createVuetify({ components, directives })
 
@@ -175,12 +175,15 @@ describe('EventoDetalleView', () => {
     // The mock queue is FIFO and consumed in order by every fetch:
     //   1. cargarPorEvento (gastos) → GastoFijo[]
     //   2. cargarPlan (planes) → PlanProduccion[]
-    //   3. guardarFechasMargen → servicio.actualizar → Evento
-    // PR-2b: epStore.cargarPorEvento needs a response (FIFO queue).
+    //   3. epStore.cargarPorEvento → EventoProducto[]
+    //   4. recipesStore.cargarTodas → RecetaConIngredientes[]
+    //   5. ingredientsStore.cargarTodas → MateriaPrima[]
+    //   6. guardarFechasMargen → servicio.actualizar → Evento
     __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
     __pushSupabaseResponse<PlanProduccion[]>({ data: [], error: null })
-    // EventoProductos load (empty — no products configured yet).
     __pushSupabaseResponse<EventoProducto[]>({ data: [], error: null })
+    __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
+    __pushSupabaseResponse<MateriaPrima[]>({ data: [], error: null })
     __pushSupabaseResponse<Evento>({
       data: { ...evento, fecha_fin: '2026-07-22', margen_ganancia: 0.5 },
       error: null,

@@ -1,0 +1,341 @@
+{
+  "findings": [
+    {
+      "ts": "21:47:38",
+      "level": "OK  ",
+      "section": "A",
+      "msg": "A1: back button hidden on /"
+    },
+    {
+      "ts": "21:47:38",
+      "level": "OK  ",
+      "section": "A",
+      "msg": "A2: home icon present"
+    },
+    {
+      "ts": "21:47:40",
+      "level": "OK  ",
+      "section": "A",
+      "msg": "A4: catch-all redirects to /"
+    },
+    {
+      "ts": "21:47:44",
+      "level": "OK  ",
+      "section": "A",
+      "msg": "A6: reload on /eventos OK"
+    },
+    {
+      "ts": "21:47:46",
+      "level": "OBS ",
+      "section": "B",
+      "msg": "mp-list rows visible: 5"
+    },
+    {
+      "ts": "21:47:46",
+      "level": "OBS ",
+      "section": "B",
+      "msg": "mp v-list-item elements: 5"
+    },
+    {
+      "ts": "21:47:46",
+      "level": "OBS ",
+      "section": "B",
+      "msg": "mp-empty present: false, mp-loading present: false"
+    },
+    {
+      "ts": "21:47:46",
+      "level": "OK  ",
+      "section": "B",
+      "msg": "B2: clicked FAB nueva materia prima"
+    },
+    {
+      "ts": "21:47:46",
+      "level": "OBS ",
+      "section": "B",
+      "msg": "B3: submit button found in dialog: false"
+    },
+    {
+      "ts": "21:47:47",
+      "level": "OBS ",
+      "section": "B",
+      "msg": "B3: validation visible on empty submit: false"
+    },
+    {
+      "ts": "21:47:49",
+      "level": "OBS ",
+      "section": "B",
+      "msg": "recetas v-list-item count: 2"
+    },
+    {
+      "ts": "21:47:50",
+      "level": "OK  ",
+      "section": "B",
+      "msg": "B11: clicked first receta row"
+    },
+    {
+      "ts": "21:47:50",
+      "level": "OK  ",
+      "section": "B",
+      "msg": "B11: receta-detalle titulo visible"
+    },
+    {
+      "ts": "21:47:50",
+      "level": "OK  ",
+      "section": "B",
+      "msg": "B20: vender button present, label=\"Vender esta receta\""
+    },
+    {
+      "ts": "21:47:53",
+      "level": "OK  ",
+      "section": "B",
+      "msg": "B19: receta no encontrada alert visible"
+    },
+    {
+      "ts": "21:47:54",
+      "level": "OBS ",
+      "section": "C",
+      "msg": "C: producto cards count: 2"
+    },
+    {
+      "ts": "21:47:55",
+      "level": "OBS ",
+      "section": "C",
+      "msg": "C7: clicked \"Agregar al carrito\" on /productos — checking if cart populates"
+    },
+    {
+      "ts": "21:47:57",
+      "level": "OBS ",
+      "section": "C",
+      "msg": "C7: cart lines visible after agregar from /productos: 0"
+    },
+    {
+      "ts": "21:48:00",
+      "level": "OBS ",
+      "section": "D",
+      "msg": "D: eventos list items: 1"
+    },
+    {
+      "ts": "21:48:00",
+      "level": "OBS ",
+      "section": "D",
+      "msg": "D2: FAB visible: true, button visible: false"
+    },
+    {
+      "ts": "21:48:01",
+      "level": "OK  ",
+      "section": "D",
+      "msg": "D7: clicked first evento → /eventos/:id"
+    },
+    {
+      "ts": "21:48:01",
+      "level": "OBS ",
+      "section": "E",
+      "msg": "E: titulo evento = \"Master\""
+    },
+    {
+      "ts": "21:48:01",
+      "level": "OBS ",
+      "section": "E",
+      "msg": "E: fechas = \"18/06/2026\""
+    },
+    {
+      "ts": "21:48:01",
+      "level": "OK  ",
+      "section": "E",
+      "msg": "E1: proyeccion card visible"
+    },
+    {
+      "ts": "21:48:01",
+      "level": "OBS ",
+      "section": "E",
+      "msg": "E: proyeccion testid = proyeccion-card"
+    },
+    {
+      "ts": "21:48:01",
+      "level": "OBS ",
+      "section": "E",
+      "msg": "E1: proyeccion total = \"Total: USD 269.00\""
+    },
+    {
+      "ts": "21:48:01",
+      "level": "OBS ",
+      "section": "E",
+      "msg": "E1: fijos=USD 269.00 variables=USD 0.00"
+    },
+    {
+      "ts": "21:48:01",
+      "level": "OBS ",
+      "section": "E",
+      "msg": "E: no break-even section visible"
+    },
+    {
+      "ts": "21:48:01",
+      "level": "OBS ",
+      "section": "F",
+      "msg": "F: eventoId = 68d65441-c2de-4fe9-8672-67e2267d3b7f"
+    },
+    {
+      "ts": "21:48:02",
+      "level": "OK  ",
+      "section": "F",
+      "msg": "F1: tabla de productos del evento visible"
+    },
+    {
+      "ts": "21:48:02",
+      "level": "OBS ",
+      "section": "F",
+      "msg": "F: margen chip = \"Margen 40%\""
+    },
+    {
+      "ts": "21:48:02",
+      "level": "OBS ",
+      "section": "F",
+      "msg": "F: sliders count in tabla = 2"
+    },
+    {
+      "ts": "21:48:02",
+      "level": "OBS ",
+      "section": "F",
+      "msg": "F: pricing alerts visible = 0"
+    },
+    {
+      "ts": "21:48:02",
+      "level": "OK  ",
+      "section": "F",
+      "msg": "F9: aplicar-minimo button visible"
+    },
+    {
+      "ts": "21:48:02",
+      "level": "OBS ",
+      "section": "F",
+      "msg": "F: table headers = [\"\",\"Producto\",\"Receta\",\"Costo unitario\",\"Margen (%)\",\"Precio sugerido\",\"Precio de venta\"]"
+    },
+    {
+      "ts": "21:48:02",
+      "level": "OBS ",
+      "section": "F",
+      "msg": "F: table rows = [[\"\",\"(producto sin receta)\",\"\",\"USD 0.00\",\"0%  $0.00\",\"USD 0.00\",\"Contribución $Contribución $\"],[\"\",\"(producto sin receta)\",\"\",\"USD 0.00\",\"40%  $0.00\",\"USD 0.00\",\"Contribución $Contribución $\"]]"
+    },
+    {
+      "ts": "21:48:05",
+      "level": "OK  ",
+      "section": "G",
+      "msg": "G1: sin evento alert: false"
+    },
+    {
+      "ts": "21:48:05",
+      "level": "OBS ",
+      "section": "G",
+      "msg": "G: producto cards in POS grid = 0"
+    },
+    {
+      "ts": "21:48:05",
+      "level": "OBS ",
+      "section": "G",
+      "msg": "G22: online chip = {\"text\":\"En línea\",\"classes\":\"v-chip v-theme--light text-success v-chip--density-default v-chip--size-small v-chip--variant-tonal\"}"
+    },
+    {
+      "ts": "21:48:05",
+      "level": "OK  ",
+      "section": "G",
+      "msg": "G19: expanded imprevistos section"
+    },
+    {
+      "ts": "21:48:05",
+      "level": "OBS ",
+      "section": "G",
+      "msg": "G19: total imprevistos = \"Total: $100.00\""
+    },
+    {
+      "ts": "21:48:07",
+      "level": "OK  ",
+      "section": "H",
+      "msg": "H1: cierre sin-evento: false"
+    },
+    {
+      "ts": "21:48:07",
+      "level": "OBS ",
+      "section": "H",
+      "msg": "H: evento info = \"Master0 venta(s) — Total: $0.00\""
+    },
+    {
+      "ts": "21:48:07",
+      "level": "OK  ",
+      "section": "H",
+      "msg": "H3: cierre resumen card visible"
+    },
+    {
+      "ts": "21:48:07",
+      "level": "OBS ",
+      "section": "H",
+      "msg": "H: resumen testid = cierre-resumen"
+    },
+    {
+      "ts": "21:48:07",
+      "level": "OBS ",
+      "section": "H",
+      "msg": "H: ventas = \"Ventas0 venta(s) — USD 0.00\""
+    },
+    {
+      "ts": "21:48:07",
+      "level": "OBS ",
+      "section": "H",
+      "msg": "H: utilidad = \"Utilidad brutaUSD 0.00\""
+    },
+    {
+      "ts": "21:48:07",
+      "level": "OBS ",
+      "section": "H",
+      "msg": "H: utilidad neta = \"Utilidad neta-USD 369.00\""
+    },
+    {
+      "ts": "21:48:07",
+      "level": "OBS ",
+      "section": "H",
+      "msg": "H: margen contribucion = \"Margen de contribución Contribución total: USD 0.00 · Gastos fijos: USD 369.00 · Cubiertos: 0%\""
+    },
+    {
+      "ts": "21:48:07",
+      "level": "OBS ",
+      "section": "H",
+      "msg": "H: desglose = \"Desglose por categoríaGastos fijosRenta — $214.00Otro — $55.00Gastos imprevistosInsumos extra — $100.00\""
+    },
+    {
+      "ts": "21:48:07",
+      "level": "OBS ",
+      "section": "H",
+      "msg": "H: acciones = \"No hay ventas registradas — ¿estás seguro de cerrar?  Registrar cierre\""
+    },
+    {
+      "ts": "21:48:10",
+      "level": "OBS ",
+      "section": "I",
+      "msg": "I1: reporte empty (no cerrado) = true"
+    },
+    {
+      "ts": "21:48:13",
+      "level": "OBS ",
+      "section": "J",
+      "msg": "J1: counters = [{\"testid\":\"contadores-home\",\"text\":\"5Materias primas2Recetas1Eventos2Productos0Ventas hoy\"},{\"testid\":\"contador-materias-primas\",\"text\":\"5Materias primas\"},{\"testid\":\"contador-recetas\",\"text\":\"2Recetas\"},{\"testid\":\"contador-eventos\",\"text\":\"1Eventos\"},{\"testid\":\"contador-productos\",\"text\":\"2Productos\"},{\"testid\":\"contador-ventas-hoy\",\"text\":\"0Ventas hoy\"}]"
+    },
+    {
+      "ts": "21:48:13",
+      "level": "OBS ",
+      "section": "J",
+      "msg": "J2: banner evento activo = true"
+    },
+    {
+      "ts": "21:48:13",
+      "level": "OBS ",
+      "section": "J",
+      "msg": "J6: estado conexion = \"Kilo-Lima · En línea\""
+    },
+    {
+      "ts": "21:48:22",
+      "level": "OK  ",
+      "section": "K",
+      "msg": "QA PASS — collected 55 observations"
+    }
+  ],
+  "totalObservations": 56
+}

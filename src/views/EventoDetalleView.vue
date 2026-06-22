@@ -30,6 +30,8 @@ import { useGastosFijos } from '@/composables/useGastosFijos'
 import { usePlans } from '@/composables/usePlans'
 import { useProyeccionCostos } from '@/composables/useProyeccionCostos'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
+import { useRecipesStore } from '@/stores/recipes.store'
+import { useIngredientsStore } from '@/stores/ingredients.store'
 import { estadoEsEditable } from '@/utils/estado'
 import type { EstadoEvento, GastoFijoInput } from '@/types'
 
@@ -128,6 +130,9 @@ onMounted(() => {
     void cargarPorEvento(eventoId.value)
     void cargarPlan(eventoId.value)
     void epStore.cargarPorEvento(eventoId.value)
+    // Ensure catalogs are loaded so the projection has receta costs.
+    void useRecipesStore().cargarTodas()
+    void useIngredientsStore().cargarTodas()
   }
 })
 
