@@ -32,6 +32,7 @@ import { useProyeccionCostos } from '@/composables/useProyeccionCostos'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
+import { useProductosStore } from '@/stores/productos.store'
 import { estadoEsEditable } from '@/utils/estado'
 import type { EstadoEvento, GastoFijoInput } from '@/types'
 
@@ -133,6 +134,7 @@ onMounted(() => {
     // Ensure catalogs are loaded so the projection has receta costs.
     void useRecipesStore().cargarTodas()
     void useIngredientsStore().cargarTodas()
+    void useProductosStore().cargarTodas()
   }
 })
 
