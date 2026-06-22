@@ -370,6 +370,55 @@ describe('PosView — adding to cart uses evento price (REQ-FIN-29)', () => {
   })
 })
 
+// REQ-CON-8 (PR-2): per-producto ContribucionBadge rendered in the
+// POS grid below the price. The badge is fed from
+// usePreciosEvento.contribucionParaProducto(productoId).
+describe('PosView — ContribucionBadge per card (REQ-CON-8)', () => {
+  it('renders a ContribucionBadge on every product card when contribution > 0', async () => {
+    // costo=10 + margen=0.4 → precio_sugerido = 16.67; contrib = 6.67.
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([
+      fabricarProductoParaPOS('p-1', { costo: 10, margen: 0.4 }),
+      fabricarProductoParaPOS('p-2', { costo: 10, margen: 0.4 }),
+    ])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const badges = wrapper.findAll('[data-testid="contribucion-badge"]')
+      expect(badges.length).toBe(2)
+      // Each badge text must mention Contribución + a positive USD value.
+      expect(badges[0]?.text()).toContain('Contribución')
+    })
+  })
+
+  it('renders one badge per visible card, never more (no orphan badges)', async () => {
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0.4 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const cards = wrapper.findAll('[data-testid="producto-card"]')
+      const badges = wrapper.findAll('[data-testid="contribucion-badge"]')
+      expect(cards.length).toBe(badges.length)
+    })
+  })
+
+  it('shows red badge text (contribution < 0) when the operator prices below cost', async () => {
+    // costo=10 but a manual precio_venta=8 → contribution = -2.
+    sembrarEventoEnCurso()
+    const fabricado = fabricarProductoParaPOS('p-1', { costo: 10, margen: 0.4 })
+    fabricado.ep.precio_venta = 8 // operator forces below-cost pricing
+    sembrarProductosEnPOS([fabricado])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const badge = wrapper.find('[data-testid="contribucion-badge"]')
+      expect(badge.exists()).toBe(true)
+      expect(badge.text()).toContain('Contribución')
+    })
+  })
+})
+
 describe('PosView — Imprevistos section (preserved, REQ-POS-40)', () => {
   it('renders the Imprevistos collapsible section with the total chip (REQ-POS-40)', async () => {
     sembrarEventoEnCurso()

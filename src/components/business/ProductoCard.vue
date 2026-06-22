@@ -4,13 +4,23 @@
 // product is unavailable (REQ-POS-3 — products.toggle). Card is
 // purely visual — every action is an emit, the parent view owns the
 // dialogs and store wiring.
+//
+// REQ-CON-8 (PR-2): optional `contribucion` prop surfaces the
+// per-producto contribution badge below the price. When omitted
+// (e.g., for the legacy catalog view) the badge is hidden, keeping
+// the card backwards-compatible.
+import ContribucionBadge from './ContribucionBadge.vue'
 import type { Producto } from '@/types'
 import { formatearUSD } from '@/utils/format'
 
-defineProps<{
-  producto: Producto
-  nombreReceta: string
-}>()
+withDefaults(
+  defineProps<{
+    producto: Producto
+    nombreReceta: string
+    contribucion?: number | null
+  }>(),
+  { contribucion: null },
+)
 
 defineEmits<{
   agregar: [productoId: string]
@@ -26,6 +36,11 @@ defineEmits<{
     <div class="text-h5 mb-2" data-testid="producto-card-precio">
       {{ formatearUSD(producto.precio_venta) }}
     </div>
+    <ContribucionBadge
+      v-if="contribucion !== null && contribucion !== undefined"
+      :contribucion="contribucion"
+      class="mb-2 align-self-start"
+    />
     <v-spacer />
     <div class="d-flex ga-2 mt-2 flex-wrap">
       <v-btn

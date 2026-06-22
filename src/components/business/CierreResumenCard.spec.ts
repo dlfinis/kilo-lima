@@ -148,3 +148,74 @@ describe('CierreResumenCard', () => {
     expect(utilidad.classes()).toContain('text-success')
   })
 })
+
+// REQ-CON-15 (PR-2): informational "Margen de contribución" line.
+// Surfaces total utilidadBruta against total gastos fijos + a
+// "Cubiertos: N%" indicator. Does NOT affect utilidadNeta — this is
+// a read-only informational row.
+describe('CierreResumenCard — Margen de contribución (REQ-CON-15)', () => {
+  it('renders the contribution margin section with totals + cubiertos percentage', () => {
+    const wrapper = mountCard(
+      mkResumen({
+        utilidadBruta: 150,
+        totalGastosFijos: 100,
+        totalGastosImprevistos: 0,
+      }),
+    )
+
+    const section = wrapper.find('[data-testid="cierre-margen"]')
+    expect(section.exists()).toBe(true)
+    // 150/100 = 1.5 → 150% cubiertos.
+    expect(section.text()).toContain('Cubiertos')
+    expect(section.text()).toContain('150')
+    expect(section.text()).toContain('100.00')
+  })
+
+  it('renders 0% cubiertos when utilidadBruta is 0', () => {
+    const wrapper = mountCard(
+      mkResumen({
+        utilidadBruta: 0,
+        totalGastosFijos: 100,
+        totalGastosImprevistos: 0,
+      }),
+    )
+
+    const section = wrapper.find('[data-testid="cierre-margen"]')
+    expect(section.exists()).toBe(true)
+    expect(section.text()).toContain('Cubiertos')
+    expect(section.text()).toContain('0%')
+  })
+
+  it('handles zero gastos fijos gracefully (Math guard — no divide-by-zero)', () => {
+    const wrapper = mountCard(
+      mkResumen({
+        utilidadBruta: 50,
+        totalGastosFijos: 0,
+        totalGastosImprevistos: 0,
+      }),
+    )
+
+    const section = wrapper.find('[data-testid="cierre-margen"]')
+    expect(section.exists()).toBe(true)
+    expect(section.text()).toContain('Cubiertos')
+    // When gastosFijos = 0, the percentage is N/A or Infinity-safe.
+    // We assert the section renders without crashing.
+  })
+
+  it('does NOT alter utilidadNeta (read-only informational row)', () => {
+    const wrapper = mountCard(
+      mkResumen({
+        utilidadBruta: 100,
+        totalGastosFijos: 30,
+        totalGastosImprevistos: 20,
+        utilidadNeta: 50,
+      }),
+    )
+
+    // utilidadNeta stays exactly as supplied.
+    expect(wrapper.text()).toContain('Utilidad neta')
+    expect(wrapper.text()).toContain('50.00')
+    // The margin section is independent of utilidadNeta.
+    expect(wrapper.find('[data-testid="cierre-margen"]').exists()).toBe(true)
+  })
+})

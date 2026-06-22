@@ -4,6 +4,11 @@
 // the responsive grid layout, the search filter, and the empty
 // states. The view wires the store calls (cargarDisponibles,
 // agregarAlCarrito) and the dialogs.
+//
+// REQ-CON-8 (PR-2): optional `contribucionesPorProducto` map forwards
+// a per-producto monetary contribution to each ProductoCard so the
+// POS grid can render the contribution badge inline. The map is keyed
+// by productoId; absent keys render the card without a badge.
 import { computed } from 'vue'
 
 import ProductoCard from './ProductoCard.vue'
@@ -14,8 +19,9 @@ const props = withDefaults(
     productos: Producto[]
     recetas: RecetaConIngredientes[]
     busqueda?: string
+    contribucionesPorProducto?: Record<string, number>
   }>(),
-  { busqueda: '' },
+  { busqueda: '', contribucionesPorProducto: () => ({}) },
 )
 
 defineEmits<{
@@ -41,6 +47,11 @@ const emptyTitulo = computed(() =>
     ? 'No hay productos disponibles'
     : 'No se encontraron productos',
 )
+
+function contribucionPara(producto: Producto): number | null {
+  const valor = props.contribucionesPorProducto[producto.id]
+  return typeof valor === 'number' ? valor : null
+}
 </script>
 
 <template>
@@ -60,6 +71,7 @@ const emptyTitulo = computed(() =>
         <ProductoCard
           :producto="producto"
           :nombre-receta="nombreReceta(producto)"
+          :contribucion="contribucionPara(producto)"
           @agregar="(id) => $emit('agregar', id)"
         />
       </v-col>

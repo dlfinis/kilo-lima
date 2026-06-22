@@ -1,9 +1,12 @@
 <script setup lang="ts">
-// REQ-PRICING-1, REQ-PRICING-7, REQ-FIN-18, REQ-PRICING-8:
+// REQ-PRICING-1, REQ-PRICING-7, REQ-FIN-18, REQ-PRICING-8,
+// REQ-CON-7, REQ-CON-9, REQ-CON-10 (PR-2):
 // per-evento product picker at `/eventos/:id/productos`. Composes:
 //   - useEvents()        — evento header + read-only gate
 //   - usePreciosEvento() — joined list (costo + precio_sugerido +
-//                          margen_efectivo + precio_final)
+//                          margen_efectivo + precio_final) +
+//                          contribucionParaProducto +
+//                          precioMinimoParaProducto (PR-2)
 //   - useEventoProductosStore() — mutations + inicializarDesdeCatalogo
 //
 // Optimistic updates for the incluido toggle and the precio_venta
@@ -11,10 +14,19 @@
 // reconciles. `estadoEsEditable` hides the bulk "Inicializar desde
 // catálogo" button + the editable slider/input when the evento is
 // cerrado.
+//
+// PR-2 changes (REQ-CON-7, REQ-CON-9, REQ-CON-10):
+//   - Inline <PricingAlert> below the editable precio_venta field.
+//     The alert is purely advisory — saving the new price still
+//     proceeds (no save-blocking).
+//   - Bulk action "APLICAR PRECIO MÍNIMO BREAK-EVEN" — applies the
+//     computed `precioMinimoParaProducto(productoId)` to each row's
+//     `precio_venta` via the existing store path.
 import { computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import MargenSlider from '@/components/business/MargenSlider.vue'
+import PricingAlert from '@/components/business/PricingAlert.vue'
 import { useEvents } from '@/composables/useEvents'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
@@ -32,7 +44,7 @@ const eventoId = computed<string | null>(() => {
 
 const { eventoActual, cargarPorId } = useEvents()
 const epStore = useEventoProductosStore()
-const { productosDelEvento } = usePreciosEvento(eventoId)
+const { productosDelEvento, precioMinimoParaProducto } = usePreciosEvento(eventoId)
 
 const editable = computed(() =>
   eventoActual.value ? estadoEsEditable(eventoActual.value.estado) : false,
@@ -71,6 +83,19 @@ async function alCambiarPrecio(ep: EventoProducto, valor: number) {
 async function alCambiarMargen(ep: EventoProducto, margen: number) {
   if (!eventoId.value) return
   await epStore.actualizarPrecio(eventoId.value, ep.producto_id, ep.precio_venta ?? 0, margen)
+}
+
+// REQ-CON-10 (PR-2): bulk action — apply the break-even minimum price
+// to every included producto. Iterates over `productosDelEvento` and
+// calls `actualizarPrecio` with the minimum so the operator can pivot
+// the table to break-even pricing in one click.
+async function aplicarPrecioMinimo() {
+  if (!eventoId.value) return
+  for (const ep of productosDelEvento.value) {
+    const minimo = precioMinimoParaProducto.value(ep.producto_id)
+    if (minimo === null) continue
+    await epStore.actualizarPrecio(eventoId.value, ep.producto_id, minimo, ep.margen ?? 0)
+  }
 }
 
 function volver() {
@@ -117,8 +142,23 @@ function volver() {
         </v-btn>
       </v-card>
 
+      <!-- REQ-CON-10 (PR-2): bulk action — apply the break-even
+           minimum price to every included producto. Hidden when
+           the evento is cerrado (read-only state). -->
+      <div v-if="productosDelEvento.length > 0 && editable" class="d-flex ga-2 mb-3">
+        <v-btn
+          color="warning"
+          variant="tonal"
+          prepend-icon="mdi-cash-multiple"
+          data-testid="evento-productos-aplicar-minimo"
+          @click="aplicarPrecioMinimo"
+        >
+          Aplicar precio mínimo break-even
+        </v-btn>
+      </div>
+
       <v-data-table
-        v-else
+        v-if="productosDelEvento.length > 0"
         :items="productosDelEvento"
         :headers="[
           { title: '', key: 'incluido', sortable: false, width: 60 },
@@ -155,16 +195,26 @@ function volver() {
           {{ formatearUSD(item.precio_sugerido) }}
         </template>
         <template #[`item.precio_final`]="{ item }">
-          <v-text-field
-            :model-value="item.precio_final"
-            type="number"
-            density="compact"
-            hide-details
-            :disabled="!editable"
-            :data-testid="`evento-productos-precio-${item.producto_id}`"
-            style="max-width: 120px"
-            @update:model-value="(v) => alCambiarPrecio(item, Number(v))"
-          />
+          <div class="d-flex flex-column">
+            <v-text-field
+              :model-value="item.precio_final"
+              type="number"
+              density="compact"
+              hide-details
+              :disabled="!editable"
+              :data-testid="`evento-productos-precio-${item.producto_id}`"
+              style="max-width: 120px"
+              @update:model-value="(v) => alCambiarPrecio(item, Number(v))"
+            />
+            <!-- REQ-CON-7 (PR-2): inline PricingAlert. Advisory only
+                 — saving the new price still proceeds. The alert
+                 renders below the input field inside the same cell. -->
+            <PricingAlert
+              :precio="item.precio_final"
+              :costo-produccion="item.costo_unitario"
+              :precio-minimo="precioMinimoParaProducto(item.producto_id)"
+            />
+          </div>
         </template>
       </v-data-table>
     </template>

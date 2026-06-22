@@ -1,4 +1,5 @@
-// REQ-FIN-21, REQ-FIN-22, REQ-FIN-26, REQ-REPORTE-1..6 (PR-2c):
+// REQ-FIN-21, REQ-FIN-22, REQ-FIN-26, REQ-REPORTE-1..6 (PR-2c),
+// REQ-CON-11 (PR-2):
 // `useReporteEvento(eventoId)` is the report orchestrator. It reads
 // ventas + venta_items (already loaded by `useVentas.cargarPorEvento`)
 // + the cierre snapshot + the evento (for the date range) and exposes
@@ -340,6 +341,104 @@ describe('useReporteEvento — defensive reads', () => {
       const r = useReporteEvento('e-1')
       expect(r.reportePorDia.value).toHaveLength(3)
       expect(r.reportePorProducto.value).toHaveLength(1)
+    })
+  })
+})
+
+// REQ-CON-11 (PR-2): contribution-derived computeds on the report.
+// - `rankingContribucion`: same rows as `reportePorProducto`, sorted
+//   by `utilidadBruta` DESC (top earners first).
+// - `productosPagaronOperacion`: top 3 by utilidadBruta.
+// - `productosGananciaPura`: rows where utilidadBruta covers its share
+//   of gastos fijos. For PR-2 we surface every producto when total
+//   utilidadBruta > gastos fijos (PR-2 brief "simplified").
+describe('useReporteEvento — contribution ranking (REQ-CON-11)', () => {
+  it('rankingContribucion sorts reportePorProducto by utilidadBruta DESC', () => {
+    sembrarEvento(mkEvento('e-1'))
+    conContexto(() => {
+      const ventas = useVentasStore()
+      ventas.ventas = [
+        mkVentaConItems('v-1', '2026-12-18T10:00:00Z', 50, [
+          { id: 'vi-1', productoId: 'p-low', cantidad: 2, precioUnitario: 25, costoUnitario: 20 },
+        ]),
+        mkVentaConItems('v-2', '2026-12-18T11:00:00Z', 100, [
+          { id: 'vi-2', productoId: 'p-high', cantidad: 4, precioUnitario: 25, costoUnitario: 5 },
+        ]),
+        mkVentaConItems('v-3', '2026-12-18T12:00:00Z', 60, [
+          { id: 'vi-3', productoId: 'p-mid', cantidad: 2, precioUnitario: 30, costoUnitario: 15 },
+        ]),
+      ]
+      const r = useReporteEvento('e-1')
+      // utilidadBruta: p-high = 80, p-mid = 30, p-low = 10
+      expect(r.rankingContribucion.value[0]?.productoId).toBe('p-high')
+      expect(r.rankingContribucion.value[1]?.productoId).toBe('p-mid')
+      expect(r.rankingContribucion.value[2]?.productoId).toBe('p-low')
+    })
+  })
+
+  it('productosPagaronOperacion returns the top 3 by utilidadBruta', () => {
+    sembrarEvento(mkEvento('e-1'))
+    conContexto(() => {
+      const ventas = useVentasStore()
+      ventas.ventas = [
+        mkVentaConItems('v-1', '2026-12-18T10:00:00Z', 100, [
+          { id: 'vi-1', productoId: 'p-a', cantidad: 4, precioUnitario: 25, costoUnitario: 5 },
+        ]),
+        mkVentaConItems('v-2', '2026-12-18T11:00:00Z', 80, [
+          { id: 'vi-2', productoId: 'p-b', cantidad: 4, precioUnitario: 20, costoUnitario: 8 },
+        ]),
+        mkVentaConItems('v-3', '2026-12-18T12:00:00Z', 60, [
+          { id: 'vi-3', productoId: 'p-c', cantidad: 3, precioUnitario: 20, costoUnitario: 10 },
+        ]),
+        mkVentaConItems('v-4', '2026-12-18T13:00:00Z', 40, [
+          { id: 'vi-4', productoId: 'p-d', cantidad: 2, precioUnitario: 20, costoUnitario: 15 },
+        ]),
+      ]
+      const r = useReporteEvento('e-1')
+      expect(r.productosPagaronOperacion.value).toHaveLength(3)
+      expect(r.productosPagaronOperacion.value[0]?.productoId).toBe('p-a')
+      expect(r.productosPagaronOperacion.value[2]?.productoId).toBe('p-c')
+      expect(r.productosPagaronOperacion.value.map((d) => d.productoId)).not.toContain('p-d')
+    })
+  })
+
+  it('productosPagaronOperacion returns fewer than 3 when there are not enough productos', () => {
+    sembrarEvento(mkEvento('e-1'))
+    conContexto(() => {
+      const ventas = useVentasStore()
+      ventas.ventas = [
+        mkVentaConItems('v-1', '2026-12-18T10:00:00Z', 50, [
+          { id: 'vi-1', productoId: 'p-only', cantidad: 2, precioUnitario: 25, costoUnitario: 10 },
+        ]),
+      ]
+      const r = useReporteEvento('e-1')
+      expect(r.productosPagaronOperacion.value).toHaveLength(1)
+      expect(r.productosPagaronOperacion.value[0]?.productoId).toBe('p-only')
+    })
+  })
+
+  it('productosGananciaPura returns empty when there are no ventas', () => {
+    sembrarEvento(mkEvento('e-1'))
+    conContexto(() => {
+      const r = useReporteEvento('e-1')
+      expect(r.productosGananciaPura.value).toEqual([])
+    })
+  })
+
+  it('productosGananciaPura returns all productos when total utilidadBruta > 0 (simplified)', () => {
+    sembrarEvento(mkEvento('e-1'))
+    conContexto(() => {
+      const ventas = useVentasStore()
+      ventas.ventas = [
+        mkVentaConItems('v-1', '2026-12-18T10:00:00Z', 100, [
+          { id: 'vi-1', productoId: 'p-a', cantidad: 4, precioUnitario: 25, costoUnitario: 5 },
+        ]),
+      ]
+      const r = useReporteEvento('e-1')
+      // No gastos fijos seeded here so the simplified "ganancia pura"
+      // surfaces the single producto. Real PR-3+ work uses the
+      // per-product share of gastos fijos.
+      expect(r.productosGananciaPura.value.length).toBeGreaterThanOrEqual(1)
     })
   })
 })
