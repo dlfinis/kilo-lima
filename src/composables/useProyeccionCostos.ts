@@ -28,6 +28,7 @@ import { usePlansStore } from '@/stores/plans.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
+import { useProductosStore } from '@/stores/productos.store'
 import { calcularCostoReceta, type LineaInput } from '@/composables/useCalculoReceta'
 import { redondearCentavos } from '@/utils/moneda'
 import { calcularBreakEvenUnidades, calcularPrecioMinimoBreakEven, type ContribucionConVolumen } from '@/utils/contribucion'
@@ -44,7 +45,7 @@ export function calcularProyeccion(
   materiasPrimas: MateriaPrima[],
   // Optional: priced products for this evento. When provided, the
   // function extends the result with break-even + contribution fields.
-  productos?: { productoId: string; precioVenta: number }[],
+  productos?: { productoId: string; recetaId: string; precioVenta: number }[],
 ): ProyeccionResultado {
   // Recetas arrive with embedded `ingredientes` from the store's joined
   // query; cast to the catalog-shaped shape so the lookup stays typed.
@@ -116,25 +117,19 @@ export function calcularProyeccion(
 
   if (productos && productos.length > 0) {
     // Build a map of recetaId → precioVenta for the contribution calc.
-    // Each producto has a receta_id (via productos table), and each
-    // plan row references a receta_id. Match them to compute per-unit
-    // contribution = precioVenta − costoPorUnidad.
-    const productoPrecioPorReceta = new Map<string, number>()
+    // Plan rows reference receta_id; we match productos by their receta.
+    const precioPorReceta = new Map<string, number>()
     for (const p of productos) {
-      // productoId is not directly mappable to receta_id here without
-      // the productos store. Instead, the EventoProductoConDetalle
-      // carries producto_id + precio_venta. We match by producto's
-      // receta_id via a separate lookup that the composable does.
-      // For the pure function, we accept { productoId, precioVenta }
-      // and use the productoId to find its recetaId from plan rows.
-      productoPrecioPorReceta.set(p.productoId, p.precioVenta)
+      if (p.recetaId && p.precioVenta > 0) {
+        precioPorReceta.set(p.recetaId, p.precioVenta)
+      }
     }
 
     // Build contribuciones array: for each plan row, find matching
     // producto price, compute contribution per unit.
     const contribuciones: ContribucionConVolumen[] = []
     for (const fila of plan) {
-      const precioVenta = productoPrecioPorReceta.get(fila.id) ?? 0
+      const precioVenta = precioPorReceta.get(fila.receta_id) ?? 0
       const linea = lineas.find((l) => l.recetaId === fila.receta_id)
       const costoPorUnidad = linea?.costoPorUnidad ?? 0
       contribuciones.push({
@@ -203,6 +198,7 @@ export function useProyeccionCostos(
   const recipesStore = useRecipesStore()
   const ingredientsStore = useIngredientsStore()
   const epStore = useEventoProductosStore()
+  const productosStore = useProductosStore()
 
   return computed<ProyeccionResultado | null>(() => {
     const id = toValue(eventoId)
@@ -222,7 +218,14 @@ export function useProyeccionCostos(
     // the eventoProductos store (configured in EventoProductosView).
     const eps = epStore.productosPorEvento.get(id) ?? []
     const productos = eps.length > 0
-      ? eps.map((ep) => ({ productoId: ep.producto_id, precioVenta: ep.precio_venta ?? 0 }))
+      ? eps.map((ep) => {
+          const prod = productosStore.productos.find((p) => p.id === ep.producto_id)
+          return {
+            productoId: ep.producto_id,
+            recetaId: prod?.receta_id ?? '',
+            precioVenta: ep.precio_venta ?? 0,
+          }
+        })
       : undefined
 
     return calcularProyeccion(
