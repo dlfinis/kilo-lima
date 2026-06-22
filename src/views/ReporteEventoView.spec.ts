@@ -1,4 +1,5 @@
-// REQ-FIN-23, REQ-FIN-24, REQ-FIN-25, REQ-REPORTE-3..6 (PR-2c):
+// REQ-FIN-23, REQ-FIN-24, REQ-FIN-25, REQ-REPORTE-3..6 (PR-2c),
+// REQ-CON-12, REQ-CON-13, REQ-CON-14 (PR-2):
 // `ReporteEventoView.vue` is the post-evento analytics surface at
 // `/eventos/:id/reporte`. Renders 3 Vuetify tabs:
 //
@@ -334,5 +335,149 @@ describe('ReporteEventoView — arithmetic consistency (REQ-REPORTE-6)', () => {
     const resumen = card.props('resumen') as { utilidadBruta: number } | null
     expect(resumen).not.toBeNull()
     expect(resumen?.utilidadBruta).toBe(110)
+  })
+})
+
+// REQ-CON-12, REQ-CON-13, REQ-CON-14 (PR-2): ranking + banners on
+// the Por producto tab.
+describe('ReporteEventoView — Por producto contribution surfaces (REQ-CON-12..14)', () => {
+  const eventoCerrado = (): Evento => mkEvento('e-1', { estado: 'cerrado' })
+
+  it('shows a "Productos que pagaron la operación" banner with the top 3 (REQ-CON-13)', async () => {
+    const ventas = [
+      mkVentaConItems('v-1', '2026-12-18T10:00:00Z', 100, [
+        { id: 'vi-1', productoId: 'p-a', cantidad: 4, precioUnitario: 25, costoUnitario: 5 },
+      ]),
+      mkVentaConItems('v-2', '2026-12-18T11:00:00Z', 80, [
+        { id: 'vi-2', productoId: 'p-b', cantidad: 4, precioUnitario: 20, costoUnitario: 8 },
+      ]),
+      mkVentaConItems('v-3', '2026-12-18T12:00:00Z', 60, [
+        { id: 'vi-3', productoId: 'p-c', cantidad: 3, precioUnitario: 20, costoUnitario: 10 },
+      ]),
+    ]
+    __pushSupabaseResponse<VentaConItems[]>({ data: ventas, error: null })
+    __pushSupabaseResponse<CierreCaja | null>({
+      data: mkCierre('e-1', 120),
+      error: null,
+    })
+    sembrarEvento(eventoCerrado())
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+    await wrapper.find('[data-testid="reporte-tab-por-producto"]').trigger('click')
+    await flushPromises()
+
+    const banner = document.querySelector('[data-testid="reporte-pagaron-operacion"]')
+    expect(banner).not.toBeNull()
+    expect(banner?.textContent ?? '').toContain('pagaron la operación')
+    expect(banner?.textContent ?? '').toContain('p-a')
+    expect(banner?.textContent ?? '').toContain('p-b')
+    expect(banner?.textContent ?? '').toContain('p-c')
+  })
+
+  it('shows a "Ganancia pura" banner when total utilidadBruta > 0 (REQ-CON-14)', async () => {
+    const ventas = [
+      mkVentaConItems('v-1', '2026-12-18T10:00:00Z', 100, [
+        { id: 'vi-1', productoId: 'p-a', cantidad: 4, precioUnitario: 25, costoUnitario: 5 },
+      ]),
+    ]
+    __pushSupabaseResponse<VentaConItems[]>({ data: ventas, error: null })
+    __pushSupabaseResponse<CierreCaja | null>({
+      data: mkCierre('e-1', 80),
+      error: null,
+    })
+    sembrarEvento(eventoCerrado())
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+    await wrapper.find('[data-testid="reporte-tab-por-producto"]').trigger('click')
+    await flushPromises()
+
+    const banner = document.querySelector('[data-testid="reporte-ganancia-pura"]')
+    expect(banner).not.toBeNull()
+    expect(banner?.textContent ?? '').toContain('Ganancia pura')
+  })
+
+  it('does NOT show "Ganancia pura" banner when total utilidadBruta <= 0 (REQ-CON-14)', async () => {
+    const ventas = [
+      mkVentaConItems('v-1', '2026-12-18T10:00:00Z', 30, [
+        { id: 'vi-1', productoId: 'p-loss', cantidad: 1, precioUnitario: 30, costoUnitario: 50 },
+      ]),
+    ]
+    __pushSupabaseResponse<VentaConItems[]>({ data: ventas, error: null })
+    __pushSupabaseResponse<CierreCaja | null>({
+      data: mkCierre('e-1', -20),
+      error: null,
+    })
+    sembrarEvento(eventoCerrado())
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+    await wrapper.find('[data-testid="reporte-tab-por-producto"]').trigger('click')
+    await flushPromises()
+
+    expect(document.querySelector('[data-testid="reporte-ganancia-pura"]')).toBeNull()
+  })
+
+  it('renders a 🏆 crown on each top-3 row in the Por producto table (REQ-CON-12)', async () => {
+    const ventas = [
+      mkVentaConItems('v-1', '2026-12-18T10:00:00Z', 100, [
+        { id: 'vi-1', productoId: 'p-a', cantidad: 4, precioUnitario: 25, costoUnitario: 5 },
+      ]),
+      mkVentaConItems('v-2', '2026-12-18T11:00:00Z', 60, [
+        { id: 'vi-2', productoId: 'p-b', cantidad: 2, precioUnitario: 30, costoUnitario: 15 },
+      ]),
+    ]
+    __pushSupabaseResponse<VentaConItems[]>({ data: ventas, error: null })
+    __pushSupabaseResponse<CierreCaja | null>({
+      data: mkCierre('e-1', 100),
+      error: null,
+    })
+    sembrarEvento(eventoCerrado())
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+    await wrapper.find('[data-testid="reporte-tab-por-producto"]').trigger('click')
+    await flushPromises()
+
+    // The crown is rendered as a 🏆 glyph inside the ranking column
+    // for top-3 rows. p-a is top, p-b is second.
+    const crowns = document.querySelectorAll('[data-testid^="reporte-ranking-"]')
+    expect(crowns.length).toBeGreaterThanOrEqual(2)
+    expect(crowns[0]?.textContent ?? '').toContain('🏆')
+  })
+
+  it('renders no 🏆 on rows beyond the top 3 (REQ-CON-12)', async () => {
+    const ventas = [
+      mkVentaConItems('v-1', '2026-12-18T10:00:00Z', 100, [
+        { id: 'vi-1', productoId: 'p-a', cantidad: 4, precioUnitario: 25, costoUnitario: 5 },
+      ]),
+      mkVentaConItems('v-2', '2026-12-18T11:00:00Z', 60, [
+        { id: 'vi-2', productoId: 'p-b', cantidad: 2, precioUnitario: 30, costoUnitario: 15 },
+      ]),
+      mkVentaConItems('v-3', '2026-12-18T12:00:00Z', 50, [
+        { id: 'vi-3', productoId: 'p-c', cantidad: 2, precioUnitario: 25, costoUnitario: 20 },
+      ]),
+      mkVentaConItems('v-4', '2026-12-18T13:00:00Z', 40, [
+        { id: 'vi-4', productoId: 'p-d', cantidad: 2, precioUnitario: 20, costoUnitario: 18 },
+      ]),
+    ]
+    __pushSupabaseResponse<VentaConItems[]>({ data: ventas, error: null })
+    __pushSupabaseResponse<CierreCaja | null>({
+      data: mkCierre('e-1', 60),
+      error: null,
+    })
+    sembrarEvento(eventoCerrado())
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+    await wrapper.find('[data-testid="reporte-tab-por-producto"]').trigger('click')
+    await flushPromises()
+
+    // Only the top 3 (p-a, p-b, p-c) get a crown.
+    const crowns = Array.from(
+      document.querySelectorAll('[data-testid^="reporte-ranking-"]'),
+    )
+    expect(crowns.length).toBe(3)
+    const ids = crowns.map((el) => el.getAttribute('data-testid'))
+    expect(ids).toContain('reporte-ranking-p-a')
+    expect(ids).toContain('reporte-ranking-p-b')
+    expect(ids).toContain('reporte-ranking-p-c')
+    expect(ids).not.toContain('reporte-ranking-p-d')
   })
 })

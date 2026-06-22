@@ -26,9 +26,13 @@ const mkProducto = (overrides: Partial<Producto> = {}): Producto => ({
   ...overrides,
 })
 
-const mountCard = (props: { producto: Producto; nombreReceta?: string }) =>
+const mountCard = (props: { producto: Producto; nombreReceta?: string; contribucion?: number | null }) =>
   mount(ProductoCard, {
-    props: { producto: props.producto, nombreReceta: props.nombreReceta ?? 'Pan básico' },
+    props: {
+      producto: props.producto,
+      nombreReceta: props.nombreReceta ?? 'Pan básico',
+      contribucion: props.contribucion ?? null,
+    },
     global: { plugins: [vuetify] },
   })
 
@@ -69,5 +73,21 @@ describe('ProductoCard', () => {
     const wrapper = mountCard({ producto: mkProducto({ disponible: false }) })
 
     expect(wrapper.find('[data-testid="producto-card-agregar"]').exists()).toBe(false)
+  })
+
+  it('does NOT render the ContribucionBadge when no contribution prop is passed (default)', () => {
+    const wrapper = mountCard({ producto: mkProducto() })
+    expect(wrapper.find('[data-testid="contribucion-badge"]').exists()).toBe(false)
+  })
+
+  it('renders the ContribucionBadge below the price when contribution prop is provided (REQ-CON-8)', () => {
+    const wrapper = mountCard({
+      producto: mkProducto({ precio_venta: 15 }),
+      contribucion: 5,
+    })
+    const badge = wrapper.find('[data-testid="contribucion-badge"]')
+    expect(badge.exists()).toBe(true)
+    expect(badge.text()).toContain('Contribución')
+    expect(badge.text()).toContain('5.00')
   })
 })

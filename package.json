@@ -27,6 +27,10 @@
     "verify:finanzas-pr1": "node scripts/verify-finanzas-pr1.mjs",
     "verify:finanzas-pr2a": "node scripts/verify-finanzas-pr2a.mjs",
     "verify:finanzas-pr2b": "node scripts/verify-finanzas-pr2b.mjs",
+    "verify:finanzas-pr2c": "node scripts/verify-finanzas-pr2c.mjs",
+    "verify:contribucion-pr1": "node scripts/verify-contribucion-pr1.mjs",
+    "verify:contribucion-pr2": "node scripts/verify-contribucion-pr2.mjs",
+    "verify:contribucion-all": "node scripts/verify-contribucion-pr1.mjs && node scripts/verify-contribucion-pr2.mjs",
     "verify:all": "node scripts/verify-all.mjs"
   },
   "dependencies": {

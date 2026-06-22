@@ -1,4 +1,5 @@
-// REQ-FIN-21, REQ-FIN-22, REQ-FIN-26, REQ-REPORTE-1..6 (PR-2c):
+// REQ-FIN-21, REQ-FIN-22, REQ-FIN-26, REQ-REPORTE-1..6 (PR-2c),
+// REQ-CON-11 (PR-2):
 // `useReporteEvento(eventoId)` is the report orchestrator. It reads
 // from existing stores (ventas, cierresCaja, events) and exposes
 // computed aggregations for the `ReporteEventoView`:
@@ -9,6 +10,11 @@
 //   - `reportePorProducto`: per-producto aggregation (REQ-REPORTE-2) —
 //     computed in utils/cierre.calcularDesglosePorProducto for unit
 //     testability; this composable just exposes it reactively.
+//   - `rankingContribucion`: sorted by utilidadBruta DESC
+//     (REQ-CON-11).
+//   - `productosPagaronOperacion`: top 3 by utilidadBruta (REQ-CON-11).
+//   - `productosGananciaPura`: simplified banner — every producto
+//     when total utilidadBruta > 0 (REQ-CON-11).
 //   - `cierre`: the CierreCaja snapshot row (null when not cerrado).
 //   - `cargando`, `error`: proxied from ventasStore.
 //
@@ -37,6 +43,9 @@ export type ReportePorProducto = DesgloseProducto
 export interface UseReporteEventoReturn {
   reportePorDia: ComputedRef<ReportePorDia[]>
   reportePorProducto: ComputedRef<ReportePorProducto[]>
+  rankingContribucion: ComputedRef<ReportePorProducto[]>
+  productosPagaronOperacion: ComputedRef<ReportePorProducto[]>
+  productosGananciaPura: ComputedRef<ReportePorProducto[]>
   cierre: ComputedRef<CierreCaja | null>
   cargando: ComputedRef<boolean>
   error: ComputedRef<string | null>
@@ -95,6 +104,34 @@ export function useReporteEvento(
     return calcularDesglosePorProducto(itemsDelEvento.value)
   })
 
+  // REQ-CON-11 (PR-2): contribution ranking. Sorted by utilidadBruta
+  // DESC so the top earners surface first. Sorts a fresh copy so the
+  // underlying `reportePorProducto` (sorted by ingresoTotal) stays
+  // unchanged for the Por producto tab.
+  const rankingContribucion = computed<ReportePorProducto[]>(() => {
+    return [...reportePorProducto.value].sort((a, b) => b.utilidadBruta - a.utilidadBruta)
+  })
+
+  // REQ-CON-11 (PR-2): "productos que pagaron la operación" — the top
+  // 3 productos by utilidadBruta. When fewer than 3 productos exist,
+  // returns whatever is available.
+  const productosPagaronOperacion = computed<ReportePorProducto[]>(() => {
+    return rankingContribucion.value.slice(0, 3)
+  })
+
+  // REQ-CON-11 (PR-2): "ganancia pura" banner. Simplified PR-2
+  // definition: every producto when total utilidadBruta > 0 (the
+  // operator sold at a profit overall). Full per-product share of
+  // gastos fijos lands later.
+  const productosGananciaPura = computed<ReportePorProducto[]>(() => {
+    const totalUtilidad = reportePorProducto.value.reduce(
+      (acc, d) => acc + d.utilidadBruta,
+      0,
+    )
+    if (totalUtilidad <= 0) return []
+    return [...reportePorProducto.value]
+  })
+
   // Cierre snapshot (read from cierresCajaStore — the store
   // fetches it on demand via cargarPorEvento()).
   const cierre = computed<CierreCaja | null>(() => {
@@ -128,6 +165,9 @@ export function useReporteEvento(
   return {
     reportePorDia,
     reportePorProducto,
+    rankingContribucion,
+    productosPagaronOperacion,
+    productosGananciaPura,
     cierre,
     cargando,
     error,

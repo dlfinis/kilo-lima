@@ -2,7 +2,8 @@
 // REQ-POS-7, REQ-POS-14, REQ-POS-15, REQ-POS-16, REQ-POS-20,
 // REQ-POS-24, REQ-POS-25, REQ-POS-28, REQ-POS-39, REQ-POS-40,
 // REQ-POS-46, REQ-POS-49, REQ-POS-54, REQ-POS-55,
-// REQ-FIN-28, REQ-FIN-29, REQ-FIN-30, REQ-FIN-32 (PR-2b POS integration):
+// REQ-FIN-28, REQ-FIN-29, REQ-FIN-30, REQ-FIN-32 (PR-2b POS integration),
+// REQ-CON-8 (PR-2):
 //
 // POS main view. Wires useProductos + useVentas + useEvents +
 // useGastosImprevistos + usePreciosEvento + useEventoProductosStore.
@@ -24,6 +25,12 @@
 //     path: when eventoEnCurso is null and a cerrado evento exists,
 //     `useVentas().registrarVenta` short-circuits before reaching
 //     this view (REQ-FIN-32, REQ-POS-39).
+//
+// PR-2 (REQ-CON-8): each product card surfaces a ContribucionBadge
+// with the per-producto monetary contribution. The view builds a
+// map<productoId, number> from `usePreciosEvento.contribucionParaProducto`
+// and forwards it to ProductoCardGrid, which passes each value to
+// the corresponding ProductoCard.
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
@@ -61,10 +68,25 @@ const { online } = useOnlineStatus()
 // refresh. `productosDelEvento` already filters `incluido = true`; we
 // additionally filter out rows whose costo_unitario is 0 (receta has
 // no ingredients) so the POS never shows unsellable $0 cards.
-const { productosDelEvento } = usePreciosEvento(() => eventoEnCurso.value?.id ?? null)
+const { productosDelEvento, contribucionParaProducto } = usePreciosEvento(
+  () => eventoEnCurso.value?.id ?? null,
+)
 const productosParaGrid = computed(() =>
   productosDelEvento.value.filter((ep) => ep.costo_unitario > 0),
 )
+
+// REQ-CON-8: build a productId → contribution map for the grid.
+// Reads the new `contribucionParaProducto` getter from usePreciosEvento
+// for each producto in the grid so the ProductoCardGrid can render
+// each ContribucionBadge inline.
+const contribucionesPorProducto = computed<Record<string, number>>(() => {
+  const mapa: Record<string, number> = {}
+  for (const ep of productosParaGrid.value) {
+    const contrib = contribucionParaProducto.value(ep.producto_id)
+    if (contrib !== null) mapa[ep.producto_id] = contrib
+  }
+  return mapa
+})
 // ProductoCardGrid is a presentational component that takes
 // Producto[] + RecetaConIngredientes[]; map the joined shape into
 // the legacy types so we keep the existing card surface without a
@@ -291,6 +313,7 @@ function reintentar() {
             :productos="productosMapeados"
             :recetas="recetasParaGrid"
             :busqueda="busqueda"
+            :contribuciones-por-producto="contribucionesPorProducto"
             @agregar="manejarAgregar"
           />
         </v-col>

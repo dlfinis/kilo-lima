@@ -1,5 +1,6 @@
 <script setup lang="ts">
-// REQ-FIN-23, REQ-FIN-24, REQ-FIN-25, REQ-REPORTE-3..6 (PR-2c):
+// REQ-FIN-23, REQ-FIN-24, REQ-FIN-25, REQ-REPORTE-3..6 (PR-2c),
+// REQ-CON-12, REQ-CON-13, REQ-CON-14 (PR-2):
 // post-evento analytics view at `/eventos/:id/reporte`. Three
 // Vuetify tabs (Resumen / Por día / Por producto) backed by
 // `useReporteEvento`. The view composes:
@@ -11,8 +12,13 @@
 //     [fecha_inicio, fecha_fin] inclusive, even zero-venta days
 //     (REQ-FIN-24, REQ-REPORTE-1).
 //   - Por producto tab: DataTable driven by reportePorProducto
-//     (REQ-FIN-25, REQ-REPORTE-2). Sortable by productoNombre /
-//     unidades / ingresoTotal / margenReal / utilidadBruta.
+//     (REQ-FIN-25, REQ-REPORTE-2). PR-2 adds:
+//       * 🏆 crown on top-3 rows by utilidadBruta (REQ-CON-12).
+//       * "Productos que pagaron la operación" banner listing the
+//         top 3 by utilidadBruta (REQ-CON-13).
+//       * "Ganancia pura" banner surfacing productos beyond
+//         break-even — simplified: every producto when total
+//         utilidadBruta > 0 (REQ-CON-14).
 //
 // Empty state (REQ-REPORTE-5): when `evento.estado !== 'cerrado'`
 // the view renders "El evento debe estar cerrado para ver el reporte"
@@ -42,11 +48,21 @@ const eventoId = computed<string | null>(() => {
 const {
   reportePorDia,
   reportePorProducto,
+  rankingContribucion,
+  productosPagaronOperacion,
+  productosGananciaPura,
   cierre,
   cargando,
   error,
   cargar,
 } = useReporteEvento(eventoId)
+
+// REQ-CON-12 (PR-2): `rankingContribucion` is the full sorted list —
+// the Por producto tab consumes `productosPagaronOperacion` (the
+// top-3 slice) for the 🏆 column and the banner. The full ranking
+// is exposed for future deep-link / export work; we acknowledge it
+// explicitly here so eslint / typecheck don't flag it.
+void rankingContribucion
 
 // The view reads the evento through the eventsStore so the
 // "cerrado" gate is consistent with the rest of the app. We do NOT
@@ -105,6 +121,27 @@ function cambiarTab(t: TabReporte) {
 function formatearPorcentaje(decimal: number): string {
   return `${Math.round(decimal * 100)}%`
 }
+
+// REQ-CON-12 (PR-2): set of productoIds that appear in the top-3 of
+// the contribution ranking. Used by the Por producto tab to render
+// the 🏆 crown on the right rows.
+const topProductoIds = computed<Set<string>>(() => {
+  return new Set(productosPagaronOperacion.value.map((d) => d.productoId))
+})
+
+// REQ-CON-13 (PR-2): display labels for the "pagaron la operación"
+// banner — a comma-separated list of the top-3 product names.
+const pagaronOperacionTexto = computed<string>(() => {
+  return productosPagaronOperacion.value
+    .map((d) => d.productoNombre)
+    .join(', ')
+})
+
+// REQ-CON-14 (PR-2): a simplified "ganancia pura" flag — surfaces
+// every producto when total utilidadBruta > 0.
+const hayGananciaPura = computed<boolean>(
+  () => productosGananciaPura.value.length > 0,
+)
 </script>
 
 <template>
@@ -213,13 +250,43 @@ function formatearPorcentaje(decimal: number): string {
           </v-card>
         </v-window-item>
 
-        <!-- Por producto tab: per-producto aggregation (REQ-REPORTE-2) -->
+        <!-- Por producto tab: per-producto aggregation (REQ-REPORTE-2) +
+             PR-2 ranking + banners. -->
         <v-window-item value="por-producto">
           <v-card class="pa-4" data-testid="reporte-por-producto-card">
             <h2 class="mb-3">Por producto</h2>
+
+            <!-- REQ-CON-13 (PR-2): top-3 productos that paid the
+                 operation. Always rendered when at least 1 producto
+                 exists; the product names come from
+                 `productosPagaronOperacion`. -->
+            <v-alert
+              v-if="productosPagaronOperacion.length > 0"
+              type="success"
+              variant="tonal"
+              class="mb-3"
+              data-testid="reporte-pagaron-operacion"
+            >
+              <p class="text-subtitle-1 mb-1">🏆 Productos que pagaron la operación</p>
+              <p class="mb-0">{{ pagaronOperacionTexto }}</p>
+            </v-alert>
+
+            <!-- REQ-CON-14 (PR-2): simplified ganancia pura banner
+                 — surfaces when total utilidadBruta > 0. -->
+            <v-alert
+              v-if="hayGananciaPura"
+              type="info"
+              variant="tonal"
+              class="mb-3"
+              data-testid="reporte-ganancia-pura"
+            >
+              Ganancia pura — la operación cerró con margen positivo.
+            </v-alert>
+
             <v-data-table
               :items="reportePorProducto"
               :headers="[
+                { title: '', key: 'ranking', sortable: false, width: 60 },
                 { title: 'Producto', key: 'productoNombre' },
                 { title: 'Uds vendidas', key: 'unidades' },
                 { title: 'Ingreso', key: 'ingresoTotal' },
@@ -230,6 +297,14 @@ function formatearPorcentaje(decimal: number): string {
               density="comfortable"
               data-testid="reporte-por-producto-tabla"
             >
+              <template #[`item.ranking`]="{ item }">
+                <span
+                  v-if="topProductoIds.has(item.productoId)"
+                  :data-testid="`reporte-ranking-${item.productoId}`"
+                >
+                  🏆
+                </span>
+              </template>
               <template #[`item.productoNombre`]="{ item }">
                 <span :data-testid="`reporte-por-producto-fila-${item.productoId}`">{{ item.productoNombre }}</span>
               </template>

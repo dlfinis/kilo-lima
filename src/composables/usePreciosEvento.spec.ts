@@ -308,3 +308,180 @@ describe('usePreciosEvento', () => {
     })
   })
 })
+
+// REQ-CON-8 (PR-2): per-producto contribution and minimum break-even
+// price getters, layered on top of the existing join.
+describe('usePreciosEvento — contribucionParaProducto (REQ-CON-8)', () => {
+  it('returns precio_final − costo_unitario for a configured producto', () => {
+    conContexto(() => {
+      const epStore = useEventoProductosStore()
+      const evStore = useEventsStore()
+      const recStore = useRecipesStore()
+      const ingStore = useIngredientsStore()
+      const prodStore = useProductosStore()
+
+      recStore.recetas.push(mkReceta('r-1', 1))
+      recStore.recetas[0]!.ingredientes = [
+        {
+          id: 'ri-1',
+          receta_id: 'r-1',
+          materia_prima_id: 'mp-1',
+          cantidad: 1,
+          created_at: '2026-06-20T00:00:00Z',
+        },
+      ]
+      ingStore.materiasPrimas.push(mkMateria('mp-1', 10))
+      prodStore.productos.push({
+        id: 'p-1',
+        receta_id: 'r-1',
+        precio_venta: 0,
+        disponible: true,
+        orden: 0,
+        created_at: '2026-06-20T00:00:00Z',
+        updated_at: '2026-06-20T00:00:00Z',
+      })
+      evStore.eventos.push(mkEvento('e-1', 0.5))
+      // margen 0.5 → precio_sugerido = 20; manual override → 25
+      epStore.productosPorEvento.set('e-1', [
+        mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.5, precio_venta: 25 }),
+      ])
+
+      const { contribucionParaProducto } = usePreciosEvento('e-1')
+      // 25 − 10 = 15
+      expect(contribucionParaProducto.value('p-1')).toBe(15)
+    })
+  })
+
+  it('returns a negative number when the operator prices below cost (loss)', () => {
+    conContexto(() => {
+      const epStore = useEventoProductosStore()
+      const evStore = useEventsStore()
+      const recStore = useRecipesStore()
+      const ingStore = useIngredientsStore()
+      const prodStore = useProductosStore()
+
+      recStore.recetas.push(mkReceta('r-1', 1))
+      recStore.recetas[0]!.ingredientes = [
+        {
+          id: 'ri-1',
+          receta_id: 'r-1',
+          materia_prima_id: 'mp-1',
+          cantidad: 1,
+          created_at: '2026-06-20T00:00:00Z',
+        },
+      ]
+      ingStore.materiasPrimas.push(mkMateria('mp-1', 10))
+      prodStore.productos.push({
+        id: 'p-1',
+        receta_id: 'r-1',
+        precio_venta: 0,
+        disponible: true,
+        orden: 0,
+        created_at: '2026-06-20T00:00:00Z',
+        updated_at: '2026-06-20T00:00:00Z',
+      })
+      evStore.eventos.push(mkEvento('e-1', 0.4))
+      epStore.productosPorEvento.set('e-1', [
+        mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: 8 }),
+      ])
+
+      const { contribucionParaProducto } = usePreciosEvento('e-1')
+      // 8 − 10 = −2
+      expect(contribucionParaProducto.value('p-1')).toBe(-2)
+    })
+  })
+
+  it('returns null when the producto is not configured for the evento', () => {
+    conContexto(() => {
+      const { contribucionParaProducto } = usePreciosEvento('e-1')
+      expect(contribucionParaProducto.value('p-missing')).toBeNull()
+    })
+  })
+
+  it('returns 0 contribution when precio equals costo', () => {
+    conContexto(() => {
+      const epStore = useEventoProductosStore()
+      const evStore = useEventsStore()
+      const recStore = useRecipesStore()
+      const ingStore = useIngredientsStore()
+      const prodStore = useProductosStore()
+
+      recStore.recetas.push(mkReceta('r-1', 1))
+      recStore.recetas[0]!.ingredientes = [
+        {
+          id: 'ri-1',
+          receta_id: 'r-1',
+          materia_prima_id: 'mp-1',
+          cantidad: 1,
+          created_at: '2026-06-20T00:00:00Z',
+        },
+      ]
+      ingStore.materiasPrimas.push(mkMateria('mp-1', 10))
+      prodStore.productos.push({
+        id: 'p-1',
+        receta_id: 'r-1',
+        precio_venta: 0,
+        disponible: true,
+        orden: 0,
+        created_at: '2026-06-20T00:00:00Z',
+        updated_at: '2026-06-20T00:00:00Z',
+      })
+      evStore.eventos.push(mkEvento('e-1', 0.4))
+      epStore.productosPorEvento.set('e-1', [
+        mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: 10 }),
+      ])
+
+      const { contribucionParaProducto } = usePreciosEvento('e-1')
+      expect(contribucionParaProducto.value('p-1')).toBe(0)
+    })
+  })
+})
+
+describe('usePreciosEvento — precioMinimoParaProducto (REQ-CON-8)', () => {
+  it('returns a non-null minimum price (>= costo) for a configured producto', () => {
+    conContexto(() => {
+      const epStore = useEventoProductosStore()
+      const evStore = useEventsStore()
+      const recStore = useRecipesStore()
+      const ingStore = useIngredientsStore()
+      const prodStore = useProductosStore()
+
+      recStore.recetas.push(mkReceta('r-1', 1))
+      recStore.recetas[0]!.ingredientes = [
+        {
+          id: 'ri-1',
+          receta_id: 'r-1',
+          materia_prima_id: 'mp-1',
+          cantidad: 1,
+          created_at: '2026-06-20T00:00:00Z',
+        },
+      ]
+      ingStore.materiasPrimas.push(mkMateria('mp-1', 10))
+      prodStore.productos.push({
+        id: 'p-1',
+        receta_id: 'r-1',
+        precio_venta: 0,
+        disponible: true,
+        orden: 0,
+        created_at: '2026-06-20T00:00:00Z',
+        updated_at: '2026-06-20T00:00:00Z',
+      })
+      evStore.eventos.push(mkEvento('e-1', 0.4))
+      epStore.productosPorEvento.set('e-1', [
+        mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: 15 }),
+      ])
+
+      const { precioMinimoParaProducto } = usePreciosEvento('e-1')
+      const min = precioMinimoParaProducto.value('p-1')
+      expect(min).not.toBeNull()
+      expect(min!).toBeGreaterThanOrEqual(10)
+    })
+  })
+
+  it('returns null when the producto is not configured for the evento', () => {
+    conContexto(() => {
+      const { precioMinimoParaProducto } = usePreciosEvento('e-1')
+      expect(precioMinimoParaProducto.value('p-missing')).toBeNull()
+    })
+  })
+})

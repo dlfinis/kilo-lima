@@ -1,7 +1,12 @@
-// REQ-PRICING-2..4, REQ-FIN-14..16, REQ-PRICING-7: pricing math
-// pure helpers. Single rounding at the end via `redondearCentavos`
-// from `utils/moneda.ts` — no intermediate rounding, per the project
-// single-rounding policy (REQ-CATALOG-20).
+// REQ-PRICING-2..4, REQ-FIN-14..16, REQ-PRICING-7, REQ-CON-1:
+// pricing math pure helpers. Single rounding at the end via
+// `redondearCentavos` from `utils/moneda.ts` — no intermediate
+// rounding, per the project single-rounding policy (REQ-CATALOG-20).
+//
+// PR-1 task 1.6: re-export the contribution utils from `contribucion.ts`
+// so `pricing.ts` stays the single entry point for "anything related
+// to pricing math". Callers that need `calcularContribucionUnitaria`
+// can import it from either module — they are aliases.
 //
 // Design §8 contract:
 //   calcularPrecioPorMargen(costo, margen) = redondearCentavos(costo / (1 − margen))
@@ -11,6 +16,18 @@
 // (the slider is bounded 0..90% so `margen >= 1` shouldn't happen, but
 // a programmatic caller could still pass it).
 import { redondearCentavos } from '@/utils/moneda'
+
+// REQ-CON-1: re-export the contribution math so callers that already
+// import from `pricing.ts` keep working without an extra import path.
+export {
+  calcularContribucionUnitaria,
+  calcularContribucionPorcentual,
+  calcularBreakEvenUnidades,
+  calcularPrecioMinimoBreakEven,
+  clasificarContribucion,
+  type ContribucionConVolumen,
+  type CategoriaContribucion,
+} from '@/utils/contribucion'
 
 /**
  * Compute selling price from cost and desired margin.

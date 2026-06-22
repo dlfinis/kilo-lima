@@ -1,8 +1,12 @@
-// REQ-PRICING-7, REQ-FIN-18, REQ-FIN-28/29, REQ-PRICING-3:
-// usePreciosEvento joins evento_productos + productos + recetas to
-// surface per-producto computed prices. The POS grid (PR-2b) reads
-// from `productosDelEvento` (filtered `incluido = true`); the
-// EventoProductosView reads the same joined list to render the table.
+// REQ-PRICING-7, REQ-FIN-18, REQ-FIN-28/29, REQ-PRICING-3,
+// REQ-CON-8 (PR-2): usePreciosEvento joins evento_productos +
+// productos + recetas to surface per-producto computed prices. The
+// POS grid (PR-2b) reads from `productosDelEvento` (filtered
+// `incluido = true`); the EventoProductosView reads the same joined
+// list to render the table. PR-2 adds two contribution getters:
+//
+//   - `contribucionParaProducto(productoId)` → precio_final − costo
+//   - `precioMinimoParaProducto(productoId)` → break-even minimum
 //
 // Cross-store READS inside `computed()`:
 //   - eventoProductosStore.productosPorEvento (Map<eventoId, ...>)
@@ -20,6 +24,7 @@ import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { calcularCostoReceta } from '@/composables/useCalculoReceta'
 import { calcularPrecioPorMargen } from '@/utils/pricing'
+import { calcularContribucionUnitaria, calcularPrecioMinimoBreakEven } from '@/utils/contribucion'
 
 export interface UsePreciosEvento {
   /** Per-evento joined list (only `incluido = true` rows). */
@@ -28,6 +33,10 @@ export interface UsePreciosEvento {
   precioParaProducto: ComputedRef<(productoId: string) => number>
   /** Lookup the effective margen (product override → evento fallback). */
   margenParaProducto: ComputedRef<(productoId: string) => number | null>
+  /** REQ-CON-8: monetary contribution (precio − costo) for a producto. */
+  contribucionParaProducto: ComputedRef<(productoId: string) => number | null>
+  /** REQ-CON-8: break-even minimum price for a producto. */
+  precioMinimoParaProducto: ComputedRef<(productoId: string) => number | null>
   /** Whether the store has loaded data for this evento. */
   cargado: ComputedRef<boolean>
 }
@@ -111,11 +120,49 @@ export function usePreciosEvento(
     }
   })
 
+  // REQ-CON-8 (PR-2): monetary contribution per producto.
+  // Delegates to `calcularContribucionUnitaria` (already single-rounded).
+  // Returns null when the producto is not configured for the evento so
+  // the view can show a fallback / hide the badge.
+  const contribucionParaProducto = computed<(productoId: string) => number | null>(() => {
+    return (productoId: string): number | null => {
+      const id = idRef.value
+      if (!id) return null
+      const fila = productosDelEvento.value.find((ep) => ep.producto_id === productoId)
+      if (!fila) return null
+      return calcularContribucionUnitaria(fila.precio_final, fila.costo_unitario)
+    }
+  })
+
+  // REQ-CON-8 (PR-2): break-even minimum price per producto. We
+  // surface a defensive buffer (costo + gastosFijos/unidadesEstimadas)
+  // computed by `calcularPrecioMinimoBreakEven`. For PR-2 we pass
+  // gastosFijos=0 and unidadesEstimadas=1 so the "minimum" equals the
+  // costo; full break-even integration with `useProyeccionCostos` lands
+  // later. The function never returns Infinity because of the
+  // `Math.max(1, ...)` defensive guard.
+  const precioMinimoParaProducto = computed<(productoId: string) => number | null>(() => {
+    return (productoId: string): number | null => {
+      const id = idRef.value
+      if (!id) return null
+      const fila = productosDelEvento.value.find((ep) => ep.producto_id === productoId)
+      if (!fila) return null
+      return calcularPrecioMinimoBreakEven(fila.costo_unitario, 0, 1)
+    }
+  })
+
   const cargado = computed<boolean>(() => {
     const id = idRef.value
     if (!id) return false
     return epStore.productosPorEvento.has(id)
   })
 
-  return { productosDelEvento, precioParaProducto, margenParaProducto, cargado }
+  return {
+    productosDelEvento,
+    precioParaProducto,
+    margenParaProducto,
+    contribucionParaProducto,
+    precioMinimoParaProducto,
+    cargado,
+  }
 }

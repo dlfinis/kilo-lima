@@ -1,11 +1,15 @@
 <script setup lang="ts">
-// REQ-POS-31, REQ-POS-34, REQ-POS-54, REQ-FIN-6, REQ-FIN-7, REQ-FIN-11:
-// read-only review card for the cierre. Five sections (REQ-FIN-11):
+// REQ-POS-31, REQ-POS-34, REQ-POS-54, REQ-FIN-6, REQ-FIN-7, REQ-FIN-11,
+// REQ-CON-15 (PR-2):
+// read-only review card for the cierre. Five sections (REQ-FIN-11) +
+// one informational row (REQ-CON-15):
 //   1. Ventas — count + total + per-metodo_pago breakdown
 //   2. Gastos — fijos + imprevistos with category breakdown
 //   3. Utilidad bruta (ventas − COGS, color-coded)
 //   4. Utilidad neta (utilidadBruta − gastosOp)
 //   5. Diferencia — yellow v-alert when diferencia !== 0
+//   6. Margen de contribución — total utilidadBruta vs gastos fijos
+//      with a "Cubiertos: N%" indicator (REQ-CON-15).
 //
 // Receives the pre-computed `CierreResultado` via prop (no service /
 // store calls — pure presentation component) so the view can swap
@@ -41,6 +45,25 @@ const utilidadBrutaColor = computed<string>(() => {
 const utilidadNetaColor = computed<string>(() => {
   if (!props.resumen) return 'text-medium-emphasis'
   return props.resumen.utilidadNeta >= 0 ? 'text-success' : 'text-error'
+})
+
+// REQ-CON-15 (PR-2): the "Cubiertos: N%" indicator for the
+// contribution margin section. When gastos fijos are 0 we surface
+// the ratio as `Infinity` so the UI never crashes on a divide-by-zero
+// (the snapshot may legitimately have no gastos fijos for free /
+// casual events).
+const gastosOperativosTotales = computed<number>(() => {
+  if (!props.resumen) return 0
+  return props.resumen.totalGastosFijos + props.resumen.totalGastosImprevistos
+})
+
+const porcentajeCubiertos = computed<string>(() => {
+  if (!props.resumen) return '0%'
+  const gastos = gastosOperativosTotales.value
+  if (gastos === 0) return 'N/A'
+  const ratio = props.resumen.utilidadBruta / gastos
+  if (!Number.isFinite(ratio)) return 'N/A'
+  return `${Math.round(ratio * 100)}%`
 })
 </script>
 
@@ -112,6 +135,18 @@ const utilidadNetaColor = computed<string>(() => {
     >
       Sin conteo de efectivo
     </p>
+
+    <!-- REQ-CON-15 (PR-2): informational "Margen de contribución"
+         line. Surfaces total contribution vs gastos operativos with
+         a "Cubiertos: N%" indicator. Does NOT alter utilidadNeta. -->
+    <div class="mb-3" data-testid="cierre-margen">
+      <h3 class="text-subtitle-1">Margen de contribución</h3>
+      <p>
+        Contribución total: <strong>{{ formatearUSD(resumen.utilidadBruta) }}</strong>
+        · Gastos fijos: <strong>{{ formatearUSD(gastosOperativosTotales) }}</strong>
+        · Cubiertos: <strong>{{ porcentajeCubiertos }}</strong>
+      </p>
+    </div>
   </v-card>
 
   <v-card
