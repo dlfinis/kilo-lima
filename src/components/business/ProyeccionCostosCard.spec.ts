@@ -23,6 +23,10 @@ const mkProyeccion = (overrides: Partial<ProyeccionResultado> = {}): ProyeccionR
   lineas: [],
   desgloseFijos: [],
   desgloseVariables: [],
+  breakEvenUnidades: null,
+  breakEvenIngreso: null,
+  contribucionPromedioPonderada: null,
+  precioMinimoSugeridoPorProducto: {},
   ...overrides,
 })
 

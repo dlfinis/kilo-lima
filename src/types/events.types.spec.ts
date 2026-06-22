@@ -147,6 +147,10 @@ describe('events.types surface', () => {
       ],
       desgloseFijos: [{ gastoId: 'g-1', categoria: 'renta', monto: 800, descripcion: 'Alquiler' }],
       desgloseVariables: [{ recetaId: 'r-1', recetaNombre: 'Pan de muerto', costoLinea: 15 }],
+      breakEvenUnidades: null,
+      breakEvenIngreso: null,
+      contribucionPromedioPonderada: null,
+      precioMinimoSugeridoPorProducto: {},
     }
     expect(proyeccion.costoTotal).toBe(950)
     expect(proyeccion.desgloseFijos[0]?.categoria).toBe('renta')
