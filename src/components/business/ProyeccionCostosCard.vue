@@ -96,6 +96,34 @@ function categoria(c: CategoriaGasto): string {
     <p class="text-h5" data-testid="proyeccion-total">
       Total: <strong>{{ formatearUSD(proyeccion.costoTotal) }}</strong>
     </p>
+
+    <!-- REQ-CON-5: Break-even section. Visible when puntoEquilibrio is computed. -->
+    <template v-if="proyeccion.breakEvenUnidades !== null">
+      <hr class="my-3" />
+      <div data-testid="proyeccion-break-even">
+        <h3 class="text-subtitle-1 mb-2">Punto de equilibrio</h3>
+        <template v-if="proyeccion.breakEvenUnidades === Infinity">
+          <v-alert type="warning" variant="tonal" density="compact" class="mb-2"
+            data-testid="proyeccion-break-even-infinito">
+            No es posible alcanzar el punto de equilibrio con los precios actuales.
+            Aumentá el margen o reducí los gastos fijos.
+          </v-alert>
+        </template>
+        <template v-else>
+          <p class="text-body-1 mb-1">
+            Necesitás vender
+            <strong data-testid="proyeccion-break-even-unidades">{{ proyeccion.breakEvenUnidades }}</strong>
+            unidades para cubrir
+            <strong>{{ formatearUSD(proyeccion.costosFijos) }}</strong>
+            de gastos fijos.
+          </p>
+          <p class="text-body-2 text-medium-emphasis">
+            Contribución promedio ponderada:
+            <strong>{{ formatearUSD(proyeccion.contribucionPromedioPonderada ?? 0) }}</strong> por unidad
+          </p>
+        </template>
+      </div>
+    </template>
   </v-card>
 
   <v-card v-else class="pa-4 text-center text-medium-emphasis" data-testid="proyeccion-empty">

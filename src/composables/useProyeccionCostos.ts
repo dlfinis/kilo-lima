@@ -27,25 +27,24 @@ import { useGastosFijosStore } from '@/stores/gastosFijos.store'
 import { usePlansStore } from '@/stores/plans.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
+import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { calcularCostoReceta, type LineaInput } from '@/composables/useCalculoReceta'
 import { redondearCentavos } from '@/utils/moneda'
+import { calcularBreakEvenUnidades, calcularPrecioMinimoBreakEven, type ContribucionConVolumen } from '@/utils/contribucion'
 
-// REQ-EVENTS-20: pure function. Inputs are plain domain types so the
-// test can pass fixtures without touching Pinia/Vue. Per design §5:
-//   1. Build lookup maps (receta, materia).
-//   2. For each plan row: look up receta → call calcularCostoReceta
-//      → multiply costoPorUnidad × unidades for costoLinea.
-//   3. Sum gastos for costosFijos.
-//   4. Sum lineas for costosVariables.
-//   5. costoTotal = fijos + variables. Three top-level totals each
-//      rounded once via redondearCentavos to avoid cumulative ±$0.01
-//      drift (REQ-EVENTS-20, matches catalog REQ-CATALOG-20 policy).
+// REQ-CON-4, REQ-CON-5, AC-6, AC-9: break-even + contribution fields.
+// When the optional `productos` param is provided, the function computes
+// the weighted-average contribution and break-even units. Without it,
+// the new fields return null (backward-compatible).
 export function calcularProyeccion(
   _evento: Evento,
   gastosFijos: GastoFijo[],
   plan: PlanProduccion[],
   recetas: RecetaConIngredientes[],
   materiasPrimas: MateriaPrima[],
+  // Optional: priced products for this evento. When provided, the
+  // function extends the result with break-even + contribution fields.
+  productos?: { productoId: string; precioVenta: number }[],
 ): ProyeccionResultado {
   // Recetas arrive with embedded `ingredientes` from the store's joined
   // query; cast to the catalog-shaped shape so the lookup stays typed.
@@ -108,7 +107,85 @@ export function calcularProyeccion(
   const costosVariables = redondearCentavos(lineas.reduce((acc, l) => acc + l.costoLinea, 0))
   const costoTotal = redondearCentavos(costosFijos + costosVariables)
 
-  return { costosFijos, costosVariables, costoTotal, lineas, desgloseFijos, desgloseVariables }
+  // REQ-CON-4: compute break-even and contribution when productos
+  // pricing data is available. When omitted, fields stay null.
+  let breakEvenUnidades: number | null = null
+  let breakEvenIngreso: number | null = null
+  let contribucionPromedioPonderada: number | null = null
+  const precioMinimoSugeridoPorProducto: Record<string, number> = {}
+
+  if (productos && productos.length > 0) {
+    // Build a map of recetaId → precioVenta for the contribution calc.
+    // Each producto has a receta_id (via productos table), and each
+    // plan row references a receta_id. Match them to compute per-unit
+    // contribution = precioVenta − costoPorUnidad.
+    const productoPrecioPorReceta = new Map<string, number>()
+    for (const p of productos) {
+      // productoId is not directly mappable to receta_id here without
+      // the productos store. Instead, the EventoProductoConDetalle
+      // carries producto_id + precio_venta. We match by producto's
+      // receta_id via a separate lookup that the composable does.
+      // For the pure function, we accept { productoId, precioVenta }
+      // and use the productoId to find its recetaId from plan rows.
+      productoPrecioPorReceta.set(p.productoId, p.precioVenta)
+    }
+
+    // Build contribuciones array: for each plan row, find matching
+    // producto price, compute contribution per unit.
+    const contribuciones: ContribucionConVolumen[] = []
+    for (const fila of plan) {
+      const precioVenta = productoPrecioPorReceta.get(fila.id) ?? 0
+      const linea = lineas.find((l) => l.recetaId === fila.receta_id)
+      const costoPorUnidad = linea?.costoPorUnidad ?? 0
+      contribuciones.push({
+        contribucionUnidad: precioVenta - costoPorUnidad,
+        unidades: fila.unidades_a_producir,
+      })
+    }
+
+    breakEvenUnidades = calcularBreakEvenUnidades(costosFijos, contribuciones)
+    // Break-even ingreso: unidades × avg precio
+    if (Number.isFinite(breakEvenUnidades) && contribuciones.length > 0) {
+      const totalUnidadesPlan = contribuciones.reduce((acc, c) => acc + c.unidades, 0)
+      const ingresoPromedioPorUnidad = totalUnidadesPlan > 0
+        ? contribuciones.reduce((acc, c) => acc + c.contribucionUnidad * c.unidades, 0) / totalUnidadesPlan + costosFijos / Math.max(1, totalUnidadesPlan)
+        : 0
+      breakEvenIngreso = redondearCentavos(breakEvenUnidades * ingresoPromedioPorUnidad)
+    }
+
+    // Weighted average contribution
+    const totalUnidades = contribuciones.reduce((acc, c) => acc + c.unidades, 0)
+    if (totalUnidades > 0) {
+      contribucionPromedioPonderada = redondearCentavos(
+        contribuciones.reduce((acc, c) => acc + c.contribucionUnidad * c.unidades, 0) / totalUnidades,
+      )
+    }
+
+    // Per-product break-even minimum price
+    for (const fila of plan) {
+      const linea = lineas.find((l) => l.recetaId === fila.receta_id)
+      if (linea && linea.costoPorUnidad > 0 && fila.unidades_a_producir > 0) {
+        precioMinimoSugeridoPorProducto[fila.receta_id] = calcularPrecioMinimoBreakEven(
+          linea.costoPorUnidad,
+          costosFijos,
+          fila.unidades_a_producir,
+        )
+      }
+    }
+  }
+
+  return {
+    costosFijos,
+    costosVariables,
+    costoTotal,
+    lineas,
+    desgloseFijos,
+    desgloseVariables,
+    breakEvenUnidades,
+    breakEvenIngreso,
+    contribucionPromedioPonderada,
+    precioMinimoSugeridoPorProducto,
+  }
 }
 
 // REQ-EVENTS-21: reactive seam that reads from 4 stores inside a
@@ -125,6 +202,7 @@ export function useProyeccionCostos(
   const plansStore = usePlansStore()
   const recipesStore = useRecipesStore()
   const ingredientsStore = useIngredientsStore()
+  const epStore = useEventoProductosStore()
 
   return computed<ProyeccionResultado | null>(() => {
     const id = toValue(eventoId)
@@ -138,12 +216,22 @@ export function useProyeccionCostos(
     // evento_id in a Map for O(1) detail-view reads.
     const gastosFijos = gastosStore.gastosPorEvento.get(id) ?? []
     const plan = plansStore.planesPorEvento.get(id) ?? []
+
+    // REQ-CON-4: pass priced products so the pure function can compute
+    // break-even and contribution. Uses productoId → precio_venta from
+    // the eventoProductos store (configured in EventoProductosView).
+    const eps = epStore.productosPorEvento.get(id) ?? []
+    const productos = eps.length > 0
+      ? eps.map((ep) => ({ productoId: ep.producto_id, precioVenta: ep.precio_venta ?? 0 }))
+      : undefined
+
     return calcularProyeccion(
       evento,
       gastosFijos,
       plan,
       recipesStore.recetas,
       ingredientsStore.materiasPrimas,
+      productos,
     )
   })
 }

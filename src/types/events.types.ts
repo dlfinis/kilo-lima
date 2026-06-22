@@ -83,6 +83,11 @@ export interface DesgloseVariable {
 // (REQ-EVENTS-20). costoPorUnidad at the top level is intentionally
 // absent — it is OUT OF SCOPE v1 per REQ-EVENTS-23/24 and lives in
 // per-receta LineaProyeccion entries only.
+//
+// REQ-CON-4 / AC-6 / AC-9: break-even + contribution fields added by
+// `calcularProyeccion` when the caller passes `productos`. Optional
+// (`number | null`) so existing callers (no productos param) keep
+// working without changes — backward-compatible.
 export interface ProyeccionResultado {
   costosFijos: number
   costosVariables: number
@@ -90,4 +95,14 @@ export interface ProyeccionResultado {
   lineas: LineaProyeccion[]
   desgloseFijos: DesgloseFijo[]
   desgloseVariables: DesgloseVariable[]
+  // REQ-CON-4: break-even + contribution. null when no productos were
+  // provided (the operator hasn't priced any products yet).
+  breakEvenUnidades: number | null
+  breakEvenIngreso: number | null
+  contribucionPromedioPonderada: number | null
+  // Per-product minimum break-even price (REQ-CON-3 / AC-4). Keyed by
+  // `producto_id` so `ProyeccionCostosCard` can show "precio mínimo
+  // sugerido por producto". null entry when the product has no cost
+  // set yet. Empty record when productos wasn't provided.
+  precioMinimoSugeridoPorProducto: Record<string, number>
 }

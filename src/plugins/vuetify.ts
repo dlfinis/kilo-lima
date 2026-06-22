@@ -1,4 +1,5 @@
 import 'vuetify/styles'
+import '@mdi/font/css/materialdesignicons.css'
 import { createVuetify } from 'vuetify'
 
 // Light theme only (REQ-UI-4). Palette from design section 10.
