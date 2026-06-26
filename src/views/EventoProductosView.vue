@@ -89,11 +89,13 @@ async function alToggleIncluido(ep: EventoProducto) {
   await epStore.toggleIncluido(eventoId.value, ep.producto_id)
 }
 
-async function alCambiarPrecio(ep: EventoProducto, valor: number) {
+async function alCambiarPrecio(ep: EventoProductoConDetalle, valor: number) {
   if (!eventoId.value) return
-  // productos-mejoras: pass margen as-is (null is a valid value
-  // meaning "inherit evento default"). The DB column is NUMERIC NULL.
-  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, valor, ep.margen)
+  // productos-mejoras: calcular el margen equivalente al precio manual
+  const margenEquivalente = valor > ep.costo_unitario
+    ? (valor - ep.costo_unitario) / valor
+    : 0
+  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, valor, margenEquivalente)
 }
 
 // REQ-CON (Type A calculator): when the operator edits the contribution
@@ -272,11 +274,10 @@ const calculoPorProducto = computed(() => {
           { title: '', key: 'data-table-expand' },
           { title: '', key: 'incluido', sortable: false, width: 60 },
           { title: 'Producto', key: 'producto_nombre' },
-          { title: 'Receta', key: 'receta_nombre' },
-          { title: 'Costo unitario', key: 'costo_unitario' },
-          { title: 'Margen (%)', key: 'margen_efectivo' },
-          { title: 'Precio sugerido', key: 'precio_sugerido' },
-          { title: 'Precio de venta', key: 'precio_final' },
+          { title: 'Costo', key: 'costo_unitario' },
+          { title: 'Margen', key: 'margen_efectivo' },
+          { title: 'Precio venta', key: 'precio_final' },
+          { title: 'Ganancia', key: 'ganancia_unitaria' },
         ]"
         density="comfortable"
         show-expand
@@ -301,9 +302,6 @@ const calculoPorProducto = computed(() => {
             @update:model-value="(m) => alCambiarMargen(item, m)"
           />
         </template>
-        <template #[`item.precio_sugerido`]="{ item }">
-          {{ formatearUSD(item.precio_sugerido) }}
-        </template>
         <template #[`item.precio_final`]="{ item }">
           <div class="d-flex flex-column">
             <v-text-field
@@ -316,28 +314,21 @@ const calculoPorProducto = computed(() => {
               style="max-width: 120px"
               @update:model-value="(v) => alCambiarPrecio(item, Number(v))"
             />
-            <!-- Contribución editable: si el usuario cambia la contribución,
-                 el precio se recalcula automáticamente (Type A calculator). -->
-            <v-text-field
-              :model-value="calcularContribucionUnitaria(item.precio_final, item.costo_unitario)"
-              type="number"
-              density="compact"
-              hide-details
-              label="Contribución $"
-              :disabled="!editable"
-              :data-testid="`evento-productos-contribucion-${item.producto_id}`"
-              style="max-width: 120px; margin-top: 4px"
-              @update:model-value="(v) => alCambiarContribucion(item, Number(v))"
-            />
-            <!-- REQ-CON-7 (PR-2): inline PricingAlert. Advisory only
-                 — saving the new price still proceeds. The alert
-                 renders below the input field inside the same cell. -->
-            <PricingAlert
-              :precio="item.precio_final"
-              :costo-produccion="item.costo_unitario"
-              :precio-minimo="precioMinimoParaProducto(item.producto_id)"
-            />
+            <!-- Indicador si es precio manual (diferente al sugerido) -->
+            <v-chip
+              v-if="item.precio_venta !== null && Math.abs(item.precio_venta - item.precio_sugerido) > 0.01"
+              size="x-small"
+              color="warning"
+              class="mt-1"
+            >
+              Manual
+            </v-chip>
           </div>
+        </template>
+        <template #[`item.ganancia_unitaria`]="{ item }">
+          <span class="font-weight-medium" :class="item.precio_final - item.costo_unitario >= 0 ? 'text-success' : 'text-error'">
+            {{ formatearUSD(item.precio_final - item.costo_unitario) }}
+          </span>
         </template>
         <!-- productos-mejoras / cost breakdown: expandable row showing
              the per-producto ingredient breakdown via RecetaCostoDesglose.
