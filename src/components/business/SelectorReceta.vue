@@ -60,6 +60,8 @@ function onUpdate(value: string | null) {
   <v-autocomplete
     :model-value="modelValue"
     :items="items"
+    item-title="title"
+    item-value="value"
     :label="etiqueta"
     clearable
     data-testid="selector-receta"
