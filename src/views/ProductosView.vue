@@ -170,6 +170,7 @@ function cerrarDialogo() {
         <ProductoCard
           :producto="producto"
           :nombre-receta="recetas.find((r) => r.id === producto.receta_id)?.nombre ?? 'Receta'"
+          modo="catalogo"
           @agregar="alAgregar"
           @editar="abrirEditar"
           @toggle="toggleDisponible"

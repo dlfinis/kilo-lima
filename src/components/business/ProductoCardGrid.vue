@@ -26,6 +26,9 @@ const props = withDefaults(
 
 defineEmits<{
   agregar: [productoId: string]
+  editar: [productoId: string]
+  toggle: [productoId: string]
+  eliminar: [productoId: string]
 }>()
 
 function nombreReceta(producto: Producto): string {
@@ -72,7 +75,11 @@ function contribucionPara(producto: Producto): number | null {
           :producto="producto"
           :nombre-receta="nombreReceta(producto)"
           :contribucion="contribucionPara(producto)"
+          modo="pos"
           @agregar="(id) => $emit('agregar', id)"
+          @editar="(id) => $emit('editar', id)"
+          @toggle="(id) => $emit('toggle', id)"
+          @eliminar="(id) => $emit('eliminar', id)"
         />
       </v-col>
     </v-row>

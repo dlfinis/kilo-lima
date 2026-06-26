@@ -1,9 +1,6 @@
-// REQ-POS-1, REQ-POS-46, REQ-POS-54: presentational card for a single
-// producto. Shows recipe name, price, available toggle, and an
-// "Agregar al carrito" button (disabled in PR2 — the cart store lands
-// in PR3). Edit/Toggle/Eliminar actions are exposed via emits so the
-// view layer can wire them to dialogs without coupling the card to
-// any store.
+// POS card redesign: toda la card es clickeable, icono grande,
+// contribucion sutil, sin botones de editar/eliminar (eso vive en
+// el catalogo, no en el POS).
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
@@ -22,6 +19,7 @@ const mkProducto = (overrides: Partial<Producto> = {}): Producto => ({
   disponible: true,
   orden: 0,
   descripcion: null,
+  icono: 'mdi-food',
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -31,80 +29,83 @@ const mountCard = (props: { producto: Producto; nombreReceta?: string; contribuc
   mount(ProductoCard, {
     props: {
       producto: props.producto,
-      nombreReceta: props.nombreReceta ?? 'Pan básico',
+      nombreReceta: props.nombreReceta ?? 'Pan basico',
       contribucion: props.contribucion ?? null,
     },
     global: { plugins: [vuetify] },
   })
 
-describe('ProductoCard', () => {
-  it('renders the recipe name and formatted price (REQ-POS-1, REQ-POS-48)', () => {
+describe('ProductoCard — POS redesign', () => {
+  it('renders the recipe name and formatted price', () => {
     const wrapper = mountCard({ producto: mkProducto({ precio_venta: 5 }) })
 
-    expect(wrapper.text()).toContain('Pan básico')
-    // Intl.NumberFormat('es-MX', USD) yields "USD 5.00" in some Node builds,
-    // "$5.00" in others — assert the digits, not the currency glyph.
+    expect(wrapper.text()).toContain('Pan basico')
     expect(wrapper.text()).toMatch(/5[.,]00/)
   })
 
-  it('emits agregar when the Agregar button is clicked (REQ-POS-1, REQ-POS-21)', async () => {
+  it('renders the icon with default mdi-food', () => {
+    const wrapper = mountCard({ producto: mkProducto() })
+    expect(wrapper.find('[data-testid="producto-card-icono"]').exists()).toBe(true)
+  })
+
+  it('emits agregar when the card is clicked (toda la card es clickeable)', async () => {
     const wrapper = mountCard({ producto: mkProducto() })
 
-    const boton = wrapper.find('[data-testid="producto-card-agregar"]')
-    expect(boton.exists()).toBe(true)
-    await boton.trigger('click')
+    const card = wrapper.find('[data-testid="producto-card-active"]')
+    expect(card.exists()).toBe(true)
+    await card.trigger('click')
 
     expect(wrapper.emitted('agregar')).toBeTruthy()
     expect(wrapper.emitted('agregar')?.[0]).toEqual(['p-1'])
   })
 
-  it('emits editar, toggle, eliminar when those buttons fire (REQ-POS-1)', async () => {
-    const wrapper = mountCard({ producto: mkProducto() })
-
-    await wrapper.find('[data-testid="producto-card-editar"]').trigger('click')
-    await wrapper.find('[data-testid="producto-card-toggle"]').trigger('click')
-    await wrapper.find('[data-testid="producto-card-eliminar"]').trigger('click')
-
-    expect(wrapper.emitted('editar')).toBeTruthy()
-    expect(wrapper.emitted('toggle')).toBeTruthy()
-    expect(wrapper.emitted('eliminar')).toBeTruthy()
-  })
-
-  it('hides the Agregar button when the product is unavailable (REQ-POS-3)', () => {
+  it('shows disabled overlay when product is unavailable', () => {
     const wrapper = mountCard({ producto: mkProducto({ disponible: false }) })
 
-    expect(wrapper.find('[data-testid="producto-card-agregar"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="producto-card-disabled"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="producto-card-active"]').exists()).toBe(false)
   })
 
-  it('does NOT render the ContribucionBadge when no contribution prop is passed (default)', () => {
+  it('does NOT emit agregar when clicking a disabled card', async () => {
+    const wrapper = mountCard({ producto: mkProducto({ disponible: false }) })
+
+    const card = wrapper.find('[data-testid="producto-card-disabled"]')
+    await card.trigger('click')
+
+    expect(wrapper.emitted('agregar')).toBeFalsy()
+  })
+
+  it('does NOT render ContribucionBadge when no contribution prop is passed', () => {
     const wrapper = mountCard({ producto: mkProducto() })
-    expect(wrapper.find('[data-testid="contribucion-badge"]').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="producto-card-contribucion"]').exists()).toBe(false)
   })
 
-  it('renders the ContribucionBadge below the price when contribution prop is provided (REQ-CON-8)', () => {
+  it('renders contribucion text below the price when provided', () => {
     const wrapper = mountCard({
       producto: mkProducto({ precio_venta: 15 }),
       contribucion: 5,
     })
-    const badge = wrapper.find('[data-testid="contribucion-badge"]')
-    expect(badge.exists()).toBe(true)
-    expect(badge.text()).toContain('Contribución')
-    expect(badge.text()).toContain('5.00')
+    const contribucion = wrapper.find('[data-testid="producto-card-contribucion"]')
+    expect(contribucion.exists()).toBe(true)
+    expect(contribucion.text()).toContain('5.00')
+    expect(contribucion.classes()).toContain('text-success')
   })
 
-  // productos-mejoras / producto-descripcion: descripcion renders
-  // below the receta name when present, hidden when null.
-  it('renders descripcion as a small caption when present (productos-mejoras)', () => {
+  it('renders red contribucion text when contribution < 0', () => {
     const wrapper = mountCard({
-      producto: mkProducto({ descripcion: 'Pan de masa madre artesanal' }),
+      producto: mkProducto({ precio_venta: 3 }),
+      contribucion: -2,
     })
-    const caption = wrapper.find('[data-testid="producto-card-descripcion"]')
-    expect(caption.exists()).toBe(true)
-    expect(caption.text()).toBe('Pan de masa madre artesanal')
+    const contribucion = wrapper.find('[data-testid="producto-card-contribucion"]')
+    expect(contribucion.exists()).toBe(true)
+    expect(contribucion.classes()).toContain('text-error')
   })
 
-  it('hides the descripcion caption when descripcion is null', () => {
-    const wrapper = mountCard({ producto: mkProducto({ descripcion: null }) })
-    expect(wrapper.find('[data-testid="producto-card-descripcion"]').exists()).toBe(false)
+  it('supports keyboard navigation (Enter/Space to add)', async () => {
+    const wrapper = mountCard({ producto: mkProducto() })
+    const card = wrapper.find('[data-testid="producto-card-active"]')
+
+    await card.trigger('keydown.enter')
+    expect(wrapper.emitted('agregar')).toBeTruthy()
   })
 })

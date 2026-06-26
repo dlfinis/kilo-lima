@@ -22,6 +22,7 @@ const mkProducto = (id: string, overrides: Partial<Producto> = {}): Producto => 
   disponible: true,
   orden: 0,
   descripcion: null,
+  icono: 'mdi-food',
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -56,18 +57,18 @@ describe('ProductoCardGrid', () => {
   it('renders one card per producto (REQ-POS-20)', () => {
     const wrapper = mountGrid({
       productos: [mkProducto('p-1'), mkProducto('p-2')],
-      recetas: [mkReceta('r-p-1', 'Pan básico'), mkReceta('r-p-2', 'Galleta')],
+      recetas: [mkReceta('r-p-1', 'Pan basico'), mkReceta('r-p-2', 'Galleta')],
     })
-    expect(wrapper.findAll('[data-testid="producto-card"]').length).toBe(2)
+    expect(wrapper.findAll('[data-testid="producto-card-active"]').length).toBe(2)
   })
 
-  it('emits agregar with the productoId when a card fires agregar (REQ-POS-20)', async () => {
+  it('emits agregar with the productoId when a card is clicked (POS mode)', async () => {
     const wrapper = mountGrid({
       productos: [mkProducto('p-1')],
-      recetas: [mkReceta('r-p-1', 'Pan básico')],
+      recetas: [mkReceta('r-p-1', 'Pan basico')],
     })
-    const boton = wrapper.find('[data-testid="producto-card-agregar"]')
-    await boton.trigger('click')
+    const card = wrapper.find('[data-testid="producto-card-active"]')
+    await card.trigger('click')
     expect(wrapper.emitted('agregar')?.[0]).toEqual(['p-1'])
   })
 
@@ -82,7 +83,7 @@ describe('ProductoCardGrid', () => {
       recetas: [mkReceta('r-p-1', 'Brownies'), mkReceta('r-p-2', 'Galletas')],
       busqueda: 'brow',
     })
-    expect(wrapper.findAll('[data-testid="producto-card"]').length).toBe(1)
+    expect(wrapper.findAll('[data-testid="producto-card-active"]').length).toBe(1)
     expect(wrapper.text()).toContain('Brownies')
   })
 

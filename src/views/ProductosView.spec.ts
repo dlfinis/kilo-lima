@@ -29,6 +29,7 @@ const mkProducto = (id: string, overrides: Partial<Producto> = {}): Producto => 
   disponible: true,
   orden: 0,
   descripcion: null,
+  icono: 'mdi-food',
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -113,7 +114,7 @@ describe('ProductosView', () => {
     const wrapper = await mountView()
     await flushPromises()
 
-    const cards = wrapper.findAll('[data-testid="producto-card"]')
+    const cards = wrapper.findAll('[data-testid="producto-card-active"], [data-testid="producto-card-disabled"]')
     expect(cards.length).toBe(2)
   })
 
@@ -134,14 +135,14 @@ describe('ProductosView', () => {
     await flushPromises()
 
     // Default is "Todos" — both visible.
-    expect(wrapper.findAll('[data-testid="producto-card"]').length).toBe(2)
+    expect(wrapper.findAll('[data-testid="producto-card-active"], [data-testid="producto-card-disabled"]').length).toBe(2)
 
     // Click "Disponibles" tab/filter
     const filtro = wrapper.findAll('button').find((b) => b.text().includes('Disponibles'))
     await filtro?.trigger('click')
     await flushPromises()
 
-    expect(wrapper.findAll('[data-testid="producto-card"]').length).toBe(1)
+    expect(wrapper.findAll('[data-testid="producto-card-active"], [data-testid="producto-card-disabled"]').length).toBe(1)
   })
 
   it('opens the create dialog when "Nuevo producto" is clicked (REQ-POS-46)', async () => {

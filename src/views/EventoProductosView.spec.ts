@@ -375,7 +375,7 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
     expect(gananciaCell?.querySelector('.text-error')).not.toBeNull()
   })
 
-  it('shows contribution margin % below the monetary value', async () => {
+  it('shows margin % below the monetary ganancia value', async () => {
     await conContexto(async () => {
       const evStore = useEventsStore()
       const epStore = useEventoProductosStore()
@@ -393,10 +393,11 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
     await mountView('e-1')
     await flushPromises()
 
-    // Contribución column shows: $10.00 (monetary) + "c/u · 40%"
+    // Ganancia column shows: $10.00 (monetary) + "Margen: 40%"
     const gananciaCell = document.querySelector('[data-testid="evento-productos-tabla"] tbody tr td:nth-child(7)')
     expect(gananciaCell?.textContent).toContain('USD')
     expect(gananciaCell?.textContent).toContain('10.00')
+    expect(gananciaCell?.textContent).toContain('Margen:')
     expect(gananciaCell?.textContent).toContain('40%')
   })
 })
