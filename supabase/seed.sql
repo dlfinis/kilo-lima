@@ -1,6 +1,6 @@
 -- seed.sql
 -- Idempotent seed for the catalog slice.
--- 5 sample materias_primas, 2 recetas, 5 receta_ingredientes rows.
+-- 6 sample materias_primas (5 ingredientes + 1 empaque), 2 recetas, 5 receta_ingredientes rows.
 -- Uses ON CONFLICT DO NOTHING so it is safe to re-run.
 -- Per REQ-CATALOG-23.
 --
@@ -9,12 +9,13 @@
 -- venta_items, gastos_fijos, gastos_imprevistos, and 1 cierre_caja.
 -- Required for testing the evento cascade-delete behavior introduced
 -- by the `cascade_ventas_evento` migration. Per REQ-EVENTS-39.
-insert into public.materias_primas (nombre, unidad, costo_por_unidad, notas) values
-  ('Azúcar', 'g', 0.05, null),
-  ('Harina', 'kg', 2.50, 'Harina de trigo todo uso'),
-  ('Mantequilla', 'g', 0.12, null),
-  ('Huevo', 'unidad', 0.30, 'Huevo de gallina tamaño grande'),
-  ('Chocolate', 'kg', 15.00, 'Chocolate semiamargo')
+insert into public.materias_primas (nombre, unidad, costo_por_unidad, categoria, notas) values
+  ('Azúcar', 'g', 0.05, 'ingrediente', null),
+  ('Harina', 'kg', 2.50, 'ingrediente', 'Harina de trigo todo uso'),
+  ('Mantequilla', 'g', 0.12, 'ingrediente', null),
+  ('Huevo', 'unidad', 0.30, 'ingrediente', 'Huevo de gallina tamaño grande'),
+  ('Chocolate', 'kg', 15.00, 'ingrediente', 'Chocolate semiamargo'),
+  ('Envase cartón', 'unidad', 1.50, 'empaque', 'Envase para pan de caja')
 on conflict do nothing;
 
 -- 2. recetas (2 rows)

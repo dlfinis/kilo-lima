@@ -1,0 +1,227 @@
+{
+  "findings": [
+    {
+      "ts": "22:01:20",
+      "level": "OBS ",
+      "section": "A",
+      "msg": "A-SPA: url after click = http://localhost:5173/materias-primas"
+    },
+    {
+      "ts": "22:01:21",
+      "level": "OBS ",
+      "section": "B",
+      "msg": "B-validation after empty submit: []"
+    },
+    {
+      "ts": "22:01:24",
+      "level": "OBS ",
+      "section": "B",
+      "msg": "B5-duplicate detection: [{\"type\":\"error\",\"text\":\"Ya existe una materia prima con el nombre 'Azúcar' Reintentar\"}]"
+    },
+    {
+      "ts": "22:01:24",
+      "level": "OK  ",
+      "section": "B",
+      "msg": "B5: duplicate detection works"
+    },
+    {
+      "ts": "22:01:29",
+      "level": "OBS ",
+      "section": "B",
+      "msg": "B17 receta cost: {\"costoTotal\":\"USD 2.37\",\"costoPorUnidad\":\"USD 0.20\"}"
+    },
+    {
+      "ts": "22:01:31",
+      "level": "OK  ",
+      "section": "B",
+      "msg": "B19: receta-detalle-no-encontrada visible"
+    },
+    {
+      "ts": "22:01:35",
+      "level": "OBS ",
+      "section": "C",
+      "msg": "C: productos cards = 2"
+    },
+    {
+      "ts": "22:01:35",
+      "level": "OBS ",
+      "section": "C",
+      "msg": "C7: clicked Agregar from /productos"
+    },
+    {
+      "ts": "22:01:35",
+      "level": "OBS ",
+      "section": "C",
+      "msg": "C7: cart content = [{\"id\":\"8bcb64d0-f760-46d4-a552-d36e64ad4a6e\",\"cant\":1,\"precio\":3,\"costo\":0}]"
+    },
+    {
+      "ts": "22:01:41",
+      "level": "OK  ",
+      "section": "D",
+      "msg": "D7: clicked into evento"
+    },
+    {
+      "ts": "22:01:41",
+      "level": "OBS ",
+      "section": "E",
+      "msg": "E: titulo = \"Master\""
+    },
+    {
+      "ts": "22:01:41",
+      "level": "OBS ",
+      "section": "E",
+      "msg": "E1: total=\"Total: USD 334.00\", fijos=\"USD 269.00\", variables=\"USD 65.00\""
+    },
+    {
+      "ts": "22:01:41",
+      "level": "OBS ",
+      "section": "E",
+      "msg": "E: break-even section = \"Punto de equilibrio Necesitás vender 6 unidades para cubrir USD 269.00 de gastos fijos.  Contribución promedio ponderada: USD 52.90 por unidad\""
+    },
+    {
+      "ts": "22:01:42",
+      "level": "OBS ",
+      "section": "E",
+      "msg": "E3: margen after save = \"4050\""
+    },
+    {
+      "ts": "22:01:44",
+      "level": "OBS ",
+      "section": "F",
+      "msg": "F: tabla (SPA) = {\n  \"headers\": [\n    \"\",\n    \"Producto\",\n    \"Receta\",\n    \"Costo unitario\",\n    \"Margen (%)\",\n    \"Precio sugerido\",\n    \"Precio de venta\"\n  ],\n  \"rows\": [\n    [\n      \"\",\n      \"Pan basico\",\n      \"Pan basico\",\n      \"USD 0.90\",\n      \"0%  $0.90\",\n      \"USD 0.90\",\n      \"Contribución $Contribución $\"\n    ],\n    [\n      \"\",\n      \"Galletas de chocolate\",\n      \"Galletas de chocolate\",\n      \"USD 0.20\",\n      \"40%  $0.33\",\n      \"USD 0.33\",\n      \"Contribución $Contribución $\"\n    ]\n  ]\n}"
+    },
+    {
+      "ts": "22:01:44",
+      "level": "OK  ",
+      "section": "F",
+      "msg": "F: tabla muestra nombres de receta correctos"
+    },
+    {
+      "ts": "22:01:44",
+      "level": "OBS ",
+      "section": "F",
+      "msg": "F: alerts = []"
+    },
+    {
+      "ts": "22:01:45",
+      "level": "OBS ",
+      "section": "F",
+      "msg": "F4 after edit: alerts = []"
+    },
+    {
+      "ts": "22:01:50",
+      "level": "OBS ",
+      "section": "F",
+      "msg": "F: evento-detalle-cerrar button visible (en_curso state)"
+    },
+    {
+      "ts": "22:01:54",
+      "level": "OBS ",
+      "section": "G",
+      "msg": "G: pos cards = 2"
+    },
+    {
+      "ts": "22:01:55",
+      "level": "OBS ",
+      "section": "G",
+      "msg": "G: cart total after 3 clicks = USD 4,503.03"
+    },
+    {
+      "ts": "22:01:55",
+      "level": "OBS ",
+      "section": "G",
+      "msg": "G: cart lines = [{\"id\":\"8bcb64d0-f760-46d4-a552-d36e64ad4a6e\",\"cant\":1,\"precio\":3,\"costo\":0,\"margen\":null,\"subtotal\":3},{\"id\":\"417ff4b5-61cd-4dd6-94f2-d3a7222f178f\",\"cant\":3,\"precio\":1500.01,\"costo\":0.9,\"margen\":0,\"subtotal\":4500.03}]"
+    },
+    {
+      "ts": "22:01:56",
+      "level": "OBS ",
+      "section": "G",
+      "msg": "G15: metodo_pago options = 4"
+    },
+    {
+      "ts": "22:01:59",
+      "level": "OBS ",
+      "section": "G",
+      "msg": "G15 toast = []"
+    },
+    {
+      "ts": "22:01:59",
+      "level": "OBS ",
+      "section": "G",
+      "msg": "G15 cart after = {\"items\":0,\"vacio\":true}"
+    },
+    {
+      "ts": "22:01:59",
+      "level": "OK  ",
+      "section": "G",
+      "msg": "G15: cart se vació tras venta"
+    },
+    {
+      "ts": "22:02:01",
+      "level": "OBS ",
+      "section": "H",
+      "msg": "H: event info = \"Master1 venta(s) — Total: $4503.03\""
+    },
+    {
+      "ts": "22:02:01",
+      "level": "OBS ",
+      "section": "H",
+      "msg": "H: resumen = \"Resumen del cierreVentas1 venta(s) — USD 4,503.03Transferencia — USD 4,503.03Gastos Fijos: USD 269.00 Imprevistos: USD 100.00Utilidad brutaUSD 4,500.33Utilidad netaUSD 4,131.33 Sin conteo de efectivo Margen de contribución Contribución total: USD 4,500.33 · Gastos fijos: USD 369.00 · Cubiertos: 1220%\""
+    },
+    {
+      "ts": "22:02:04",
+      "level": "OBS ",
+      "section": "H",
+      "msg": "H: URL after cerrar = http://localhost:5173/eventos/68d65441-c2de-4fe9-8672-67e2267d3b7f"
+    },
+    {
+      "ts": "22:02:06",
+      "level": "OBS ",
+      "section": "I",
+      "msg": "I: reporte = {\"empty\":false,\"tabs\":3}"
+    },
+    {
+      "ts": "22:02:07",
+      "level": "OBS ",
+      "section": "I",
+      "msg": "I por dia rows = [[\"2026-06-18\",\"0\",\"0\",\"USD 0.00\",\"USD 0.00\"]]"
+    },
+    {
+      "ts": "22:02:08",
+      "level": "OBS ",
+      "section": "I",
+      "msg": "I por producto = {\n  \"pagaronOp\": \"🏆 Productos que pagaron la operación417ff4b5-61cd-4dd6-94f2-d3a7222f178f, 8bcb64d0-f760-46d4-a552-d36e64ad4a6e\",\n  \"gananciaPura\": \"Ganancia pura — la operación cerró con margen positivo.\",\n  \"rows\": [\n    [\n      \"🏆\",\n      \"417ff4b5-61cd-4dd6-94f2-d3a7222f178f\",\n      \"3\",\n      \"USD 4,500.03\",\n      \"USD 2.70\",\n      \"USD 4,497.33\",\n      \"100%\"\n    ],\n    [\n      \"🏆\",\n      \"8bcb64d0-f760-46d4-a552-d36e64ad4a6e\",\n      \"1\",\n      \"USD 3.00\",\n      \"USD 0.00\",\n      \"USD 3.00\",\n      \"100%\"\n    ]\n  ]\n}"
+    },
+    {
+      "ts": "22:02:10",
+      "level": "OBS ",
+      "section": "J",
+      "msg": "J: counters = [{\"testid\":\"contador-materias-primas\",\"text\":\"5Materias primas\"},{\"testid\":\"contador-recetas\",\"text\":\"2Recetas\"},{\"testid\":\"contador-eventos\",\"text\":\"1Eventos\"},{\"testid\":\"contador-productos\",\"text\":\"2Productos\"},{\"testid\":\"contador-ventas-hoy\",\"text\":\"1Ventas hoy\"}]"
+    },
+    {
+      "ts": "22:02:10",
+      "level": "OBS ",
+      "section": "J",
+      "msg": "J: banner evento activo = \"undefined\""
+    },
+    {
+      "ts": "22:02:10",
+      "level": "OBS ",
+      "section": "J",
+      "msg": "J6: estado conexion = \"Kilo-Lima · En línea\""
+    },
+    {
+      "ts": "22:02:19",
+      "level": "OBS ",
+      "section": "BUG-001",
+      "msg": "BUG-001 cold load tabla = [[\"\",\"(producto sin receta)\",\"\",\"USD 0.00\",\"0%  $0.00\",\"USD 0.00\",\"Contribución $Contribución $\"],[\"\",\"(producto sin receta)\",\"\",\"USD 0.00\",\"40%  $0.00\",\"USD 0.00\",\"Contribución $Contribución $\"]]"
+    },
+    {
+      "ts": "22:02:22",
+      "level": "OBS ",
+      "section": "BUG-001",
+      "msg": "BUG-001 cold /pos cards = 0"
+    }
+  ],
+  "totalObservations": 37
+}

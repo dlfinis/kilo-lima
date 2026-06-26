@@ -4,7 +4,7 @@
 // runs before `submit` fires so the parent view gets a typed payload.
 import { computed, ref, watch } from 'vue'
 
-import type { MateriaPrimaInput, UnidadMedida } from '@/types'
+import type { CategoriaMateriaPrima, MateriaPrimaInput, UnidadMedida } from '@/types'
 
 const props = withDefaults(defineProps<{ valoresIniciales?: MateriaPrimaInput | null }>(), {
   valoresIniciales: null,
@@ -16,9 +16,14 @@ const emit = defineEmits<{
 }>()
 
 const UNIDADES: UnidadMedida[] = ['kg', 'g', 'l', 'ml', 'unidad']
+const CATEGORIAS: { title: string; value: CategoriaMateriaPrima }[] = [
+  { title: 'Ingrediente', value: 'ingrediente' },
+  { title: 'Empaque', value: 'empaque' },
+]
 
 const nombre = ref<string>('')
 const unidad = ref<UnidadMedida>('kg')
+const categoria = ref<CategoriaMateriaPrima>('ingrediente')
 const costo_por_unidad = ref<number>(0)
 const notas = ref<string | null>(null)
 
@@ -30,6 +35,7 @@ watch(
     if (!v) {
       nombre.value = ''
       unidad.value = 'kg'
+      categoria.value = 'ingrediente'
       costo_por_unidad.value = 0
       notas.value = null
       errores.value = {}
@@ -37,6 +43,7 @@ watch(
     }
     nombre.value = v.nombre
     unidad.value = v.unidad
+    categoria.value = v.categoria
     costo_por_unidad.value = v.costo_por_unidad
     notas.value = v.notas
     errores.value = {}
@@ -61,6 +68,7 @@ function onSubmit() {
   emit('submit', {
     nombre: nombre.value.trim(),
     unidad: unidad.value,
+    categoria: categoria.value,
     costo_por_unidad: costo_por_unidad.value,
     notas: notas.value?.trim() ? notas.value.trim() : null,
   })
@@ -84,6 +92,12 @@ function onCancelar() {
       :items="UNIDADES"
       label="Unidad"
       data-testid="mp-unidad"
+    />
+    <v-select
+      v-model="categoria"
+      :items="CATEGORIAS"
+      label="Categoría"
+      data-testid="mp-categoria"
     />
     <v-text-field
       v-model.number="costo_por_unidad"

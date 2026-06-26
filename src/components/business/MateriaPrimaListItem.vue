@@ -15,7 +15,12 @@ const emit = defineEmits<{
 
 <template>
   <v-list-item :data-testid="`mp-row-${materia.id}`">
-    <v-list-item-title>{{ materia.nombre }}</v-list-item-title>
+    <v-list-item-title>
+      {{ materia.nombre }}
+      <v-chip size="x-small" class="ml-2" :color="materia.categoria === 'ingrediente' ? 'primary' : 'secondary'">
+        {{ materia.categoria === 'ingrediente' ? 'Ingrediente' : 'Empaque' }}
+      </v-chip>
+    </v-list-item-title>
     <v-list-item-subtitle>
       {{ materia.unidad }} · {{ formatearUSD(materia.costo_por_unidad) }} / {{ materia.unidad }}
     </v-list-item-subtitle>

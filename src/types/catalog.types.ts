@@ -1,12 +1,14 @@
 // Spanish domain types per REQ-CATALOG-26 / REQ-CATALOG-37.
 // Field names mirror SQL columns 1:1 to eliminate name-mapping bugs.
 export type UnidadMedida = 'kg' | 'g' | 'l' | 'ml' | 'unidad'
+export type CategoriaMateriaPrima = 'ingrediente' | 'empaque'
 
 export interface MateriaPrima {
   id: string
   nombre: string
   unidad: UnidadMedida
   costo_por_unidad: number
+  categoria: CategoriaMateriaPrima
   notas: string | null
   created_at: string
   updated_at: string
