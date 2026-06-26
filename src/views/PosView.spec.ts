@@ -16,7 +16,7 @@
 // responses for those fetches; the non-fetched stores
 // (evento_productos, ingredientes) are seeded directly via the store
 // references.
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createApp, type App } from 'vue'

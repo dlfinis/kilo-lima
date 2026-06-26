@@ -21,7 +21,7 @@ describe('calcularCambio (REQ-POS-CAMBIO-2)', () => {
   })
 
   it('returns null when montoRecibido is undefined (defensive)', () => {
-    expect(calcularCambio(35, undefined)).toBeNull()
+    expect(calcularCambio(35, undefined as unknown as null)).toBeNull()
   })
 
   it('returns a negative number when the payment is short (caller validates separately)', () => {

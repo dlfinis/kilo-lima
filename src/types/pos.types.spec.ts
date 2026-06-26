@@ -133,6 +133,11 @@ describe('pos.types surface', () => {
       evento_id: 'e-1',
       total: 10,
       metodo_pago: 'efectivo',
+      // pos-redesign: Venta widens with these optional cols; the
+      // input shape mirrors them.
+      monto_recibido: null,
+      cambio: null,
+      comprobante_numero: null,
     }
     expect(input).not.toHaveProperty('id')
     expect(input).not.toHaveProperty('fecha')
