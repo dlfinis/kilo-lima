@@ -178,7 +178,7 @@ on conflict do nothing;
 
 insert into public.ventas (evento_id, fecha, total, metodo_pago)
 select e.id, '2026-06-20T14:15:00Z', 105.00, 'transferencia'
-from public eventos e
+from public.eventos e
 where e.nombre = 'Festival de la galleta'
 on conflict do nothing;
 

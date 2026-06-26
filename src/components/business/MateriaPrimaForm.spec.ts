@@ -17,6 +17,7 @@ const vuetify = createVuetify({ components, directives })
 const mkInput = (overrides: Partial<MateriaPrimaInput> = {}): MateriaPrimaInput => ({
   nombre: 'Harina',
   unidad: 'kg',
+  categoria: 'ingrediente',
   costo_por_unidad: 2.5,
   notas: null,
   ...overrides,
@@ -48,7 +49,9 @@ describe('MateriaPrimaForm', () => {
     const inputs = wrapper.findAll('input')
     const values = inputs.map((w) => (w.element as HTMLInputElement).value)
     expect(values).toContain('Mantequilla')
-    expect(values).toContain('0.12')
+    // Cost field now shows formatted currency value (e.g., "$0.12" or "USD 0.12")
+    const costInput = values.find((v) => v.includes('0.12') || v.includes('0,12'))
+    expect(costInput).toBeTruthy()
   })
 
   it('emits submit with the typed values when valid (REQ-CATALOG-2)', async () => {

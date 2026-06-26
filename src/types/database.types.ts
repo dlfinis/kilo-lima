@@ -12,6 +12,7 @@ export interface Database {
           nombre: string
           unidad: 'kg' | 'g' | 'l' | 'ml' | 'unidad'
           costo_por_unidad: number
+          categoria: 'ingrediente' | 'empaque'
           notas: string | null
           created_at: string
           updated_at: string
@@ -21,6 +22,7 @@ export interface Database {
           nombre: string
           unidad: 'kg' | 'g' | 'l' | 'ml' | 'unidad'
           costo_por_unidad: number
+          categoria?: 'ingrediente' | 'empaque'
           notas?: string | null
           created_at?: string
           updated_at?: string

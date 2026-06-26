@@ -108,8 +108,6 @@ function onCancelar() {
       prefix="$"
       :error-messages="errores.costo ? [errores.costo] : []"
       data-testid="mp-costo"
-      hint="Ingrese el costo en USD"
-      persistent-hint
     />
     <v-textarea v-model="notas" label="Notas (opcional)" rows="2" data-testid="mp-notas" />
     <div class="d-flex ga-2 mt-2">
