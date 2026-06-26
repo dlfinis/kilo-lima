@@ -8,6 +8,10 @@
 // v-model is decimal 0..1 (DB representation); the slider renders
 // 0%..90%. `costo` is the product cost (read-only) used to compute
 // the live price preview via `calcularPrecioPorMargen(costo, m)`.
+//
+// productos-mejoras UX: el precio mostrado es clickeable. Al hacer
+// clic, se emite `apply-price` con el precio calculado para que la
+// vista lo establezca como precio de venta.
 import { computed } from 'vue'
 
 import { calcularPrecioPorMargen } from '@/utils/pricing'
@@ -20,6 +24,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: number]
+  'apply-price': [price: number]
 }>()
 
 const porcentaje = computed<number>(() => Math.round((props.modelValue ?? 0) * 100))
@@ -34,6 +39,12 @@ function onSliderInput(event: Event) {
   const ui = Number(target.value)
   const decimal = Math.max(0, Math.min(90, ui)) / 100
   emit('update:modelValue', decimal)
+}
+
+function onPrecioClick() {
+  if (!props.disabled) {
+    emit('apply-price', precioPreview.value)
+  }
 }
 </script>
 
@@ -53,7 +64,13 @@ function onSliderInput(event: Event) {
     <span class="text-caption text-medium-emphasis" data-testid="margen-slider-porcentaje">
       {{ porcentaje }}%
     </span>
-    <span class="text-body-2 font-weight-medium" data-testid="margen-slider-precio">
+    <span
+      class="text-body-2 font-weight-medium text-primary"
+      :class="{ 'cursor-pointer': !disabled }"
+      :style="{ textDecoration: disabled ? 'none' : 'underline' }"
+      data-testid="margen-slider-precio"
+      @click="onPrecioClick"
+    >
       ${{ precioPreview.toFixed(2) }}
     </span>
   </div>
@@ -64,5 +81,8 @@ function onSliderInput(event: Event) {
   flex: 1 1 auto;
   max-width: 240px;
   accent-color: rgb(var(--v-theme-primary));
+}
+.cursor-pointer {
+  cursor: pointer;
 }
 </style>

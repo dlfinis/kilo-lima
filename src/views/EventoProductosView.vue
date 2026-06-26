@@ -98,6 +98,13 @@ async function alCambiarPrecio(ep: EventoProductoConDetalle, valor: number) {
   await epStore.actualizarPrecio(eventoId.value, ep.producto_id, valor, margenEquivalente)
 }
 
+// productos-mejoras UX: cuando el usuario hace clic en el precio del
+// slider, establecer ese precio como precio de venta.
+async function alAplicarPrecioSlider(ep: EventoProductoConDetalle, precio: number) {
+  if (!eventoId.value) return
+  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, precio, ep.margen)
+}
+
 // REQ-CON (Type A calculator): when the operator edits the contribution
 // field, the price is derived automatically. precio = costo + contribucion.
 async function alCambiarContribucion(ep: EventoProductoConDetalle, contribucionDeseada: number) {
@@ -300,35 +307,34 @@ const calculoPorProducto = computed(() => {
             :costo="item.costo_unitario"
             :disabled="!editable"
             @update:model-value="(m) => alCambiarMargen(item, m)"
+            @apply-price="(p) => alAplicarPrecioSlider(item, p)"
           />
         </template>
         <template #[`item.precio_final`]="{ item }">
-          <div class="d-flex flex-column">
-            <v-text-field
-              :model-value="item.precio_final"
-              type="number"
-              density="compact"
-              hide-details
-              :disabled="!editable"
-              :data-testid="`evento-productos-precio-${item.producto_id}`"
-              style="max-width: 120px"
-              @update:model-value="(v) => alCambiarPrecio(item, Number(v))"
-            />
-            <!-- Indicador si es precio manual (diferente al sugerido) -->
-            <v-chip
-              v-if="item.precio_venta !== null && Math.abs(item.precio_venta - item.precio_sugerido) > 0.01"
-              size="x-small"
-              color="warning"
-              class="mt-1"
-            >
-              Manual
-            </v-chip>
-          </div>
+          <v-text-field
+            :model-value="item.precio_final"
+            type="number"
+            density="compact"
+            hide-details
+            :disabled="!editable"
+            :data-testid="`evento-productos-precio-${item.producto_id}`"
+            style="max-width: 120px"
+            prefix="$"
+            @update:model-value="(v) => alCambiarPrecio(item, Number(v))"
+          />
         </template>
         <template #[`item.ganancia_unitaria`]="{ item }">
-          <span class="font-weight-medium" :class="item.precio_final - item.costo_unitario >= 0 ? 'text-success' : 'text-error'">
-            {{ formatearUSD(item.precio_final - item.costo_unitario) }}
-          </span>
+          <div class="d-flex flex-column">
+            <span
+              class="font-weight-medium"
+              :class="item.precio_final - item.costo_unitario >= 0 ? 'text-success' : 'text-error'"
+            >
+              {{ formatearUSD(item.precio_final - item.costo_unitario) }}
+            </span>
+            <span class="text-caption text-medium-emphasis">
+              {{ item.precio_final > 0 ? Math.round(((item.precio_final - item.costo_unitario) / item.precio_final) * 100) : 0 }}%
+            </span>
+          </div>
         </template>
         <!-- productos-mejoras / cost breakdown: expandable row showing
              the per-producto ingredient breakdown via RecetaCostoDesglose.

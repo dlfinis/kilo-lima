@@ -103,6 +103,19 @@ function categoria(c: CategoriaGasto): string {
       <hr class="my-3" />
       <div data-testid="proyeccion-break-even">
         <h3 class="text-subtitle-1 mb-2">Punto de equilibrio</h3>
+        
+        <!-- Correlación con producción planificada -->
+        <div v-if="proyeccion.lineas.length > 0" class="mb-3 pa-3 bg-grey-lighten-4 rounded">
+          <p class="text-body-2 mb-1">
+            <strong>Producción planificada:</strong>
+            {{ proyeccion.lineas.reduce((acc, l) => acc + l.unidades, 0) }} unidades
+          </p>
+          <p class="text-body-2 mb-0">
+            <strong>Costo de producción:</strong>
+            {{ formatearUSD(proyeccion.costosVariables) }}
+          </p>
+        </div>
+
         <template v-if="proyeccion.breakEvenUnidades === Infinity">
           <v-alert type="warning" variant="tonal" density="compact" class="mb-2"
             data-testid="proyeccion-break-even-infinito">
@@ -118,6 +131,27 @@ function categoria(c: CategoriaGasto): string {
             <strong>{{ formatearUSD(proyeccion.costosFijos) }}</strong>
             de gastos fijos.
           </p>
+          
+          <!-- Indicador visual de progreso -->
+          <div v-if="proyeccion.lineas.length > 0" class="mb-2">
+            <v-progress-linear
+              :model-value="Math.min(100, (proyeccion.breakEvenUnidades / proyeccion.lineas.reduce((acc, l) => acc + l.unidades, 0)) * 100)"
+              color="success"
+              height="20"
+              rounded
+              class="mb-1"
+            >
+              <template #default>
+                <strong>
+                  {{ Math.round((proyeccion.breakEvenUnidades / proyeccion.lineas.reduce((acc, l) => acc + l.unidades, 0)) * 100) }}%
+                </strong>
+              </template>
+            </v-progress-linear>
+            <p class="text-caption text-medium-emphasis">
+              % de tu producción que necesitas vender para alcanzar el equilibrio
+            </p>
+          </div>
+
           <p class="text-body-2 text-medium-emphasis">
             Contribución promedio ponderada:
             <strong>{{ formatearUSD(proyeccion.contribucionPromedioPonderada ?? 0) }}</strong> por unidad
