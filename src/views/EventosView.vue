@@ -11,9 +11,11 @@ import EventoForm from '@/components/business/EventoForm.vue'
 import EventoListItem from '@/components/business/EventoListItem.vue'
 import FabNuevo from '@/components/business/FabNuevo.vue'
 import { useEvents } from '@/composables/useEvents'
+import { useEventoResumen } from '@/composables/useEventoResumen'
 import type { Evento, EventoInput, EstadoEvento } from '@/types'
 
 const { eventos, cargando, error, cargarTodas, crear, eliminar } = useEvents()
+const eventoResumen = useEventoResumen()
 
 type Dialogo =
   | { tipo: 'cerrado' }
@@ -120,7 +122,9 @@ function seleccionarFiltro(value: EstadoEvento | 'todos') {
         v-for="ev in eventosFiltrados"
         :key="ev.id"
         :evento="ev"
-        :costo-total="0"
+        :costo-total="eventoResumen.get(ev.id)?.costoTotal ?? 0"
+        :unidades-planificadas="eventoResumen.get(ev.id)?.unidadesPlanificadas ?? 0"
+        :break-even-unidades="eventoResumen.get(ev.id)?.breakEvenUnidades ?? null"
         @click="(id) => $router.push(`/eventos/${id}`)"
         @eliminar="abrirEliminar"
       />

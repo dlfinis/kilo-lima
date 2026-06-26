@@ -57,12 +57,12 @@ defineEmits<{
         v-if="producto.disponible"
         color="primary"
         size="large"
+        icon="mdi-cart-plus"
         min-height="48"
+        min-width="48"
         data-testid="producto-card-agregar"
         @click="$emit('agregar', producto.id)"
-      >
-        Agregar al carrito
-      </v-btn>
+      />
       <v-btn
         icon="mdi-pencil"
         size="small"

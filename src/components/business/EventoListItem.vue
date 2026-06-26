@@ -10,6 +10,8 @@ import type { Evento } from '@/types'
 defineProps<{
   evento: Evento
   costoTotal: number
+  unidadesPlanificadas: number
+  breakEvenUnidades: number | null
 }>()
 
 const emit = defineEmits<{
@@ -28,7 +30,13 @@ function formatearFecha(iso: string): string {
   <v-list-item :data-testid="`evento-row-${evento.id}`" @click="emit('click', evento.id)">
     <v-list-item-title>{{ evento.nombre }}</v-list-item-title>
     <v-list-item-subtitle>
-      {{ formatearFecha(evento.fecha) }} · {{ formatearUSD(costoTotal) }}
+      {{ formatearFecha(evento.fecha) }}
+      <span v-if="unidadesPlanificadas > 0" class="ml-2">
+        · <strong>{{ unidadesPlanificadas }}</strong> unidades
+      </span>
+      <span v-if="breakEvenUnidades !== null" class="ml-2 text-medium-emphasis">
+        · BE: {{ breakEvenUnidades }} uds
+      </span>
     </v-list-item-subtitle>
     <template #prepend>
       <EventoStatusChip :estado="evento.estado" />

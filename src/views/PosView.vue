@@ -85,6 +85,8 @@ const {
   vaciarCarrito,
   registrarVenta,
   cargarPorEvento,
+  actualizarCantidad,
+  quitarDelCarrito,
 } = useVentas()
 const { cargarTodas: cargarEventos } = useEvents()
 const {
@@ -396,6 +398,8 @@ function reintentar() {
             :total="totalCarrito"
             @registrar-venta="abrirDialogoRegistrar"
             @vaciar="vaciarCarrito"
+            @update-cantidad="actualizarCantidad"
+            @eliminar="quitarDelCarrito"
           />
         </v-col>
       </v-row>

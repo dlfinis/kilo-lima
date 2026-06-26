@@ -114,13 +114,13 @@ describe('RegistrarVentaDialog', () => {
     expect(cancelar?.textContent).toContain('Cancelar')
   })
 
-  it('offers all 4 metodo_pago options in the selector (REQ-POS-12)', () => {
+  it('offers 3 metodo_pago options in the selector (REQ-POS-12)', () => {
     const wrapper = mountDialog()
     const opciones = (wrapper.vm as unknown as {
       opciones: { value: MetodoPago; label: string }[]
     }).opciones
     const values = opciones.map((o) => o.value)
-    expect(values).toEqual(['efectivo', 'transferencia', 'tarjeta', 'mixto'])
+    expect(values).toEqual(['efectivo', 'transferencia', 'tarjeta'])
   })
 
   it('renders without an evento (the view still allows the dialog)', () => {
@@ -191,6 +191,31 @@ describe('RegistrarVentaDialog — efectivo UX (REQ-POS-CAMBIO-1, REQ-POS-CAMBIO
     vm.montoRecibido = 51
     await wrapper.vm.$nextTick()
     expect(vm.cambio).toBe(16)
+  })
+
+  it('billetes rápidos suman al monto_recibido (fair-speed UX)', async () => {
+    const wrapper = mountDialog({ total: 25 })
+    await cambiarMetodoPago(wrapper, 'efectivo')
+    const vm = wrapper.vm as unknown as {
+      montoRecibido: number | null
+      agregarBillete: (m: number) => void
+    }
+    expect(vm.montoRecibido).toBeNull()
+    vm.agregarBillete(20)
+    expect(vm.montoRecibido).toBe(20)
+    vm.agregarBillete(5)
+    expect(vm.montoRecibido).toBe(25)
+  })
+
+  it('renders billetes rápidos buttons when metodo_pago is efectivo', async () => {
+    const wrapper = mountDialog()
+    await cambiarMetodoPago(wrapper, 'efectivo')
+    expect(
+      document.querySelector('[data-testid="registrar-venta-billete-1"]'),
+    ).toBeTruthy()
+    expect(
+      document.querySelector('[data-testid="registrar-venta-billete-20"]'),
+    ).toBeTruthy()
   })
 
   it('confirmar emits { metodoPago, montoRecibido? } (REQ-POS-CAMBIO-3, widened contract)', async () => {

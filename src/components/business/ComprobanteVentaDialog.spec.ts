@@ -140,8 +140,8 @@ describe('ComprobanteVentaDialog — sections (REQ-POS-COMPROBANTE-2)', () => {
   })
 })
 
-describe('ComprobanteVentaDialog — actions (REQ-POS-COMPROBANTE-1, REQ-POS-COMPROBANTE-3)', () => {
-  it('closes when the user dismisses (no auto-print, REQ-POS-COMPROBANTE-1)', async () => {
+describe('ComprobanteVentaDialog — actions (REQ-POS-COMPROBANTE-1)', () => {
+  it('closes when the user dismisses (REQ-POS-COMPROBANTE-1)', async () => {
     const wrapper = mountDialog({ venta: mkVenta(), evento: mkEvento() })
     const cerrar = document.querySelector('[data-testid="comprobante-cerrar"]') as HTMLElement | null
     expect(cerrar).toBeTruthy()
@@ -153,21 +153,5 @@ describe('ComprobanteVentaDialog — actions (REQ-POS-COMPROBANTE-1, REQ-POS-COM
     const updates = wrapper.emitted('update:modelValue') ?? []
     // The last emitted value should be false (closing).
     expect(updates.at(-1)?.[0]).toBe(false)
-  })
-
-  it('Imprimir button calls window.print (REQ-POS-COMPROBANTE-3)', async () => {
-    const printSpy = vi.spyOn(window, 'print').mockImplementation(() => {})
-    const wrapper = mountDialog({ venta: mkVenta(), evento: mkEvento() })
-    const vm = wrapper.vm as unknown as { imprimir: () => void }
-    vm.imprimir()
-    expect(printSpy).toHaveBeenCalledTimes(1)
-    printSpy.mockRestore()
-  })
-
-  it('renders the Imprimir button (REQ-POS-COMPROBANTE-3)', () => {
-    mountDialog({ venta: mkVenta(), evento: mkEvento() })
-    expect(
-      document.querySelector('[data-testid="comprobante-imprimir"]'),
-    ).toBeTruthy()
   })
 })

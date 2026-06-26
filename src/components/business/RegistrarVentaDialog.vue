@@ -33,8 +33,15 @@ const opciones: { value: MetodoPago; label: string }[] = [
   { value: 'efectivo', label: 'Efectivo' },
   { value: 'transferencia', label: 'Transferencia' },
   { value: 'tarjeta', label: 'Tarjeta' },
-  { value: 'mixto', label: 'Mixto' },
 ]
+
+// Billetes rápidos para velocidad en feria. Tapping uno de estos
+// suma ese monto al monto_recibido (acumulativo — el operador puede
+// combinar billetes: $20 + $5 = $25).
+const billetesRapidos = [1, 5, 10, 20, 50]
+function agregarBillete(monto: number): void {
+  montoRecibido.value = (montoRecibido.value ?? 0) + monto
+}
 
 // pos-redesign: cash-back input (REQ-POS-CAMBIO-1). Null when the
 // dialog first opens — the operator must opt in by typing a value
@@ -144,6 +151,19 @@ function alConfirmar(): void {
             min="0"
             step="0.01"
           />
+          <!-- Billetes rápidos para velocidad en feria -->
+          <div class="d-flex flex-wrap ga-2 mb-2">
+            <v-btn
+              v-for="billete in billetesRapidos"
+              :key="billete"
+              size="small"
+              variant="outlined"
+              :data-testid="`registrar-venta-billete-${billete}`"
+              @click="agregarBillete(billete)"
+            >
+              +${billete}
+            </v-btn>
+          </div>
           <div class="d-flex align-center ga-2 mb-2">
             <v-btn
               size="small"

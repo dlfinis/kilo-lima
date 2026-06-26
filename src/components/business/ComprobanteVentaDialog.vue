@@ -154,19 +154,11 @@ defineExpose({ cerrar, imprimir })
       <v-card-actions>
         <v-spacer />
         <v-btn
-          variant="text"
+          color="primary"
           data-testid="comprobante-cerrar"
           @click="cerrar"
         >
           Cerrar
-        </v-btn>
-        <v-btn
-          color="primary"
-          prepend-icon="mdi-printer"
-          data-testid="comprobante-imprimir"
-          @click="imprimir"
-        >
-          Imprimir
         </v-btn>
       </v-card-actions>
     </v-card>
