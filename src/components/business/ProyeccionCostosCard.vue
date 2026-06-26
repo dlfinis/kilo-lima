@@ -10,13 +10,19 @@
 //     RECETA_FALTANTE advertencia
 //   - Friendly empty state when there are no gastos and no plan
 //
+// productos-mejoras: recibe `unidadesVendidas` para mostrar el progreso
+// real vs el punto de equilibrio.
+//
 // Replaces the compact summary that PR2b's EventoDetalleView shipped
 // (REQ-EVENTS-22 design §6).
 import type { CategoriaGasto, ProyeccionResultado } from '@/types'
 
 import { formatearUSD } from '@/utils/format'
 
-defineProps<{ proyeccion: ProyeccionResultado | null }>()
+defineProps<{
+  proyeccion: ProyeccionResultado | null
+  unidadesVendidas?: number
+}>()
 
 const ETIQUETAS_CATEGORIA: Record<CategoriaGasto, string> = {
   renta: 'Renta',
@@ -132,7 +138,31 @@ function categoria(c: CategoriaGasto): string {
             de gastos fijos.
           </p>
           
-          <!-- Indicador visual de progreso -->
+          <!-- Progreso de ventas reales -->
+          <div v-if="unidadesVendidas !== undefined && proyeccion.lineas.length > 0" class="mb-3">
+            <div class="d-flex justify-space-between mb-1">
+              <span class="text-body-2">
+                <strong>Vendidas:</strong> {{ unidadesVendidas }} unidades
+              </span>
+              <span class="text-body-2" :class="unidadesVendidas >= proyeccion.breakEvenUnidades ? 'text-success' : 'text-warning'">
+                {{ Math.round((unidadesVendidas / proyeccion.breakEvenUnidades) * 100) }}%
+              </span>
+            </div>
+            <v-progress-linear
+              :model-value="Math.min(100, (unidadesVendidas / proyeccion.breakEvenUnidades) * 100)"
+              :color="unidadesVendidas >= proyeccion.breakEvenUnidades ? 'success' : 'warning'"
+              height="20"
+              rounded
+            />
+            <p class="text-caption text-medium-emphasis mt-1">
+              {{ unidadesVendidas >= proyeccion.breakEvenUnidades
+                ? '¡Objetivo alcanzado!'
+                : `Faltan ${proyeccion.breakEvenUnidades - unidadesVendidas} unidades para alcanzar el equilibrio`
+              }}
+            </p>
+          </div>
+
+          <!-- Indicador visual de % de producción necesaria -->
           <div v-if="proyeccion.lineas.length > 0" class="mb-2">
             <v-progress-linear
               :model-value="Math.min(100, (proyeccion.breakEvenUnidades / proyeccion.lineas.reduce((acc, l) => acc + l.unidades, 0)) * 100)"

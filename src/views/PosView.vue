@@ -134,6 +134,7 @@ const productosMapeados = computed<Producto[]>(() =>
     disponible: true,
     orden: 0,
     descripcion: null,
+    icono: ep.producto_icono,
     created_at: ep.created_at,
     updated_at: ep.updated_at,
   })),

@@ -33,6 +33,7 @@ import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useProductosStore } from '@/stores/productos.store'
+import { useVentasStore } from '@/stores/ventas.store'
 import { estadoEsEditable } from '@/utils/estado'
 import type { EstadoEvento, GastoFijoInput } from '@/types'
 
@@ -48,11 +49,19 @@ const { eventoActual, cargando, error, cargarPorId, cambiarEstado, eliminar, act
 const { gastosPorEvento, cargando: cargandoGastos, error: errorGastos, cargarPorEvento, agregar, eliminar: eliminarGasto } = useGastosFijos()
 const { planesPorEvento, cargarPorEvento: cargarPlan } = usePlans()
 const epStore = useEventoProductosStore()
+const ventasStore = useVentasStore()
 const proyeccion = useProyeccionCostos(eventoId)
 
 const gastos = computed(() => (eventoId.value ? gastosPorEvento.value.get(eventoId.value) ?? [] : []))
 const editable = computed(() => (eventoActual.value ? estadoEsEditable(eventoActual.value.estado) : false))
 const productosCount = computed(() => (eventoId.value ? (epStore.productosPorEvento.get(eventoId.value) ?? []).length : 0))
+
+// productos-mejoras: calcular unidades vendidas sumando las cantidades de venta_items
+const unidadesVendidas = computed(() => {
+  return ventasStore.ventas.reduce((total, venta) => {
+    return total + venta.items.reduce((subtotal, item) => subtotal + item.cantidad, 0)
+  }, 0)
+})
 // REQ-EVENTS-39: cascade copy mentions the plan row count for this
 // evento. Plan rows are already loaded by `cargarPlan` in onMounted,
 // so we read them off the same `planesPorEvento` Map that the rest
@@ -136,6 +145,7 @@ onMounted(() => {
     void cargarPorEvento(eventoId.value)
     void cargarPlan(eventoId.value)
     void epStore.cargarPorEvento(eventoId.value)
+    void ventasStore.cargarPorEvento(eventoId.value)
     // Ensure catalogs are loaded so the projection has receta costs.
     void useRecipesStore().cargarTodas()
     void useIngredientsStore().cargarTodas()
@@ -271,7 +281,7 @@ function irAReporte() {
       </v-card>
 
       <div class="mb-4" data-testid="evento-detalle-proyeccion">
-        <ProyeccionCostosCard :proyeccion="proyeccion" />
+        <ProyeccionCostosCard :proyeccion="proyeccion" :unidades-vendidas="unidadesVendidas" />
       </div>
 
       <!-- Productos del evento (REQ-FIN-20): badge + link a EventoProductosView -->

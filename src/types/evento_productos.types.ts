@@ -63,4 +63,6 @@ export interface EventoProductoConDetalle extends EventoProducto {
   precio_sugerido: number
   margen_efectivo: number
   precio_final: number
+  // productos-icono: MDI icon name from the producto row.
+  producto_icono: string | null
 }

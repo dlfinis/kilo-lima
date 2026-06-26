@@ -95,6 +95,7 @@ export function usePreciosEvento(
           precio_sugerido: precioSugerido,
           margen_efectivo: margenEfectivo ?? 0,
           precio_final: precioFinal,
+          producto_icono: producto?.icono ?? null,
         }
       })
   })

@@ -1,15 +1,8 @@
 <script setup lang="ts">
-// REQ-POS-1, REQ-POS-3, REQ-POS-21, REQ-POS-54: presentational card
-// for a single producto. The Agregar button is hidden when the
-// product is unavailable (REQ-POS-3 — products.toggle). Card is
-// purely visual — every action is an emit, the parent view owns the
-// dialogs and store wiring.
-//
-// REQ-CON-8 (PR-2): optional `contribucion` prop surfaces the
-// per-producto contribution badge below the price. When omitted
-// (e.g., for the legacy catalog view) the badge is hidden, keeping
-// the card backwards-compatible.
-import ContribucionBadge from './ContribucionBadge.vue'
+// POS card redesign: toda la card es clickeable (como terminal POS).
+// Icono grande arriba, nombre, precio prominente, contribución sutil.
+// Dimensión uniforme via aspect-ratio. Sin botones de edición (eso
+// vive en el catálogo, no en el POS).
 import type { Producto } from '@/types'
 import { formatearUSD } from '@/utils/format'
 
@@ -24,77 +17,98 @@ withDefaults(
 
 defineEmits<{
   agregar: [productoId: string]
-  editar: [productoId: string]
-  toggle: [productoId: string]
-  eliminar: [productoId: string]
 }>()
 </script>
 
 <template>
-  <v-card class="pa-4 d-flex flex-column" data-testid="producto-card">
-    <div class="text-h6 mb-2">{{ nombreReceta }}</div>
-    <!-- productos-mejoras / producto-descripcion: 2-line ellipsis
-         caption rendered below the receta name. Hidden when the
-         producto has no descripcion set. -->
-    <div
-      v-if="producto.descripcion"
-      class="text-body-2 text-medium-emphasis mb-2 producto-card-descripcion"
-      data-testid="producto-card-descripcion"
-    >
-      {{ producto.descripcion }}
+  <v-card
+    class="pos-card d-flex flex-column align-center justify-center pa-4"
+    :class="{ 'pos-card--disabled': !producto.disponible }"
+    role="button"
+    :tabindex="producto.disponible ? 0 : -1"
+    :data-testid="`producto-card-${producto.disponible ? 'active' : 'disabled'}`"
+    @click="producto.disponible && $emit('agregar', producto.id)"
+    @keydown.enter="producto.disponible && $emit('agregar', producto.id)"
+    @keydown.space.prevent="producto.disponible && $emit('agregar', producto.id)"
+  >
+    <!-- Icono grande -->
+    <v-icon
+      :icon="producto.icono || 'mdi-food'"
+      size="64"
+      color="primary"
+      class="mb-3"
+      data-testid="producto-card-icono"
+    />
+
+    <!-- Nombre del producto -->
+    <div class="text-body-1 font-weight-medium text-center mb-2 text-truncate-full">
+      {{ nombreReceta }}
     </div>
-    <div class="text-h5 mb-2" data-testid="producto-card-precio">
+
+    <!-- Precio prominente -->
+    <div class="text-h5 font-weight-bold mb-1" data-testid="producto-card-precio">
       {{ formatearUSD(producto.precio_venta) }}
     </div>
-    <ContribucionBadge
+
+    <!-- Contribución sutil -->
+    <div
       v-if="contribucion !== null && contribucion !== undefined"
-      :contribucion="contribucion"
-      class="mb-2 align-self-start"
-    />
-    <v-spacer />
-    <div class="d-flex ga-2 mt-2 flex-wrap">
-      <v-btn
-        v-if="producto.disponible"
-        color="primary"
-        size="large"
-        icon="mdi-cart-plus"
-        min-height="48"
-        min-width="48"
-        data-testid="producto-card-agregar"
-        @click="$emit('agregar', producto.id)"
-      />
-      <v-btn
-        icon="mdi-pencil"
-        size="small"
-        variant="text"
-        data-testid="producto-card-editar"
-        @click="$emit('editar', producto.id)"
-      />
-      <v-btn
-        :icon="producto.disponible ? 'mdi-eye-off' : 'mdi-eye'"
-        size="small"
-        variant="text"
-        data-testid="producto-card-toggle"
-        @click="$emit('toggle', producto.id)"
-      />
-      <v-btn
-        icon="mdi-delete"
-        size="small"
-        variant="text"
-        color="error"
-        data-testid="producto-card-eliminar"
-        @click="$emit('eliminar', producto.id)"
-      />
+      class="text-caption text-center"
+      :class="contribucion >= 0 ? 'text-success' : 'text-error'"
+      data-testid="producto-card-contribucion"
+    >
+      +{{ formatearUSD(contribucion) }}
+    </div>
+
+    <!-- Estado no disponible -->
+    <div
+      v-if="!producto.disponible"
+      class="pos-card__overlay d-flex align-center justify-center"
+    >
+      <v-chip color="error" size="small" variant="tonal">No disponible</v-chip>
     </div>
   </v-card>
 </template>
 
 <style scoped>
-.producto-card-descripcion {
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  line-clamp: 2;
-  -webkit-box-orient: vertical;
+.pos-card {
+  aspect-ratio: 1;
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+  user-select: none;
+  min-height: 140px;
+}
+
+.pos-card:hover:not(.pos-card--disabled) {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.pos-card:active:not(.pos-card--disabled) {
+  transform: scale(0.98);
+}
+
+.pos-card:focus-visible {
+  outline: 2px solid rgb(var(--v-theme-primary));
+  outline-offset: 2px;
+}
+
+.pos-card--disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+.pos-card__overlay {
+  position: absolute;
+  inset: 0;
+  background: rgba(255, 255, 255, 0.7);
+  backdrop-filter: blur(2px);
+}
+
+.text-truncate-full {
+  max-width: 100%;
   overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 </style>

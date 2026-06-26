@@ -10,6 +10,7 @@
 // Spanish inline errors mirror `RecetaForm` patterns (REQ-POS-48).
 import { computed, ref, watch } from 'vue'
 
+import SelectorIcono from './SelectorIcono.vue'
 import type { Producto, ProductoInput } from '@/types'
 
 interface OpcionReceta {
@@ -41,6 +42,8 @@ const orden = ref<number>(0)
 // Nullable in the DB (≤ 500 chars); empty string → null on submit so
 // the form mirrors the DB state without keeping an empty string around.
 const descripcion = ref<string>('')
+// productos-icono: MDI icon name. Defaults to 'mdi-food' when creating.
+const icono = ref<string>('mdi-food')
 const errores = ref<{ precio?: string; receta?: string; descripcion?: string }>({})
 
 watch(
@@ -52,12 +55,14 @@ watch(
       disponible.value = v.disponible
       orden.value = v.orden
       descripcion.value = v.descripcion ?? ''
+      icono.value = v.icono ?? 'mdi-food'
     } else {
       recetaId.value = inicial ?? ''
       precioVenta.value = 0
       disponible.value = true
       orden.value = 0
       descripcion.value = ''
+      icono.value = 'mdi-food'
     }
     errores.value = {}
   },
@@ -94,6 +99,7 @@ function onSubmit() {
     // Coerce empty string to null so the DB row matches the schema
     // contract (nullable, no defaults).
     descripcion: descripcion.value.trim() === '' ? null : descripcion.value,
+    icono: icono.value,
   }
   emit('submit', payload)
 }

@@ -178,6 +178,8 @@ export interface Database {
           orden: number
           // productos-mejoras / producto-descripcion: nullable description.
           descripcion: string | null
+          // productos-icono: MDI icon name for POS display.
+          icono: string | null
           created_at: string
           updated_at: string
         }
@@ -188,6 +190,7 @@ export interface Database {
           disponible?: boolean
           orden?: number
           descripcion?: string | null
+          icono?: string | null
           created_at?: string
           updated_at?: string
         }

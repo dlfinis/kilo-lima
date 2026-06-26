@@ -26,6 +26,9 @@ export interface Producto {
   // productos-mejoras / producto-descripcion: nullable free-text
   // description (≤ 500 chars, enforced DB-side). Optional on create.
   descripcion: string | null
+  // productos-icono: MDI icon name for POS display. Nullable for
+  // legacy productos; defaults to 'mdi-food' on create.
+  icono: string | null
   created_at: string
   updated_at: string
 }
