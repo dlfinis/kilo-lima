@@ -24,9 +24,12 @@ import { useRoute, useRouter } from 'vue-router'
 import EventoStatusChip from '@/components/business/EventoStatusChip.vue'
 import GastoFijoForm from '@/components/business/GastoFijoForm.vue'
 import GastoFijoListItem from '@/components/business/GastoFijoListItem.vue'
+import GastoImprevistoForm from '@/components/business/GastoImprevistoForm.vue'
+import GastoImprevistoListItem from '@/components/business/GastoImprevistoListItem.vue'
 import ProyeccionCostosCard from '@/components/business/ProyeccionCostosCard.vue'
 import { useEvents } from '@/composables/useEvents'
 import { useGastosFijos } from '@/composables/useGastosFijos'
+import { useGastosImprevistos } from '@/composables/useGastosImprevistos'
 import { usePlans } from '@/composables/usePlans'
 import { useProyeccionCostos } from '@/composables/useProyeccionCostos'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
@@ -35,7 +38,7 @@ import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useProductosStore } from '@/stores/productos.store'
 import { useVentasStore } from '@/stores/ventas.store'
 import { estadoEsEditable } from '@/utils/estado'
-import type { EstadoEvento, GastoFijoInput } from '@/types'
+import type { EstadoEvento, GastoFijoInput, GastoImprevistoInput } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -47,12 +50,21 @@ const eventoId = computed<string | null>(() => {
 
 const { eventoActual, cargando, error, cargarPorId, cambiarEstado, eliminar, actualizar } = useEvents()
 const { gastosPorEvento, cargando: cargandoGastos, error: errorGastos, cargarPorEvento, agregar, eliminar: eliminarGasto } = useGastosFijos()
+const {
+  gastosPorEvento: imprevistosPorEvento,
+  cargarPorEvento: cargarImprevistos,
+  crear: crearImprevisto,
+  eliminar: eliminarImprevisto,
+  totalPorEvento: totalImprevistos,
+} = useGastosImprevistos()
 const { planesPorEvento, cargarPorEvento: cargarPlan } = usePlans()
 const epStore = useEventoProductosStore()
 const ventasStore = useVentasStore()
 const proyeccion = useProyeccionCostos(eventoId)
 
 const gastos = computed(() => (eventoId.value ? gastosPorEvento.value.get(eventoId.value) ?? [] : []))
+const imprevistos = computed(() => (eventoId.value ? imprevistosPorEvento.value.get(eventoId.value) ?? [] : []))
+const totalImprevistosEvento = computed(() => (eventoId.value ? totalImprevistos.value(eventoId.value).value : 0))
 const editable = computed(() => (eventoActual.value ? estadoEsEditable(eventoActual.value.estado) : false))
 const productosCount = computed(() => (eventoId.value ? (epStore.productosPorEvento.get(eventoId.value) ?? []).length : 0))
 
@@ -143,6 +155,7 @@ onMounted(() => {
   if (eventoId.value) {
     void cargarPorId(eventoId.value)
     void cargarPorEvento(eventoId.value)
+    void cargarImprevistos(eventoId.value)
     void cargarPlan(eventoId.value)
     void epStore.cargarPorEvento(eventoId.value)
     void ventasStore.cargarPorEvento(eventoId.value)
@@ -155,6 +168,7 @@ onMounted(() => {
 
 const mostrarDialogoEliminar = ref<boolean>(false)
 const dialogoGastoAbierto = ref<boolean>(false)
+const dialogoImprevistoAbierto = ref<boolean>(false)
 
 async function transicionar(t: Transicion) {
   if (eventoId.value) await cambiarEstado(eventoId.value, t.hacia)
@@ -168,6 +182,19 @@ async function confirmarEliminar() {
 async function manejarGastoSubmit(input: GastoFijoInput) {
   await agregar(input)
   dialogoGastoAbierto.value = false
+}
+async function manejarImprevistoSubmit(input: GastoImprevistoInput) {
+  if (!eventoId.value) return
+  await crearImprevisto({
+    evento_id: eventoId.value,
+    monto: input.monto,
+    motivo: input.motivo,
+    categoria: input.categoria ?? 'otro',
+  })
+  dialogoImprevistoAbierto.value = false
+}
+async function manejarEliminarImprevisto(id: string) {
+  await eliminarImprevisto(id)
 }
 function reintentar() {
   if (eventoId.value) {
@@ -329,6 +356,40 @@ function irAReporte() {
             <GastoFijoForm
               :valores-iniciales="eventoId ? { evento_id: eventoId, categoria: 'renta', monto: 0, descripcion: null } : null"
               @submit="manejarGastoSubmit" @cancel="dialogoGastoAbierto = false" />
+          </v-card-text>
+        </v-card>
+      </v-dialog>
+
+      <!-- Gastos imprevistos del evento -->
+      <div class="d-flex align-center justify-space-between mb-2 mt-6">
+        <div class="d-flex align-center ga-2">
+          <h2>Gastos imprevistos</h2>
+          <v-chip v-if="totalImprevistosEvento > 0" size="small" color="warning" variant="tonal">
+            Total: ${{ totalImprevistosEvento.toFixed(2) }}
+          </v-chip>
+        </div>
+        <v-btn v-if="editable" color="warning" prepend-icon="mdi-plus" size="small"
+          data-testid="evento-detalle-agregar-imprevisto" @click="dialogoImprevistoAbierto = true">
+          Agregar imprevisto
+        </v-btn>
+      </div>
+
+      <v-list v-if="imprevistos.length > 0" data-testid="evento-detalle-imprevistos">
+        <GastoImprevistoListItem v-for="gasto in imprevistos" :key="gasto.id"
+          :gasto="gasto" :editable="editable"
+          @eliminar="(id) => manejarEliminarImprevisto(id)" />
+      </v-list>
+      <v-card v-else class="pa-4 text-center text-medium-emphasis">
+        Sin gastos imprevistos todavía
+      </v-card>
+
+      <v-dialog v-model="dialogoImprevistoAbierto" max-width="500">
+        <v-card>
+          <v-card-title>Nuevo gasto imprevisto</v-card-title>
+          <v-card-text>
+            <GastoImprevistoForm
+              :editable="editable"
+              @submit="manejarImprevistoSubmit" @cancel="dialogoImprevistoAbierto = false" />
           </v-card-text>
         </v-card>
       </v-dialog>

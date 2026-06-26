@@ -34,6 +34,7 @@ import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
+import { useVentasStore } from '@/stores/ventas.store'
 import { calcularCostoReceta } from '@/composables/useCalculoReceta'
 import { estadoEsEditable } from '@/utils/estado'
 import { formatearUSD } from '@/utils/format'
@@ -54,6 +55,7 @@ const epStore = useEventoProductosStore()
 const productosStore = useProductosStore()
 const recipesStore = useRecipesStore()
 const ingredientsStore = useIngredientsStore()
+const ventasStore = useVentasStore()
 const { productosDelEvento, precioMinimoParaProducto } = usePreciosEvento(eventoId)
 
 const editable = computed(() =>
@@ -67,10 +69,27 @@ const porcentajeMargen = computed<number>(() =>
   Math.round((eventoActual.value?.margen_ganancia ?? 0) * 100),
 )
 
+// Calcular unidades vendidas por producto
+const unidadesVendidasPorProducto = computed(() => {
+  const map = new Map<string, number>()
+  const ventas = ventasStore.ventas
+  if (!ventas || !Array.isArray(ventas)) return map
+  for (const venta of ventas) {
+    if (!venta || !venta.items || !Array.isArray(venta.items)) continue
+    for (const item of venta.items) {
+      if (!item || !item.producto_id) continue
+      const current = map.get(item.producto_id) ?? 0
+      map.set(item.producto_id, current + item.cantidad)
+    }
+  }
+  return map
+})
+
 async function cargar() {
   if (!eventoId.value) return
   await cargarPorId(eventoId.value)
   await epStore.cargarPorEvento(eventoId.value)
+  await ventasStore.cargarPorEvento(eventoId.value)
   // productos-mejoras: catalog list is loaded lazily when the
   // operator opens the "Agregar producto" dialog (see `abrirDialogoAgregar`).
   // Avoids blocking the initial render on a Supabase round-trip when the
@@ -283,8 +302,10 @@ const calculoPorProducto = computed(() => {
           { title: 'Producto', key: 'producto_nombre' },
           { title: 'Costo', key: 'costo_unitario' },
           { title: 'Margen', key: 'margen_efectivo' },
-          { title: 'Precio', key: 'precio_final', width: 120, align: 'center' },
+          { title: 'Precio', key: 'precio_final', width: 140, align: 'center' },
           { title: 'Ganancia', key: 'ganancia_unitaria' },
+          { title: 'Contribución', key: 'contribucion_total', align: 'end' },
+          { title: 'ROI', key: 'roi', align: 'end' },
         ]"
         density="comfortable"
         show-expand
@@ -318,24 +339,29 @@ const calculoPorProducto = computed(() => {
             hide-details
             :disabled="!editable"
             :data-testid="`evento-productos-precio-${item.producto_id}`"
-            style="max-width: 120px; margin: 0 auto"
-            class="text-center"
+            class="text-center mx-auto"
+            style="max-width: 140px"
             prefix="$"
             @update:model-value="(v) => alCambiarPrecio(item, Number(v))"
           />
         </template>
         <template #[`item.ganancia_unitaria`]="{ item }">
-          <div class="d-flex flex-column">
-            <span
-              class="font-weight-medium"
-              :class="item.precio_final - item.costo_unitario >= 0 ? 'text-success' : 'text-error'"
-            >
-              {{ formatearUSD(item.precio_final - item.costo_unitario) }}
-            </span>
-            <span class="text-caption text-medium-emphasis">
-              Margen: {{ item.margen_efectivo * 100 }}%
-            </span>
-          </div>
+          <span
+            class="font-weight-medium"
+            :class="item.precio_final - item.costo_unitario >= 0 ? 'text-success' : 'text-error'"
+          >
+            ${{ (item.precio_final - item.costo_unitario).toFixed(2) }}
+          </span>
+        </template>
+        <template #[`item.contribucion_total`]="{ item }">
+          <span class="font-weight-medium text-orange-darken-2">
+            ${{ ((item.precio_final - item.costo_unitario) * (unidadesVendidasPorProducto.get(item.producto_id) ?? 0)).toFixed(2) }}
+          </span>
+        </template>
+        <template #[`item.roi`]="{ item }">
+          <span :class="item.costo_unitario > 0 ? 'text-primary' : 'text-medium-emphasis'">
+            {{ item.costo_unitario > 0 ? Math.round(((item.precio_final - item.costo_unitario) / item.costo_unitario) * 100) : 0 }}%
+          </span>
         </template>
         <!-- productos-mejoras / cost breakdown: expandable row showing
              the per-producto ingredient breakdown via RecetaCostoDesglose.

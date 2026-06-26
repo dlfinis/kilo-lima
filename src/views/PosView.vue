@@ -43,7 +43,7 @@
 //     venta row (with comprobante_numero + monto_recibido + cambio).
 // When the flag is off (default), the new components are NOT
 // rendered — the legacy surface stays untouched.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onActivated, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
 import ComprobanteVentaDialog from '@/components/business/ComprobanteVentaDialog.vue'
@@ -135,6 +135,7 @@ const productosMapeados = computed<Producto[]>(() =>
     orden: 0,
     descripcion: null,
     icono: ep.producto_icono,
+    color: ep.producto_color,
     created_at: ep.created_at,
     updated_at: ep.updated_at,
   })),
@@ -187,7 +188,7 @@ const comprobanteAbierto = ref(false)
 // pos-redesign (REQ-POS-HOY-1): when the flag is on, ventas are
 // fetched in parallel with productos — the grid is never blocked by
 // the ventas fetch (REQ-POS-HOY-4).
-onMounted(async () => {
+async function cargarDatosPOS() {
   await cargarEventos()
   const catalogo = cargarTodas()
   if (FLAG_POS_REDESIGN && eventoEnCurso.value) {
@@ -196,7 +197,13 @@ onMounted(async () => {
     await catalogo
   }
   if (recetas.value.length === 0) await cargarRecetas()
-})
+}
+
+onMounted(cargarDatosPOS)
+// onActivated: recarga productos/iconos/colores cuando el componente
+// se reactiva (si esta dentro de KeepAlive o se navega de vuelta).
+// Esto asegura que los cambios hechos en ProductosView se reflejen.
+onActivated(cargarDatosPOS)
 
 // REQ-POS-40: cargar los imprevistos del evento en curso cuando el
 // usuario expande la sección colapsable. Lazy load keeps the initial

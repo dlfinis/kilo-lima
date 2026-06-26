@@ -65,4 +65,6 @@ export interface EventoProductoConDetalle extends EventoProducto {
   precio_final: number
   // productos-icono: MDI icon name from the producto row.
   producto_icono: string | null
+  // productos-color: card color from the producto row.
+  producto_color: string | null
 }

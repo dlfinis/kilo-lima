@@ -414,7 +414,8 @@ describe('PosView — Contribucion per card (REQ-CON-8)', () => {
       await flushPromises()
       const contribucion = wrapper.find('[data-testid="producto-card-contribucion"]')
       expect(contribucion.exists()).toBe(true)
-      expect(contribucion.classes()).toContain('text-error')
+      // POS mode uses red classes for negative contribution
+      expect(contribucion.classes().some((c) => c.includes('red'))).toBe(true)
     })
   })
 })

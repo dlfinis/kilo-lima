@@ -29,6 +29,7 @@ import { useEventsStore } from '@/stores/events.store'
 import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
+import { useVentasStore } from '@/stores/ventas.store'
 
 const vuetify = createVuetify({ components, directives })
 
@@ -112,6 +113,7 @@ async function prepararCatalogo() {
     const recStore = useRecipesStore()
     const ingStore = useIngredientsStore()
     const prodStore = useProductosStore()
+    const ventStore = useVentasStore()
 
     recStore.recetas.push(mkReceta('r-1', 1))
     recStore.recetas[0]!.ingredientes = [
@@ -147,6 +149,9 @@ async function prepararCatalogo() {
       updated_at: '2026-06-20T00:00:00Z',
     })
     recStore.recetas.push(mkReceta('r-2', 1))
+    
+    // Inicializar ventas vacío para evitar errores
+    ventStore.ventas = []
   })
 }
 
@@ -354,10 +359,12 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
     await conContexto(async () => {
       const evStore = useEventsStore()
       const epStore = useEventoProductosStore()
+      const ventStore = useVentasStore()
       evStore.eventos.push(mkEvento('e-1'))
       epStore.productosPorEvento.set('e-1', [
         mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: 8 }),
       ])
+      ventStore.ventas = []
     })
     await prepararCatalogo() // costo = 10
     __pushSupabaseResponse<EventoProducto[]>({
@@ -370,8 +377,8 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
 
     // Ganancia = 8 - 10 = -2 (loss)
     const gananciaCell = document.querySelector('[data-testid="evento-productos-tabla"] tbody tr td:nth-child(7)')
-    expect(gananciaCell?.textContent).toContain('USD')
-    expect(gananciaCell?.textContent).toContain('2.00')
+    expect(gananciaCell?.textContent).toContain('$')
+    expect(gananciaCell?.textContent).toContain('-2.00')
     expect(gananciaCell?.querySelector('.text-error')).not.toBeNull()
   })
 
@@ -379,10 +386,12 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
     await conContexto(async () => {
       const evStore = useEventsStore()
       const epStore = useEventoProductosStore()
+      const ventStore = useVentasStore()
       evStore.eventos.push(mkEvento('e-1'))
       epStore.productosPorEvento.set('e-1', [
         mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: 20 }),
       ])
+      ventStore.ventas = []
     })
     await prepararCatalogo() // costo = 10
     __pushSupabaseResponse<EventoProducto[]>({
@@ -393,12 +402,10 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
     await mountView('e-1')
     await flushPromises()
 
-    // Ganancia column shows: $10.00 (monetary) + "Margen: 40%"
+    // Ganancia column shows: $10.00 (monetary)
     const gananciaCell = document.querySelector('[data-testid="evento-productos-tabla"] tbody tr td:nth-child(7)')
-    expect(gananciaCell?.textContent).toContain('USD')
+    expect(gananciaCell?.textContent).toContain('$')
     expect(gananciaCell?.textContent).toContain('10.00')
-    expect(gananciaCell?.textContent).toContain('Margen:')
-    expect(gananciaCell?.textContent).toContain('40%')
   })
 })
 // productos-mejoras / evento-producto-pricing: slider must send
@@ -409,10 +416,12 @@ describe('EventoProductosView — slider preserves null precio_venta (productos-
     await conContexto(async () => {
       const evStore = useEventsStore()
       const epStore = useEventoProductosStore()
+      const ventStore = useVentasStore()
       evStore.eventos.push(mkEvento('e-1'))
       epStore.productosPorEvento.set('e-1', [
         mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: null }),
       ])
+      ventStore.ventas = []
     })
     await prepararCatalogo()
     // First response for the initial list load.
@@ -432,6 +441,8 @@ describe('EventoProductosView — slider preserves null precio_venta (productos-
 
     await conContexto(async () => {
       const epStore = useEventoProductosStore()
+      const ventStore = useVentasStore()
+      ventStore.ventas = []
       await epStore.actualizarPrecio('e-1', 'p-1', null, 0.5)
       const fila = epStore.productosPorEvento.get('e-1')?.[0]
       expect(fila?.precio_venta).toBeNull()
@@ -472,10 +483,12 @@ describe('EventoProductosView — Agregar producto dialog (productos-mejoras)', 
     await conContexto(async () => {
       const evStore = useEventsStore()
       const epStore = useEventoProductosStore()
+      const ventStore = useVentasStore()
       evStore.eventos.push(mkEvento('e-1'))
       epStore.productosPorEvento.set('e-1', [
         mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: null }),
       ])
+      ventStore.ventas = []
     })
     await prepararCatalogo()
     __pushSupabaseResponse<EventoProducto[]>({
@@ -493,6 +506,8 @@ describe('EventoProductosView — Agregar producto dialog (productos-mejoras)', 
 
     await conContexto(async () => {
       const epStore = useEventoProductosStore()
+      const ventStore = useVentasStore()
+      ventStore.ventas = []
       await epStore.agregar('e-1', 'p-2')
       const lista = epStore.productosPorEvento.get('e-1') ?? []
       expect(lista.find((p) => p.producto_id === 'p-2')).toBeDefined()

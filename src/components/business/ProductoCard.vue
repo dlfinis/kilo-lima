@@ -1,10 +1,11 @@
 <script setup lang="ts">
-// POS card redesign: dos modos de presentacion.
+// ProductoCard: dos modos de presentacion.
 // - "pos": toda la card es clickeable, icono grande, titulo centrado,
 //   precio prominente, boton (i) de info. Sin editar/eliminar.
-// - "catalogo": card con botones de editar/toggle/eliminar para
-//   gestion en ProductosView.
-import { ref } from 'vue'
+// - "catalogo": card simplificada con botones de editar/toggle/eliminar.
+//   Sin precio (el precio depende del evento) ni "agregar al carrito".
+// El color del producto determina el color de la card en ambos modos.
+import { computed, ref } from 'vue'
 
 import type { Producto } from '@/types'
 import { formatearUSD } from '@/utils/format'
@@ -28,6 +29,9 @@ const emit = defineEmits<{
 
 const infoAbierta = ref(false)
 
+// Color de la card. Fallback a 'primary' si el producto no tiene color.
+const colorCard = computed(() => props.producto.color || 'primary')
+
 function toggleInfo(e: Event): void {
   e.stopPropagation()
   infoAbierta.value = !infoAbierta.value
@@ -44,6 +48,8 @@ function alHacerClick(): void {
   <v-card
     class="producto-card d-flex flex-column"
     :class="{ 'producto-card--disabled': !producto.disponible, 'producto-card--pos': modo === 'pos' }"
+    :color="modo === 'pos' ? colorCard : undefined"
+    :theme="modo === 'pos' ? 'dark' : undefined"
     :role="modo === 'pos' ? 'button' : undefined"
     :tabindex="modo === 'pos' && producto.disponible ? 0 : -1"
     :data-testid="`producto-card-${producto.disponible ? 'active' : 'disabled'}`"
@@ -51,9 +57,9 @@ function alHacerClick(): void {
     @keydown.enter="alHacerClick"
     @keydown.space.prevent="alHacerClick"
   >
-    <!-- MODO POS: layout centrado con icono grande -->
+    <!-- MODO POS: layout centrado con icono grande, color de fondo -->
     <template v-if="modo === 'pos'">
-      <!-- Boton de info (i) en esquina superior derecha -->
+      <!-- Boton de info (i) en esquina superior izquierda -->
       <v-btn
         v-if="producto.descripcion"
         icon="mdi-information-outline"
@@ -69,7 +75,7 @@ function alHacerClick(): void {
         <v-icon
           :icon="producto.icono || 'mdi-food'"
           size="56"
-          color="primary"
+          color="white"
           class="mb-2"
           data-testid="producto-card-icono"
         />
@@ -88,7 +94,7 @@ function alHacerClick(): void {
         <div
           v-if="contribucion !== null && contribucion !== undefined"
           class="text-caption mt-1"
-          :class="contribucion >= 0 ? 'text-success' : 'text-error'"
+          :class="contribucion >= 0 ? 'text-light-green-lighten-3' : 'text-red-lighten-2'"
           data-testid="producto-card-contribucion"
         >
           +{{ formatearUSD(contribucion) }}
@@ -97,8 +103,8 @@ function alHacerClick(): void {
 
       <!-- Panel de informacion (descripcion) -->
       <v-expand-transition>
-        <div v-if="infoAbierta && producto.descripcion" class="producto-card__info pa-3 bg-grey-lighten-4">
-          <p class="text-body-2 mb-0">{{ producto.descripcion }}</p>
+        <div v-if="infoAbierta && producto.descripcion" class="producto-card__info pa-3 bg-black bg-opacity-25">
+          <p class="text-body-2 mb-0 text-white">{{ producto.descripcion }}</p>
         </div>
       </v-expand-transition>
 
@@ -111,16 +117,23 @@ function alHacerClick(): void {
       </div>
     </template>
 
-    <!-- MODO CATALOGO: layout con botones de gestion -->
+    <!-- MODO CATALOGO: card con borde de color, sin precio ni "agregar" -->
     <template v-else>
       <div class="pa-4 d-flex flex-column">
         <div class="d-flex align-center ga-2 mb-2">
           <v-icon
             :icon="producto.icono || 'mdi-food'"
             size="32"
-            color="primary"
+            :color="colorCard"
           />
           <div class="text-h6 text-truncate">{{ nombreReceta }}</div>
+          <v-spacer />
+          <v-chip
+            :color="colorCard"
+            size="x-small"
+            variant="flat"
+            data-testid="producto-card-color-indicator"
+          />
         </div>
         <div
           v-if="producto.descripcion"
@@ -129,34 +142,8 @@ function alHacerClick(): void {
         >
           {{ producto.descripcion }}
         </div>
-        <div class="text-h5 mb-2" data-testid="producto-card-precio">
-          {{ formatearUSD(producto.precio_venta) }}
-        </div>
-        <div
-          v-if="contribucion !== null && contribucion !== undefined"
-          class="mb-2"
-        >
-          <v-chip
-            :color="contribucion >= 0 ? 'success' : 'error'"
-            size="small"
-            variant="tonal"
-            data-testid="producto-card-contribucion"
-          >
-            Contribucion: {{ formatearUSD(contribucion) }}
-          </v-chip>
-        </div>
         <v-spacer />
         <div class="d-flex ga-2 mt-2 flex-wrap">
-          <v-btn
-            v-if="producto.disponible"
-            color="primary"
-            size="large"
-            min-height="48"
-            data-testid="producto-card-agregar"
-            @click="$emit('agregar', producto.id)"
-          >
-            Agregar al carrito
-          </v-btn>
           <v-btn
             icon="mdi-pencil"
             size="small"
@@ -200,7 +187,7 @@ function alHacerClick(): void {
 
 .producto-card--pos:hover:not(.producto-card--disabled) {
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
 }
 
 .producto-card--pos:active:not(.producto-card--disabled) {
@@ -230,12 +217,12 @@ function alHacerClick(): void {
 .producto-card__info-btn {
   position: absolute;
   top: 4px;
-  right: 4px;
+  left: 4px;
   z-index: 1;
 }
 
 .producto-card__info {
-  border-top: 1px solid rgba(0, 0, 0, 0.1);
+  border-top: 1px solid rgba(255, 255, 255, 0.2);
 }
 
 .producto-card__overlay {

@@ -180,6 +180,8 @@ export interface Database {
           descripcion: string | null
           // productos-icono: MDI icon name for POS display.
           icono: string | null
+          // productos-color: card color in POS/catalog.
+          color: string | null
           created_at: string
           updated_at: string
         }
@@ -191,6 +193,7 @@ export interface Database {
           orden?: number
           descripcion?: string | null
           icono?: string | null
+          color?: string | null
           created_at?: string
           updated_at?: string
         }

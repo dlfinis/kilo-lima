@@ -29,6 +29,9 @@ export interface Producto {
   // productos-icono: MDI icon name for POS display. Nullable for
   // legacy productos; defaults to 'mdi-food' on create.
   icono: string | null
+  // productos-color: card color in POS/catalog. Vuetify color name
+  // or hex value. Defaults to 'primary'.
+  color: string | null
   created_at: string
   updated_at: string
 }

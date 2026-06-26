@@ -10,6 +10,7 @@
 // Spanish inline errors mirror `RecetaForm` patterns (REQ-POS-48).
 import { computed, ref, watch } from 'vue'
 
+import SelectorColor from './SelectorColor.vue'
 import SelectorIcono from './SelectorIcono.vue'
 import type { Producto, ProductoInput } from '@/types'
 
@@ -44,6 +45,8 @@ const orden = ref<number>(0)
 const descripcion = ref<string>('')
 // productos-icono: MDI icon name. Defaults to 'mdi-food' when creating.
 const icono = ref<string>('mdi-food')
+// productos-color: card color. Defaults to 'primary'.
+const color = ref<string>('primary')
 const errores = ref<{ precio?: string; receta?: string; descripcion?: string }>({})
 
 watch(
@@ -56,6 +59,7 @@ watch(
       orden.value = v.orden
       descripcion.value = v.descripcion ?? ''
       icono.value = v.icono ?? 'mdi-food'
+      color.value = v.color ?? 'primary'
     } else {
       recetaId.value = inicial ?? ''
       precioVenta.value = 0
@@ -63,6 +67,7 @@ watch(
       orden.value = 0
       descripcion.value = ''
       icono.value = 'mdi-food'
+      color.value = 'primary'
     }
     errores.value = {}
   },
@@ -80,10 +85,10 @@ const formularioValido = computed(
 
 function validar(): boolean {
   const nuevos: typeof errores.value = {}
-  if (!recetaId.value) nuevos.receta = 'Seleccioná una receta'
+  if (!recetaId.value) nuevos.receta = 'Selecciona una receta'
   if (!(precioVenta.value > 0)) nuevos.precio = 'El precio de venta debe ser mayor a 0'
   if (descripcion.value.length > MAX_DESCRIPCION) {
-    nuevos.descripcion = `Máximo ${MAX_DESCRIPCION} caracteres`
+    nuevos.descripcion = `Maximo ${MAX_DESCRIPCION} caracteres`
   }
   errores.value = nuevos
   return Object.keys(nuevos).length === 0
@@ -100,6 +105,7 @@ function onSubmit() {
     // contract (nullable, no defaults).
     descripcion: descripcion.value.trim() === '' ? null : descripcion.value,
     icono: icono.value,
+    color: color.value,
   }
   emit('submit', payload)
 }
@@ -120,7 +126,14 @@ function onCancelar() {
       :error-messages="errores.receta ? [errores.receta] : []"
       data-testid="producto-receta"
     />
-    <SelectorIcono v-model="icono" data-testid="producto-icono" />
+    <div class="d-flex ga-4 mb-2">
+      <div class="flex-grow-1">
+        <SelectorIcono v-model="icono" data-testid="producto-icono" />
+      </div>
+      <div>
+        <SelectorColor v-model="color" data-testid="producto-color" />
+      </div>
+    </div>
     <v-text-field
       v-model.number="precioVenta"
       label="Precio de venta"

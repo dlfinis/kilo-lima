@@ -96,6 +96,7 @@ export function usePreciosEvento(
           margen_efectivo: margenEfectivo ?? 0,
           precio_final: precioFinal,
           producto_icono: producto?.icono ?? null,
+          producto_color: producto?.color ?? null,
         }
       })
   })

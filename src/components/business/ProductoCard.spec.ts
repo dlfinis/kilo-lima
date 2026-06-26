@@ -88,7 +88,8 @@ describe('ProductoCard — POS redesign', () => {
     const contribucion = wrapper.find('[data-testid="producto-card-contribucion"]')
     expect(contribucion.exists()).toBe(true)
     expect(contribucion.text()).toContain('5.00')
-    expect(contribucion.classes()).toContain('text-success')
+    // POS mode uses light-green for positive contribution (dark theme card)
+    expect(contribucion.classes().some((c) => c.includes('light-green'))).toBe(true)
   })
 
   it('renders red contribucion text when contribution < 0', () => {
@@ -98,7 +99,8 @@ describe('ProductoCard — POS redesign', () => {
     })
     const contribucion = wrapper.find('[data-testid="producto-card-contribucion"]')
     expect(contribucion.exists()).toBe(true)
-    expect(contribucion.classes()).toContain('text-error')
+    // POS mode uses red for negative contribution (dark theme card)
+    expect(contribucion.classes().some((c) => c.includes('red'))).toBe(true)
   })
 
   it('supports keyboard navigation (Enter/Space to add)', async () => {

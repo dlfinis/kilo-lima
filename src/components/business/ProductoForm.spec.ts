@@ -71,7 +71,7 @@ describe('ProductoForm', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Seleccioná una receta')
+    expect(wrapper.text()).toContain('Selecciona una receta')
     expect(wrapper.emitted('submit')).toBeFalsy()
   })
 
@@ -160,7 +160,7 @@ describe('ProductoForm', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    expect(wrapper.text()).toContain('Máximo 500 caracteres')
+    expect(wrapper.text()).toContain('Maximo 500 caracteres')
     expect(wrapper.emitted('submit')).toBeFalsy()
   })
 
