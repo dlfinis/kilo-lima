@@ -3,8 +3,12 @@
 -- 5 sample materias_primas, 2 recetas, 5 receta_ingredientes rows.
 -- Uses ON CONFLICT DO NOTHING so it is safe to re-run.
 -- Per REQ-CATALOG-23.
-
--- 1. materias_primas (5 rows)
+--
+-- Extends with full lifecycle test data: 2 productos, 3 eventos
+-- (one per estado), evento_productos, plan_produccion, ventas +
+-- venta_items, gastos_fijos, gastos_imprevistos, and 1 cierre_caja.
+-- Required for testing the evento cascade-delete behavior introduced
+-- by the `cascade_ventas_evento` migration. Per REQ-EVENTS-39.
 insert into public.materias_primas (nombre, unidad, costo_por_unidad, notas) values
   ('Azúcar', 'g', 0.05, null),
   ('Harina', 'kg', 2.50, 'Harina de trigo todo uso'),
@@ -50,3 +54,204 @@ select r.id, m.id, 0.15
 from public.recetas r, public.materias_primas m
 where r.nombre = 'Galleta de chocolate' and m.nombre = 'Chocolate'
 on conflict do nothing;
+
+-- ============================================================
+-- Lifecycle test data: productos → eventos → evento_productos →
+-- plan_produccion / ventas + venta_items / gastos_fijos /
+-- gastos_imprevistos / cierres_caja.
+-- ============================================================
+
+-- 4. productos (2 rows) — one per receta.
+-- producto_id is referenced by venta_items and evento_productos, so
+-- it must exist before either table is populated.
+insert into public.productos (receta_id, precio_venta, disponible, orden)
+select r.id, 15.00, true, 1
+from public.recetas r
+where r.nombre = 'Galleta de chocolate'
+on conflict (receta_id) do nothing;
+
+insert into public.productos (receta_id, precio_venta, disponible, orden)
+select r.id, 35.00, true, 2
+from public.recetas r
+where r.nombre = 'Pan básico'
+on conflict (receta_id) do nothing;
+
+-- 5. eventos (3 rows) — one per estado.
+-- eventos has no unique constraint besides PK, so re-running the
+-- seed on a populated DB will produce duplicates. The seed is
+-- designed for `supabase db reset` (fresh DB); the cleanup script
+-- `verify-final.mjs` runs against a reset DB. Best-effort.
+insert into public.eventos (nombre, fecha, fecha_fin, margen_ganancia, ubicacion, estado, notas) values
+  ('Feria del dulce',     '2026-08-10', null, 0.40, 'Plaza del Carmen', 'planificacion', 'Pre-producción de galletas'),
+  ('Festival de la galleta', '2026-07-20', '2026-07-21', 0.45, 'Parque Hidalgo', 'en_curso', 'Venta activa + toma de pedidos'),
+  ('Mercado navideño',    '2026-12-15', '2026-12-20', 0.50, 'Centro histórico', 'cerrado', 'Cierre pendiente: caja cuadrada')
+on conflict do nothing;
+
+-- 6. evento_productos (3 rows) — link one producto per evento.
+-- Uses UNIQUE(evento_id, producto_id) so this section is fully
+-- idempotent.
+insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
+select e.id, p.id, null, null, true
+from public.eventos e, public.productos p
+where e.nombre = 'Feria del dulce' and p.precio_venta = 15.00
+on conflict (evento_id, producto_id) do nothing;
+
+insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
+select e.id, p.id, null, null, true
+from public.eventos e, public.productos p
+where e.nombre = 'Festival de la galleta' and p.precio_venta = 15.00
+on conflict (evento_id, producto_id) do nothing;
+
+insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
+select e.id, p.id, null, null, true
+from public.eventos e, public.productos p
+where e.nombre = 'Mercado navideño' and p.precio_venta = 35.00
+on conflict (evento_id, producto_id) do nothing;
+
+-- 7. plan_produccion (4 rows) — for "Festival de la galleta" (2
+-- recetas) and "Mercado navideño" (2 recetas). UNIQUE(evento_id,
+-- receta_id) makes this section idempotent.
+insert into public.plan_produccion (evento_id, receta_id, unidades_a_producir)
+select e.id, r.id, 240
+from public.eventos e, public.recetas r
+where e.nombre = 'Festival de la galleta' and r.nombre = 'Galleta de chocolate'
+on conflict (evento_id, receta_id) do nothing;
+
+insert into public.plan_produccion (evento_id, receta_id, unidades_a_producir)
+select e.id, r.id, 40
+from public.eventos e, public.recetas r
+where e.nombre = 'Festival de la galleta' and r.nombre = 'Pan básico'
+on conflict (evento_id, receta_id) do nothing;
+
+insert into public.plan_produccion (evento_id, receta_id, unidades_a_producir)
+select e.id, r.id, 120
+from public.eventos e, public.recetas r
+where e.nombre = 'Mercado navideño' and r.nombre = 'Galleta de chocolate'
+on conflict (evento_id, receta_id) do nothing;
+
+insert into public.plan_produccion (evento_id, receta_id, unidades_a_producir)
+select e.id, r.id, 60
+from public.eventos e, public.recetas r
+where e.nombre = 'Mercado navideño' and r.nombre = 'Pan básico'
+on conflict (evento_id, receta_id) do nothing;
+
+-- 8. gastos_fijos (5 rows) — 2 for each non-planificación evento,
+-- 1 for planificación. PK-only, best-effort idempotency.
+insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
+select e.id, 'renta', 800.00, 'Renta del stand'
+from public.eventos e
+where e.nombre = 'Feria del dulce'
+on conflict do nothing;
+
+insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
+select e.id, 'renta', 1200.00, 'Renta del stand'
+from public.eventos e
+where e.nombre = 'Festival de la galleta'
+on conflict do nothing;
+
+insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
+select e.id, 'publicidad', 350.00, 'Impresión de mantas'
+from public.eventos e
+where e.nombre = 'Festival de la galleta'
+on conflict do nothing;
+
+insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
+select e.id, 'renta', 2000.00, 'Renta del stand (5 días)'
+from public.eventos e
+where e.nombre = 'Mercado navideño'
+on conflict do nothing;
+
+insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
+select e.id, 'permisos', 600.00, 'Permiso municipal'
+from public.eventos e
+where e.nombre = 'Mercado navideño'
+on conflict do nothing;
+
+-- 9. ventas (4 rows) — 2 for "Festival de la galleta" (en_curso) and
+-- 2 for "Mercado navideño" (cerrado). PK-only, best-effort.
+insert into public.ventas (evento_id, fecha, total, metodo_pago)
+select e.id, '2026-07-20T10:30:00Z', 75.00, 'efectivo'
+from public.eventos e
+where e.nombre = 'Festival de la galleta'
+on conflict do nothing;
+
+insert into public.ventas (evento_id, fecha, total, metodo_pago)
+select e.id, '2026-07-20T14:15:00Z', 120.00, 'transferencia'
+from public.eventos e
+where e.nombre = 'Festival de la galleta'
+on conflict do nothing;
+
+insert into public.ventas (evento_id, fecha, total, metodo_pago)
+select e.id, '2026-12-15T11:00:00Z', 280.00, 'mixto'
+from public.eventos e
+where e.nombre = 'Mercado navideño'
+on conflict do nothing;
+
+insert into public.ventas (evento_id, fecha, total, metodo_pago)
+select e.id, '2026-12-15T16:45:00Z', 210.00, 'tarjeta'
+from public.eventos e
+where e.nombre = 'Mercado navideño'
+on conflict do nothing;
+
+-- 10. venta_items (5 rows) — 2 ítems for the first venta of each
+-- evento with ventas, plus 1 ítem for the second venta of
+-- "Mercado navideño". PK-only, best-effort.
+insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
+select v.id, p.id, 3, 15.00, 45.00
+from public.ventas v, public.productos p
+where v.metodo_pago = 'efectivo' and v.total = 75.00 and p.precio_venta = 15.00
+on conflict do nothing;
+
+insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
+select v.id, p.id, 2, 15.00, 30.00
+from public.ventas v, public.productos p
+where v.metodo_pago = 'efectivo' and v.total = 75.00 and p.precio_venta = 15.00
+on conflict do nothing;
+
+insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
+select v.id, p.id, 4, 35.00, 140.00
+from public.ventas v, public.productos p
+where v.metodo_pago = 'mixto' and v.total = 280.00 and p.precio_venta = 35.00
+on conflict do nothing;
+
+insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
+select v.id, p.id, 4, 35.00, 140.00
+from public.ventas v, public.productos p
+where v.metodo_pago = 'mixto' and v.total = 280.00 and p.precio_venta = 35.00
+on conflict do nothing;
+
+insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
+select v.id, p.id, 2, 35.00, 70.00
+from public.ventas v, public.productos p
+where v.metodo_pago = 'tarjeta' and v.total = 210.00 and p.precio_venta = 35.00
+on conflict do nothing;
+
+-- 11. gastos_imprevistos (2 rows) — for "Mercado navideño" only.
+-- PK-only, best-effort.
+insert into public.gastos_imprevistos (evento_id, monto, motivo, categoria)
+select e.id, 120.00, 'Reparación de horno eléctrico', 'reparacion'
+from public.eventos e
+where e.nombre = 'Mercado navideño'
+on conflict do nothing;
+
+insert into public.gastos_imprevistos (evento_id, monto, motivo, categoria)
+select e.id, 80.00, 'Compra extra de harina', 'insumos_extra'
+from public.eventos e
+where e.nombre = 'Mercado navideño'
+on conflict do nothing;
+
+-- 12. cierres_caja (1 row) — for "Mercado navideño". UNIQUE on
+-- evento_id makes this section idempotent.
+insert into public.cierres_caja (
+  evento_id, fecha_cierre,
+  total_ventas, total_gastos_fijos, total_gastos_imprevistos,
+  utilidad_bruta,
+  efectivo_esperado, efectivo_real, diferencia, notas
+)
+select e.id, '2026-12-20T20:00:00Z',
+       490.00, 2600.00, 200.00,
+       -2310.00,
+       490.00, 490.00, 0.00, 'Cierre preliminar: caja cuadrada, gastos altos'
+from public.eventos e
+where e.nombre = 'Mercado navideño'
+on conflict (evento_id) do nothing;

@@ -289,6 +289,10 @@ describe('EventoDetalleView', () => {
     const gastos = [mkGasto('g-1'), mkGasto('g-2'), mkGasto('g-3')]
     await prepararStore(evento, gastos)
     __pushSupabaseResponse<GastoFijo[]>({ data: gastos, error: null })
+    __pushSupabaseResponse<PlanProduccion[]>({ data: [], error: null })
+    __pushSupabaseResponse<EventoProducto[]>({ data: [], error: null })
+    __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
+    __pushSupabaseResponse<MateriaPrima[]>({ data: [], error: null })
     const wrapper = await montarVista('e-1')
     await flushPromises()
 
@@ -297,6 +301,13 @@ describe('EventoDetalleView', () => {
 
     const texto = document.body.textContent ?? ''
     expect(texto).toContain('Feria Cancelada')
+    // Dynamic counts for the stores this view loads.
     expect(texto).toContain('3 gastos fijos')
+    expect(texto).toContain('0 fila(s) del plan de producción')
+    expect(texto).toContain('0 configuración(es) de producto(s)')
+    // Qualitative copy for tables the detail view does NOT load.
+    expect(texto).toContain('todas las ventas y sus ítems')
+    expect(texto).toContain('los gastos imprevistos')
+    expect(texto).toContain('el cierre de caja asociado')
   })
 })

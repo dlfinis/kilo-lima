@@ -46,13 +46,18 @@ const eventoId = computed<string | null>(() => {
 
 const { eventoActual, cargando, error, cargarPorId, cambiarEstado, eliminar, actualizar } = useEvents()
 const { gastosPorEvento, cargando: cargandoGastos, error: errorGastos, cargarPorEvento, agregar, eliminar: eliminarGasto } = useGastosFijos()
-const { cargarPorEvento: cargarPlan } = usePlans()
+const { planesPorEvento, cargarPorEvento: cargarPlan } = usePlans()
 const epStore = useEventoProductosStore()
 const proyeccion = useProyeccionCostos(eventoId)
 
 const gastos = computed(() => (eventoId.value ? gastosPorEvento.value.get(eventoId.value) ?? [] : []))
 const editable = computed(() => (eventoActual.value ? estadoEsEditable(eventoActual.value.estado) : false))
 const productosCount = computed(() => (eventoId.value ? (epStore.productosPorEvento.get(eventoId.value) ?? []).length : 0))
+// REQ-EVENTS-39: cascade copy mentions the plan row count for this
+// evento. Plan rows are already loaded by `cargarPlan` in onMounted,
+// so we read them off the same `planesPorEvento` Map that the rest
+// of the view uses.
+const planCount = computed(() => (eventoId.value ? (planesPorEvento.value.get(eventoId.value) ?? []).length : 0))
 
 // REQ-EVENTS-22: 3-state machine transitions visible from the detail
 // view. Each row carries the target estado + the testid the spec
@@ -322,7 +327,7 @@ function irAReporte() {
         <v-card>
           <v-card-title>¿Eliminar "{{ eventoActual.nombre }}"?</v-card-title>
           <v-card-text>
-            Se eliminarán {{ gastos.length }} gastos fijos y todas las filas del plan de producción.
+            Se eliminarán {{ gastos.length }} gastos fijos, {{ planCount }} fila(s) del plan de producción, {{ productosCount }} configuración(es) de producto(s), todas las ventas y sus ítems, los gastos imprevistos y el cierre de caja asociado.
           </v-card-text>
           <v-card-actions>
             <v-spacer />
