@@ -2,6 +2,11 @@
 // seam between the views (PosView) and the store. `storeToRefs`
 // keeps reactivity when the view destructures the refs. Mirrors the
 // `useProductos` / `useEvents` precedent.
+//
+// pos-redesign (REQ-POS-58): `registrarVenta` signature now accepts an
+// optional `montoRecibido`; `cargarPorEvento` is exposed for the
+// PosView's parallel mount (was already returned). Surface stays
+// backward compatible.
 import { storeToRefs } from 'pinia'
 
 import { useVentasStore } from '@/stores/ventas.store'
@@ -26,5 +31,9 @@ export function useVentas() {
     cargarPorEvento: store.cargarPorEvento,
     registrarVenta: store.registrarVenta,
     descartarToast: store.descartarToast,
+    // pos-redesign: typed error constants exposed for views that
+    // need to render specific messages (e.g., MONTO_INSUFICIENTE in
+    // RegistrarVentaDialog).
+    CODIGO_MONTO_INSUFICIENTE: store.CODIGO_MONTO_INSUFICIENTE,
   }
 }

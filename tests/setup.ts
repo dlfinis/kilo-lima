@@ -109,6 +109,7 @@ function crearBuilder(): Record<string, unknown> {
     upsert: registrar('upsert'),
     delete: registrar('delete'),
     eq: registrar('eq'),
+    not: registrar('not'),
     order: registrar('order'),
   }
   builder.single = async (...args: unknown[]) => {

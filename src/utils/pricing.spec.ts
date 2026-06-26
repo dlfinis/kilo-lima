@@ -109,4 +109,25 @@ describe('calcularMargenReal', () => {
     expect(precio).toBe(100)
     expect(calcularMargenReal(precio, 10)).toBeCloseTo(0.9, 2)
   })
+
+  // productos-mejoras / Pricing calc stability: explicit ±0.01
+  // tolerance assertion pinned in the spec. The bidirectional invariant
+  // holds for the bulk-action path: applying `minimo` then computing
+  // `calcularMargenReal(minimo, costo)` recovers the original margin
+  // within the documented tolerance.
+  it('preserves bidirectional invariant within ±0.01 across a representative sweep', () => {
+    const sweep: ReadonlyArray<readonly [number, number]> = [
+      [10, 0.4],
+      [5, 0.25],
+      [100, 0.5],
+      [3.33, 0.33],
+      [12.5, 0.6],
+      [8, 0.15],
+    ]
+    for (const [costo, margen] of sweep) {
+      const precio = calcularPrecioPorMargen(costo, margen)
+      const margenBack = calcularMargenReal(precio, costo)
+      expect(Math.abs(margenBack - margen)).toBeLessThanOrEqual(0.01)
+    }
+  })
 })

@@ -14,13 +14,27 @@
 // Receives the pre-computed `CierreResultado` via prop (no service /
 // store calls — pure presentation component) so the view can swap
 // between the live computed resumen and the snapshotted cierre row.
+//
+// pos-redesign (REQ-POS-12): the card also surfaces the per-metodo_pago
+// count chip with the comprobante_numero span (V-001, V-002, …) so
+// the operator can match receipts at the cierre. The ventas list is
+// passed via a separate `comprobantesPorMetodo` prop (a map of
+// metodo_pago → comprobante_numero[]) when the caller has it; the
+// card stays backward-compatible (renders nothing when omitted).
 import { computed } from 'vue'
 
-import type { CierreResultado, MetodoPago } from '@/types'
+import type { CierreResultado, MetodoPago, VentaConItems } from '@/types'
 import { formatearUSD } from '@/utils/format'
 import { formatearDiferencia } from '@/utils/cierre'
 
-const props = defineProps<{ resumen: CierreResultado | null }>()
+const props = defineProps<{
+  resumen: CierreResultado | null
+  // pos-redesign (REQ-POS-12): optional list of ventas whose
+  // comprobante_numero is rendered next to the metodo_pago breakdown.
+  // When omitted, the comprobante chip is not rendered (legacy
+  // callers that don't have the new column).
+  ventas?: VentaConItems[]
+}>()
 
 const METODOS_ETIQUETA: Record<MetodoPago, string> = {
   efectivo: 'Efectivo',
@@ -29,7 +43,24 @@ const METODOS_ETIQUETA: Record<MetodoPago, string> = {
   mixto: 'Mixto',
 }
 
-void METODOS_ETIQUETA
+// pos-redesign (REQ-POS-12): group comprobante_numero by metodo_pago
+// for the cierre breakdown. Only includes ventas that have a
+// comprobante_numero (legacy ventas stay out — they predate the
+// redesign). Stable insertion order (preserves the input order so
+// V-001, V-002 render in sequence).
+const comprobantesPorMetodo = computed<Record<MetodoPago, string[]>>(() => {
+  const vacio: Record<MetodoPago, string[]> = {
+    efectivo: [],
+    transferencia: [],
+    tarjeta: [],
+    mixto: [],
+  }
+  const lista = props.ventas ?? []
+  for (const v of lista) {
+    if (v.comprobante_numero) vacio[v.metodo_pago].push(v.comprobante_numero)
+  }
+  return vacio
+})
 
 const diferenciaLabel = computed<string | null>(() =>
   props.resumen?.diferencia === null || props.resumen?.diferencia === undefined
@@ -79,7 +110,18 @@ const porcentajeCubiertos = computed<string>(() => {
       </p>
       <ul v-if="resumen.cantidadVentas > 0" class="ml-4">
         <li v-for="(monto, metodo) in resumen.ventasPorMetodoPago" :key="metodo">
-          <span v-if="monto > 0">{{ METODOS_ETIQUETA[metodo as MetodoPago] }} — {{ formatearUSD(monto) }}</span>
+          <span v-if="monto > 0">
+            {{ METODOS_ETIQUETA[metodo as MetodoPago] }} — {{ formatearUSD(monto) }}
+            <!-- pos-redesign (REQ-POS-12): per-metodo comprobante_numero
+                 range — operator can match receipts to the cierre. -->
+            <span
+              v-if="comprobantesPorMetodo[metodo as MetodoPago].length > 0"
+              class="text-caption text-medium-emphasis ml-2"
+              :data-testid="`cierre-comprobantes-${metodo}`"
+            >
+              ({{ comprobantesPorMetodo[metodo as MetodoPago].join(', ') }})
+            </span>
+          </span>
         </li>
       </ul>
     </div>

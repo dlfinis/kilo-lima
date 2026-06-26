@@ -27,6 +27,7 @@ const mkProducto = (overrides: Partial<Producto> = {}): Producto => ({
   precio_venta: 5,
   disponible: true,
   orden: 0,
+  descripcion: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -112,5 +113,69 @@ describe('ProductoForm', () => {
     await cancelar?.trigger('click')
 
     expect(wrapper.emitted('cancel')).toBeTruthy()
+  })
+
+  // productos-mejoras / producto-descripcion: descripcion flows into
+  // the submit payload so the DB row persists the free-text field.
+  it('emits descripcion in the submit payload when filled', async () => {
+    const wrapper = mountForm({ recetaIdInicial: 'r-1' })
+    await wrapper.find('[data-testid="producto-descripcion"] textarea').setValue('Pan de masa madre artesanal')
+    await wrapper.find('[data-testid="producto-precio"] input').setValue('7.5')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    const submit = wrapper.emitted('submit')
+    expect(submit?.[0]?.[0]).toEqual(
+      expect.objectContaining({
+        receta_id: 'r-1',
+        precio_venta: 7.5,
+        descripcion: 'Pan de masa madre artesanal',
+      }),
+    )
+  })
+
+  // Empty descripcion is coerced to null so the DB row matches the
+  // nullable contract instead of storing an empty string.
+  it('emits descripcion=null when the textarea is left empty', async () => {
+    const wrapper = mountForm({ recetaIdInicial: 'r-1' })
+    await wrapper.find('[data-testid="producto-precio"] input').setValue('7.5')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    const submit = wrapper.emitted('submit')
+    expect(submit?.[0]?.[0]).toEqual(
+      expect.objectContaining({ receta_id: 'r-1', precio_venta: 7.5, descripcion: null }),
+    )
+  })
+
+  // productos-mejoras / producto-descripcion: 500-char cap matches
+  // the DB CHECK constraint; the form blocks the save.
+  it('blocks the submit when descripcion exceeds 500 chars', async () => {
+    const wrapper = mountForm({ recetaIdInicial: 'r-1' })
+    const longText = 'a'.repeat(501)
+    await wrapper
+      .find('[data-testid="producto-descripcion"] textarea')
+      .setValue(longText)
+    await wrapper.find('[data-testid="producto-precio"] input').setValue('7.5')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(wrapper.text()).toContain('Máximo 500 caracteres')
+    expect(wrapper.emitted('submit')).toBeFalsy()
+  })
+
+  it('prefills descripcion from valoresIniciales (REQ-POS-1)', async () => {
+    const wrapper = mountForm({
+      valoresIniciales: mkProducto({
+        descripcion: 'Brownie húmedo de chocolate',
+      }),
+      recetas: [{ id: 'r-1', nombre: 'Brownie' }],
+    })
+    await flushPromises()
+
+    expect(
+      (wrapper.find('[data-testid="producto-descripcion"] textarea').element as HTMLTextAreaElement)
+        .value,
+    ).toBe('Brownie húmedo de chocolate')
   })
 })

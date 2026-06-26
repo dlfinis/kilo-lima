@@ -50,6 +50,9 @@ const mkVenta = (id: string, eventoId: string, total: number): VentaConItems => 
   fecha: '2026-06-19T10:00:00Z',
   total,
   metodo_pago: 'efectivo',
+  monto_recibido: null,
+  cambio: null,
+  comprobante_numero: null,
   created_at: '2026-06-19T10:00:00Z',
   items: [],
 })

@@ -117,6 +117,14 @@ const cantidadVentas = computed(() => {
   return ventas.value.filter((v) => v.evento_id === eventoActivo.value!.id).length
 })
 
+// pos-redesign (REQ-POS-12): pass the per-evento ventas to the
+// resumen card so it can render the per-metodo comprobante_numero
+// range. Same filter as `totalVentas` / `cantidadVentas`.
+const ventasParaCierre = computed(() => {
+  if (!eventoActivo.value) return []
+  return ventas.value.filter((v) => v.evento_id === eventoActivo.value!.id)
+})
+
 type Dialogo =
   | { tipo: 'cerrado' }
   | { tipo: 'crear' }
@@ -247,7 +255,7 @@ onMounted(async () => {
         </p>
       </v-card>
 
-      <CierreResumenCard :resumen="resumen" />
+      <CierreResumenCard :resumen="resumen" :ventas="ventasParaCierre" />
 
       <v-card class="pa-4 mb-4" data-testid="cierre-desglose">
         <h3 class="text-subtitle-1 mb-2">Desglose por categoría</h3>

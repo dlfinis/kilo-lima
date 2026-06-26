@@ -176,6 +176,8 @@ export interface Database {
           precio_venta: number
           disponible: boolean
           orden: number
+          // productos-mejoras / producto-descripcion: nullable description.
+          descripcion: string | null
           created_at: string
           updated_at: string
         }
@@ -185,6 +187,7 @@ export interface Database {
           precio_venta: number
           disponible?: boolean
           orden?: number
+          descripcion?: string | null
           created_at?: string
           updated_at?: string
         }
@@ -205,6 +208,11 @@ export interface Database {
           fecha: string
           total: number
           metodo_pago: 'efectivo' | 'transferencia' | 'tarjeta' | 'mixto'
+          // pos-redesign / pos-cambio-comprobante: cash-back + receipt
+          // numbering. Nullable for legacy rows and non-efectivo sales.
+          monto_recibido: number | null
+          cambio: number | null
+          comprobante_numero: string | null
           created_at: string
         }
         Insert: {
@@ -213,6 +221,9 @@ export interface Database {
           fecha?: string
           total: number
           metodo_pago: 'efectivo' | 'transferencia' | 'tarjeta' | 'mixto'
+          monto_recibido?: number | null
+          cambio?: number | null
+          comprobante_numero?: string | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['ventas']['Insert']>

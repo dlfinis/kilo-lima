@@ -3,7 +3,9 @@
 // REQ-POS-24, REQ-POS-25, REQ-POS-28, REQ-POS-39, REQ-POS-40,
 // REQ-POS-46, REQ-POS-49, REQ-POS-54, REQ-POS-55,
 // REQ-FIN-28, REQ-FIN-29, REQ-FIN-30, REQ-FIN-32 (PR-2b POS integration),
-// REQ-CON-8 (PR-2):
+// REQ-CON-8 (PR-2),
+// REQ-POS-CAMBIO-1..4, REQ-POS-COMPROBANTE-1..3, REQ-POS-HOY-1..4,
+// REQ-POS-57, REQ-POS-58 (pos-redesign):
 //
 // POS main view. Wires useProductos + useVentas + useEvents +
 // useGastosImprevistos + usePreciosEvento + useEventoProductosStore.
@@ -31,14 +33,26 @@
 // map<productoId, number> from `usePreciosEvento.contribucionParaProducto`
 // and forwards it to ProductoCardGrid, which passes each value to
 // the corresponding ProductoCard.
+//
+// pos-redesign (REQ-POS-58): when VITE_FLAG_POS_REDESIGN === 'true',
+// the view also:
+//   - Mounts ResumenVentasHoy (REQ-POS-HOY-1, parallel with productos
+//     via Promise.all).
+//   - Opens ComprobanteVentaDialog after a successful sale (REQ-POS-COMPROBANTE-1,
+//     REQ-POS-14 widened). The comprobante carries the just-created
+//     venta row (with comprobante_numero + monto_recibido + cambio).
+// When the flag is off (default), the new components are NOT
+// rendered — the legacy surface stays untouched.
 import { computed, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import ComprobanteVentaDialog from '@/components/business/ComprobanteVentaDialog.vue'
 import CarritoPanel from '@/components/business/CarritoPanel.vue'
 import GastoImprevistoForm from '@/components/business/GastoImprevistoForm.vue'
 import GastoImprevistoListItem from '@/components/business/GastoImprevistoListItem.vue'
 import ProductoCardGrid from '@/components/business/ProductoCardGrid.vue'
 import RegistrarVentaDialog from '@/components/business/RegistrarVentaDialog.vue'
+import ResumenVentasHoy from '@/components/business/ResumenVentasHoy.vue'
 import { useEvents } from '@/composables/useEvents'
 import { useGastosImprevistos } from '@/composables/useGastosImprevistos'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
@@ -46,13 +60,32 @@ import { useProductos } from '@/composables/useProductos'
 import { useRecipes } from '@/composables/useRecipes'
 import { useVentas } from '@/composables/useVentas'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
-import type { GastoImprevistoInput, Producto, RecetaConIngredientes } from '@/types'
+import type {
+  GastoImprevistoInput,
+  MetodoPago,
+  Producto,
+  RecetaConIngredientes,
+  VentaConItems,
+} from '@/types'
 
 const router = useRouter()
+// pos-redesign (REQ-POS-57, REQ-POS-58): build-time feature flag.
+// Default off — operators opt in per environment via .env.local.
+const FLAG_POS_REDESIGN = import.meta.env.VITE_FLAG_POS_REDESIGN === 'true'
+
 const { cargando: cargandoProductos, error: errorProductos, cargarTodas } = useProductos()
 const { recetas, cargarTodas: cargarRecetas } = useRecipes()
-const { carrito, totalCarrito, eventoEnCurso, agregarAlCarrito, vaciarCarrito, registrarVenta } =
-  useVentas()
+const {
+  carrito,
+  ventas,
+  cargando: cargandoVentas,
+  totalCarrito,
+  eventoEnCurso,
+  agregarAlCarrito,
+  vaciarCarrito,
+  registrarVenta,
+  cargarPorEvento,
+} = useVentas()
 const { cargarTodas: cargarEventos } = useEvents()
 const {
   gastosPorEvento: gastosImprevistosPorEvento,
@@ -98,6 +131,7 @@ const productosMapeados = computed<Producto[]>(() =>
     precio_venta: ep.precio_final,
     disponible: true,
     orden: 0,
+    descripcion: null,
     created_at: ep.created_at,
     updated_at: ep.updated_at,
   })),
@@ -135,14 +169,29 @@ const dialogoCrearImprevisto = ref(false)
 const busqueda = ref('')
 const dialogoRegistrarAbierto = ref(false)
 
+// pos-redesign (REQ-POS-COMPROBANTE-1, REQ-POS-14): the just-registered
+// venta opens the receipt dialog. Held in a ref so the template's
+// v-if can mount the dialog reactively.
+const comprobanteVenta = ref<VentaConItems | null>(null)
+const comprobanteAbierto = ref(false)
+
 // CargarEventos ensures eventoEnCurso is computed. The view fetches
 // eventos, productos, and recetas independently so the guard works
 // even if the user lands on /pos without first visiting /eventos or
 // /productos. usePreciosEvento (PR-2b) joins all three to compute
 // precio_final + costo_unitario for the POS grid.
+//
+// pos-redesign (REQ-POS-HOY-1): when the flag is on, ventas are
+// fetched in parallel with productos — the grid is never blocked by
+// the ventas fetch (REQ-POS-HOY-4).
 onMounted(async () => {
   await cargarEventos()
-  await cargarTodas()
+  const catalogo = cargarTodas()
+  if (FLAG_POS_REDESIGN && eventoEnCurso.value) {
+    await Promise.all([catalogo, cargarPorEvento(eventoEnCurso.value.id)])
+  } else {
+    await catalogo
+  }
   if (recetas.value.length === 0) await cargarRecetas()
 })
 
@@ -203,9 +252,25 @@ function abrirDialogoRegistrar() {
   dialogoRegistrarAbierto.value = true
 }
 
-async function confirmarRegistrar(metodoPago: 'efectivo' | 'transferencia' | 'tarjeta' | 'mixto') {
-  await registrarVenta(metodoPago)
+// pos-redesign (REQ-POS-CAMBIO-3, REQ-POS-COMPROBANTE-1): the dialog
+// now emits an object with metodoPago + optional montoRecibido. We
+// forward montoRecibido to the store and, on success, open the
+// comprobante dialog (REQ-POS-COMPROBANTE-1, REQ-POS-14 widened).
+async function confirmarRegistrar(payload: {
+  metodoPago: MetodoPago
+  montoRecibido?: number | null
+}) {
+  const res = await registrarVenta(payload.metodoPago, payload.montoRecibido ?? undefined)
   dialogoRegistrarAbierto.value = false
+  if (FLAG_POS_REDESIGN && res.data && !res.error) {
+    comprobanteVenta.value = res.data
+    comprobanteAbierto.value = true
+  }
+}
+
+function cerrarComprobante() {
+  comprobanteAbierto.value = false
+  comprobanteVenta.value = null
 }
 
 function reintentar() {
@@ -252,6 +317,14 @@ function reintentar() {
     </v-alert>
 
     <template v-else>
+      <!-- pos-redesign (REQ-POS-58, REQ-POS-HOY-1..4): per-metodo_pago
+           totals panel, gated by the feature flag. -->
+      <ResumenVentasHoy
+        v-if="FLAG_POS_REDESIGN"
+        :ventas="ventas"
+        :cargando="cargandoVentas"
+      />
+
       <!-- REQ-POS-23: search input. Plain HTML <input> to avoid Vuetify
            v-text-field's injectDefaults dependency in test mounts
            (the search field is read-only UX, not a complex form). -->
@@ -404,6 +477,16 @@ function reintentar() {
       :evento="eventoEnCurso"
       @update:model-value="(v) => { dialogoRegistrarAbierto = v }"
       @confirmar="confirmarRegistrar"
+    />
+
+    <!-- pos-redesign (REQ-POS-COMPROBANTE-1): receipt dialog opens
+         after a successful sale (gated by the feature flag). -->
+    <ComprobanteVentaDialog
+      v-if="FLAG_POS_REDESIGN && comprobanteVenta && comprobanteAbierto"
+      :model-value="comprobanteAbierto"
+      :venta="comprobanteVenta"
+      :evento="eventoEnCurso"
+      @update:model-value="cerrarComprobante"
     />
   </v-container>
 </template>

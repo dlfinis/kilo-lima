@@ -120,6 +120,7 @@ describe('usePreciosEvento', () => {
         precio_venta: 0,
         disponible: true,
         orden: 0,
+        descripcion: null,
         created_at: '2026-06-20T00:00:00Z',
         updated_at: '2026-06-20T00:00:00Z',
       })
@@ -157,6 +158,7 @@ describe('usePreciosEvento', () => {
         precio_venta: 0,
         disponible: true,
         orden: 0,
+        descripcion: null,
         created_at: '2026-06-20T00:00:00Z',
         updated_at: '2026-06-20T00:00:00Z',
       })
@@ -197,6 +199,7 @@ describe('usePreciosEvento', () => {
         precio_venta: 0,
         disponible: true,
         orden: 0,
+        descripcion: null,
         created_at: '2026-06-20T00:00:00Z',
         updated_at: '2026-06-20T00:00:00Z',
       })
@@ -223,6 +226,7 @@ describe('usePreciosEvento', () => {
         precio_venta: 12.5,
         disponible: true,
         orden: 0,
+        descripcion: null,
         created_at: '2026-06-20T00:00:00Z',
         updated_at: '2026-06-20T00:00:00Z',
       })
@@ -247,6 +251,7 @@ describe('usePreciosEvento', () => {
           precio_venta: 0,
           disponible: true,
           orden: 0,
+          descripcion: null,
           created_at: '2026-06-20T00:00:00Z',
           updated_at: '2026-06-20T00:00:00Z',
         },
@@ -256,6 +261,7 @@ describe('usePreciosEvento', () => {
           precio_venta: 0,
           disponible: true,
           orden: 1,
+          descripcion: null,
           created_at: '2026-06-20T00:00:00Z',
           updated_at: '2026-06-20T00:00:00Z',
         },
@@ -292,6 +298,7 @@ describe('usePreciosEvento', () => {
         precio_venta: 0,
         disponible: true,
         orden: 0,
+        descripcion: null,
         created_at: '2026-06-20T00:00:00Z',
         updated_at: '2026-06-20T00:00:00Z',
       })
@@ -337,6 +344,7 @@ describe('usePreciosEvento — contribucionParaProducto (REQ-CON-8)', () => {
         precio_venta: 0,
         disponible: true,
         orden: 0,
+        descripcion: null,
         created_at: '2026-06-20T00:00:00Z',
         updated_at: '2026-06-20T00:00:00Z',
       })
@@ -377,6 +385,7 @@ describe('usePreciosEvento — contribucionParaProducto (REQ-CON-8)', () => {
         precio_venta: 0,
         disponible: true,
         orden: 0,
+        descripcion: null,
         created_at: '2026-06-20T00:00:00Z',
         updated_at: '2026-06-20T00:00:00Z',
       })
@@ -423,6 +432,7 @@ describe('usePreciosEvento — contribucionParaProducto (REQ-CON-8)', () => {
         precio_venta: 0,
         disponible: true,
         orden: 0,
+        descripcion: null,
         created_at: '2026-06-20T00:00:00Z',
         updated_at: '2026-06-20T00:00:00Z',
       })
@@ -463,6 +473,7 @@ describe('usePreciosEvento — precioMinimoParaProducto (REQ-CON-8)', () => {
         precio_venta: 0,
         disponible: true,
         orden: 0,
+        descripcion: null,
         created_at: '2026-06-20T00:00:00Z',
         updated_at: '2026-06-20T00:00:00Z',
       })

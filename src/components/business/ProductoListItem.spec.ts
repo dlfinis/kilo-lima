@@ -19,6 +19,7 @@ const mkProducto = (overrides: Partial<Producto> = {}): Producto => ({
   precio_venta: 5,
   disponible: true,
   orden: 0,
+  descripcion: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -52,5 +53,29 @@ describe('ProductoListItem', () => {
 
     expect(wrapper.emitted('toggle')).toBeTruthy()
     expect(wrapper.emitted('eliminar')).toBeTruthy()
+  })
+
+  // productos-mejoras / producto-descripcion: descripcion surfaces as
+  // a secondary subtitle line when present, falling back to price-only
+  // when null.
+  it('renders descripcion as the subtitle when present (productos-mejoras)', () => {
+    const wrapper = mountItem({
+      producto: mkProducto({ descripcion: 'Pan de masa madre' }),
+    })
+    expect(wrapper.text()).toContain('Pan de masa madre')
+    // The price line is rendered as a separate small caption so the
+    // subtitle slot stays for descripcion.
+    expect(wrapper.find('[data-testid="producto-item-precio-p-1"]').exists()).toBe(true)
+  })
+
+  it('hides the descripcion subtitle when descripcion is null', () => {
+    const wrapper = mountItem({ producto: mkProducto({ descripcion: null }) })
+    // No descripcion subtitle line is rendered when descripcion is null.
+    expect(
+      wrapper.find('[data-testid="producto-item-descripcion-p-1"]').exists(),
+    ).toBe(false)
+    // Price line lives in the original subtitle slot (no descripcion).
+    const precio = wrapper.find('[data-testid="producto-item-precio-p-1"]')
+    expect(precio.exists()).toBe(true)
   })
 })

@@ -70,6 +70,9 @@ const mkVentaConItems = (
   fecha,
   total,
   metodo_pago: 'efectivo',
+  monto_recibido: null,
+  cambio: null,
+  comprobante_numero: null,
   created_at: fecha,
   items: items.map((it) => ({
     id: it.id,

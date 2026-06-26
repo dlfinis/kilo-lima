@@ -22,6 +22,9 @@ const mkVenta = (overrides: Partial<Venta> = {}): Venta => ({
   fecha: '2026-06-19T10:00:00Z',
   total: overrides.total ?? 10,
   metodo_pago: overrides.metodo_pago ?? 'efectivo',
+  monto_recibido: overrides.monto_recibido ?? null,
+  cambio: overrides.cambio ?? null,
+  comprobante_numero: overrides.comprobante_numero ?? null,
   created_at: '2026-06-19T10:00:00Z',
   ...overrides,
 })

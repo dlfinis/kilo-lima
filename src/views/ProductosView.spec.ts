@@ -28,6 +28,7 @@ const mkProducto = (id: string, overrides: Partial<Producto> = {}): Producto => 
   precio_venta: 5,
   disponible: true,
   orden: 0,
+  descripcion: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,

@@ -1,7 +1,7 @@
 // REQ-POS-6, REQ-POS-7, REQ-POS-8, REQ-POS-9, REQ-POS-10, REQ-POS-11,
 // REQ-POS-12, REQ-POS-13, REQ-POS-14, REQ-POS-15, REQ-POS-16,
 // REQ-POS-17, REQ-POS-39, REQ-POS-51, REQ-POS-55, REQ-POS-56,
-// REQ-FIN-28..32, REQ-FIN-31 (sale-time COGS snapshot):
+// REQ-FIN-28..32, REQ-FIN-31 (PR-2b sale-time COGS snapshot):
 //
 // Cart math tests (PR1 skeleton — preserved) plus PR3 additions:
 //   - cargarPorEvento loads ventas for the active evento
@@ -17,6 +17,14 @@
 //   - registrarVenta forwards the snapshot columns to the items insert
 //   - COGS is FROZEN at add-to-cart time — updating receta costs after
 //     the line is in the cart does NOT mutate the line's costo_unitario
+//
+// pos-redesign (REQ-POS-CAMBIO-2, REQ-POS-CAMBIO-4, REQ-POS-COMPROBANTE-4,
+// REQ-POS-COMPROBANTE-5):
+//   - MONTO_INSUFICIENTE: registrarVenta rejects when metodo_pago =
+//     efectivo and montoRecibido < total.
+//   - cambio persisted from calcularCambio(total, montoRecibido).
+//   - comprobante_numero generated via service.generarComprobanteNumero
+//     and forwarded on the header insert; the response includes it.
 //
 // Cross-store READS (eventsStore.eventos, productosStore, recipesStore,
 // eventoProductosStore) happen inside `computed` / actions — WRITES
@@ -70,6 +78,7 @@ const mkProducto = (id: string, overrides: Partial<Producto> = {}): Producto => 
   precio_venta: 5,
   disponible: true,
   orden: 0,
+  descripcion: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -122,6 +131,9 @@ const mkVenta = (overrides: Partial<VentaConItems> = {}): VentaConItems => ({
   fecha: '2026-06-19T00:00:00Z',
   total: 10,
   metodo_pago: 'efectivo',
+  monto_recibido: null,
+  cambio: null,
+  comprobante_numero: null,
   created_at: '2026-06-19T00:00:00Z',
   items: [],
   ...overrides,
@@ -476,6 +488,10 @@ describe('useVentasStore — registrarVenta (REQ-POS-12, REQ-POS-14, REQ-POS-15,
     await conContexto(async () => {
       const store = useVentasStore()
       store.agregarAlCarrito('p-1', 2)
+      // pos-redesign: the store calls generarComprobanteNumero first
+      // (consumes the count query response). Pushed first so the
+      // service reads it before the header insert.
+      __pushSupabaseResponse<unknown>({ data: null, error: null })
       __pushSupabaseResponse<VentaConItems>({
         data: mkVenta({ id: 'v-1', evento_id: 'e-1', total: 10 }),
         error: null,
@@ -509,6 +525,8 @@ describe('useVentasStore — registrarVenta (REQ-POS-12, REQ-POS-14, REQ-POS-15,
     await conContexto(async () => {
       const store = useVentasStore()
       store.agregarAlCarrito('p-1', 1)
+      // pos-redesign: count query first.
+      __pushSupabaseResponse<unknown>({ data: null, error: null })
       __pushSupabaseResponse<VentaConItems>({
         data: null,
         error: { code: 'PGRST301', message: 'connection lost' },
@@ -529,6 +547,7 @@ describe('useVentasStore — registrarVenta (REQ-POS-12, REQ-POS-14, REQ-POS-15,
     await conContexto(async () => {
       const store = useVentasStore()
       store.agregarAlCarrito('p-1', 1)
+      __pushSupabaseResponse<unknown>({ data: null, error: null })
       __pushSupabaseResponse<VentaConItems>({
         data: mkVenta({ id: 'v-1', evento_id: 'e-1', total: 5 }),
         error: null,
@@ -567,6 +586,7 @@ describe('useVentasStore — registrarVenta (REQ-POS-12, REQ-POS-14, REQ-POS-15,
       const store = useVentasStore()
       store.agregarAlCarrito('p-1', 1)
 
+      __pushSupabaseResponse<unknown>({ data: null, error: null })
       __pushSupabaseResponse<VentaConItems>({
         data: mkVenta({ id: 'v-1', evento_id: 'e-1', total: 16.67 }),
         error: null,
@@ -607,6 +627,184 @@ describe('useVentasStore — registrarVenta (REQ-POS-12, REQ-POS-14, REQ-POS-15,
       const store = useVentasStore()
       expect(store.eventoEnCurso?.id).toBe('e-42')
       expect(store.eventoEnCurso?.estado).toBe('en_curso')
+    })
+  })
+})
+
+// pos-redesign (REQ-POS-CAMBIO-4, REQ-POS-COMPROBANTE-4,
+// REQ-POS-COMPROBANTE-5): MONTO_INSUFICIENTE guard, cambio persistence,
+// comprobante_numero generation.
+describe('useVentasStore — registrarVenta pos-redesign (REQ-POS-CAMBIO-4, REQ-POS-COMPROBANTE-4)', () => {
+  it('returns MONTO_INSUFICIENTE when efectivo + montoRecibido < total (REQ-POS-CAMBIO-4)', async () => {
+    sembrarEventoEnCurso()
+    sembrarProducto('p-1', { margen: 0 }) // precio = costo = 5; cart total = 5
+    await conContexto(async () => {
+      const store = useVentasStore()
+      store.agregarAlCarrito('p-1', 1)
+      // Customer pays $3 for a $5 sale.
+      const res = await store.registrarVenta('efectivo', 3)
+      expect(res.error?.code).toBe('MONTO_INSUFICIENTE')
+      // Cart must remain intact (revert on validation failure).
+      expect(store.carrito).toHaveLength(1)
+    })
+  })
+
+  it('forwards monto_recibido + cambio + comprobante_numero to the ventas insert (REQ-POS-CAMBIO-5, REQ-POS-COMPROBANTE-4)', async () => {
+    sembrarEventoEnCurso()
+    sembrarProducto('p-1', { margen: 0 })
+    await conContexto(async () => {
+      const store = useVentasStore()
+      store.agregarAlCarrito('p-1', 1) // total = 5
+
+      // The store calls servicio.generarComprobanteNumero first (count
+      // query), then the header insert. Mock both responses.
+      __pushSupabaseResponse<unknown>({
+        data: null,
+        error: null,
+        // `count` rides on the response when count: 'exact' is set on
+        // the query — the mocked builder exposes it via a separate
+        // `count` field; the service ignores it and reads
+        // `respuesta.count`.
+      })
+      // The chainable mock in tests/setup doesn't capture the `count`
+      // option, so we surface the number via a side-channel: pre-seed
+      // the ventas array directly so generarComprobanteNumero reads
+      // count = 0 and returns V-001. (We verify the wiring by reading
+      // the insert payload, not the helper's return value.)
+
+      __pushSupabaseResponse<VentaConItems>({
+        data: {
+          ...mkVenta({
+            id: 'v-1',
+            evento_id: 'e-1',
+            total: 5,
+            monto_recibido: 10,
+            cambio: 5,
+            comprobante_numero: 'V-001',
+          }),
+          items: [],
+        },
+        error: null,
+      })
+      __pushSupabaseResponse<unknown>({
+        data: [
+          {
+            id: 'vi-1',
+            venta_id: 'v-1',
+            producto_id: 'p-1',
+            cantidad: 1,
+            precio_unitario: 5,
+            subtotal: 5,
+          },
+        ],
+        error: null,
+      })
+
+      const res = await store.registrarVenta('efectivo', 10)
+      expect(res.error).toBeNull()
+      expect(res.data?.monto_recibido).toBe(10)
+      expect(res.data?.cambio).toBe(5)
+      expect(res.data?.comprobante_numero).toBe('V-001')
+
+      const inserciones = __getSupabaseMockCalls().filter((l) => l.metodo === 'insert')
+      const headerArgs = inserciones[0]?.args[0] as Record<string, unknown>
+      expect(headerArgs.monto_recibido).toBe(10)
+      expect(headerArgs.cambio).toBe(5)
+      expect(headerArgs.comprobante_numero).toBe('V-001')
+    })
+  })
+
+  it('persists null monto_recibido + cambio when metodo_pago is transferencia (REQ-POS-CAMBIO-5)', async () => {
+    sembrarEventoEnCurso()
+    sembrarProducto('p-1', { margen: 0 })
+    await conContexto(async () => {
+      const store = useVentasStore()
+      store.agregarAlCarrito('p-1', 1)
+
+      __pushSupabaseResponse<unknown>({ data: null, error: null })
+      __pushSupabaseResponse<VentaConItems>({
+        data: {
+          ...mkVenta({
+            id: 'v-1',
+            evento_id: 'e-1',
+            total: 5,
+            metodo_pago: 'transferencia',
+            monto_recibido: null,
+            cambio: null,
+            comprobante_numero: 'V-001',
+          }),
+          items: [],
+        },
+        error: null,
+      })
+      __pushSupabaseResponse<unknown>({
+        data: [
+          {
+            id: 'vi-1',
+            venta_id: 'v-1',
+            producto_id: 'p-1',
+            cantidad: 1,
+            precio_unitario: 5,
+            subtotal: 5,
+          },
+        ],
+        error: null,
+      })
+
+      const res = await store.registrarVenta('transferencia')
+      expect(res.error).toBeNull()
+
+      const inserciones = __getSupabaseMockCalls().filter((l) => l.metodo === 'insert')
+      const headerArgs = inserciones[0]?.args[0] as Record<string, unknown>
+      expect(headerArgs.monto_recibido).toBeNull()
+      expect(headerArgs.cambio).toBeNull()
+      // comprobante_numero is always generated (the receipt dialog
+      // shows for every sale, not just efectivo).
+      expect(headerArgs.comprobante_numero).toBe('V-001')
+    })
+  })
+
+  it('computes cambio = montoRecibido − total via calcularCambio (REQ-POS-CAMBIO-2)', async () => {
+    sembrarEventoEnCurso()
+    sembrarProducto('p-1', { margen: 0 }) // precio=5
+    await conContexto(async () => {
+      const store = useVentasStore()
+      store.agregarAlCarrito('p-1', 1) // total = 5
+
+      __pushSupabaseResponse<unknown>({ data: null, error: null })
+      __pushSupabaseResponse<VentaConItems>({
+        data: {
+          ...mkVenta({
+            id: 'v-1',
+            evento_id: 'e-1',
+            total: 5,
+            monto_recibido: 10,
+            cambio: 5,
+            comprobante_numero: 'V-001',
+          }),
+          items: [],
+        },
+        error: null,
+      })
+      __pushSupabaseResponse<unknown>({
+        data: [
+          {
+            id: 'vi-1',
+            venta_id: 'v-1',
+            producto_id: 'p-1',
+            cantidad: 1,
+            precio_unitario: 5,
+            subtotal: 5,
+          },
+        ],
+        error: null,
+      })
+
+      await store.registrarVenta('efectivo', 10)
+      const inserciones = __getSupabaseMockCalls().filter((l) => l.metodo === 'insert')
+      const headerArgs = inserciones[0]?.args[0] as Record<string, unknown>
+      // montoRecibido=10, total=5 → cambio=5
+      expect(headerArgs.cambio).toBe(5)
     })
   })
 })

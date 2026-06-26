@@ -24,10 +24,17 @@ import type {
 
 // Input shape for `registrarVenta`. Lives next to the service because
 // it is the caller's contract — the cart hands it in already priced.
+//
+// pos-redesign (REQ-POS-CAMBIO-5, REQ-POS-COMPROBANTE-5): the three
+// cash-back / receipt columns are optional — the store derives them
+// from montoRecibido + the active evento (comprobante_numero).
 export interface VentaConItemsInput {
   evento_id: string
   metodo_pago: MetodoPago
   total: number
+  monto_recibido?: number | null
+  cambio?: number | null
+  comprobante_numero?: string | null
   items: VentaItemInput[]
 }
 
@@ -40,6 +47,12 @@ export interface VentasService {
     input: VentaConItemsInput,
   ): Promise<{ data: VentaConItems | null; error: ServiceError | null }>
   eliminar(id: string): Promise<{ data: null; error: ServiceError | null }>
+  // pos-redesign (REQ-POS-COMPROBANTE-4): returns the next sequential
+  // comprobante_numero (`V-001`, `V-002`, ...) for the given evento.
+  // Uses COUNT(*) + 1 — AD1 in the design. Single-user PWA: no
+  // concurrent writers in practice; the unique partial index catches
+  // a rare collision (23505) so the caller can retry.
+  generarComprobanteNumero(eventoId: string): Promise<string>
 }
 
 const SIN_ITEMS: ServiceError = {
@@ -80,12 +93,18 @@ export function crearVentasService(supabase: SupabaseClient<Database>): VentasSe
       }
 
       // 1) Header insert — returns the venta id used to tag each item.
+      // pos-redesign: forward the cash-back + comprobante_numero cols
+      // when the caller provides them (store-derives them; service
+      // stays dumb and just forwards).
       const insercion = await supabase
         .from('ventas')
         .insert({
           evento_id: input.evento_id,
           metodo_pago: input.metodo_pago,
           total: input.total,
+          monto_recibido: input.monto_recibido ?? null,
+          cambio: input.cambio ?? null,
+          comprobante_numero: input.comprobante_numero ?? null,
         } as Database['public']['Tables']['ventas']['Insert'])
         .select()
         .single()
@@ -135,6 +154,24 @@ export function crearVentasService(supabase: SupabaseClient<Database>): VentasSe
       // the child rows automatically.
       const respuesta = await supabase.from('ventas').delete().eq('id', id)
       return { data: null, error: respuesta.error }
+    },
+
+    async generarComprobanteNumero(eventoId: string): Promise<string> {
+      // REQ-POS-COMPROBANTE-4: COUNT(*) + 1 per evento. `head: true`
+      // skips fetching the row bodies — we only need the count.
+      // Filters by evento_id AND comprobante_numero IS NOT NULL so
+      // legacy rows (null comprobante_numero) don't break the
+      // sequence.
+      const respuesta = await supabase
+        .from('ventas')
+        .select('*', { count: 'exact', head: true })
+        .eq('evento_id', eventoId)
+        .not('comprobante_numero', 'is', null)
+      const count = respuesta.count ?? 0
+      // ServiceError from the underlying query is intentionally
+      // swallowed as a generation failure — the caller can retry. We
+      // do not throw (never-throw LSP contract).
+      return `V-${String(count + 1).padStart(3, '0')}`
     },
   }
 }

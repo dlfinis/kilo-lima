@@ -3,7 +3,14 @@
 // the total, the active evento, and lets the user pick a metodo_pago.
 // The parent (PosView) wires the actual `registrarVenta` call so the
 // optimistic UI / revert-on-failure lives in the store, not here.
-import { ref, watch } from 'vue'
+//
+// pos-redesign (REQ-POS-CAMBIO-1..3, REQ-POS-57): when metodo_pago is
+// `efectivo`, the dialog renders a monto_recibido input, a live cambio
+// preview, and an EXACTO button. The `confirmar` emit now carries the
+// optional montoRecibido so the store can validate (MONTO_INSUFICIENTE
+// when monto < total). For non-efectivo methods, the cash-back fields
+// are hidden and the emit omits montoRecibido.
+import { computed, ref, watch } from 'vue'
 
 import type { Evento, MetodoPago } from '@/types'
 
@@ -15,7 +22,10 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   'update:modelValue': [value: boolean]
-  confirmar: [metodoPago: MetodoPago]
+  // pos-redesign (REQ-POS-CAMBIO-3): widened contract — emits an
+  // object with the metodoPago and the optional montoRecibido.
+  // Caller (PosView) destructures and forwards to the store.
+  confirmar: [payload: { metodoPago: MetodoPago; montoRecibido?: number | null }]
 }>()
 
 const metodoPago = ref<MetodoPago>('efectivo')
@@ -26,10 +36,46 @@ const opciones: { value: MetodoPago; label: string }[] = [
   { value: 'mixto', label: 'Mixto' },
 ]
 
+// pos-redesign: cash-back input (REQ-POS-CAMBIO-1). Null when the
+// dialog first opens — the operator must opt in by typing a value
+// OR by tapping EXACTO. Reactive via v-model on the text field.
+const montoRecibido = ref<number | null>(null)
+
+// pos-redesign (REQ-POS-CAMBIO-2): live cambio = montoRecibido −
+// total. Rounded to 2 decimals via the same rounding policy the store
+// uses (calcularCambio semantics). Null when montoRecibido is null
+// (no preview yet — shows nothing instead of "Cambio: 0").
+const cambio = computed<number | null>(() => {
+  if (montoRecibido.value === null || montoRecibido.value === undefined) return null
+  return Math.round((montoRecibido.value - props.total + Number.EPSILON) * 100) / 100
+})
+
+// pos-redesign (REQ-POS-CAMBIO-3): EXACTO button handler — sets the
+// input to the exact total so cambio = 0. Exposed via `defineExpose`
+// so the test suite can call it directly (the template uses a
+// `@click` binding; the handler does not need to be in the template
+// scope if we expose it).
+function exacto(): void {
+  montoRecibido.value = props.total
+}
+// pos-redesign (T14 testability): tests need to switch metodoPago
+// without going through the v-select (which is in the Teleport target
+// and can't be reached via wrapper.find). `establecerMetodoPago` is a
+// pure setter that mutates the same ref the v-select binds to.
+function establecerMetodoPago(metodo: MetodoPago): void {
+  metodoPago.value = metodo
+}
+defineExpose({ exacto, montoRecibido, cambio, alConfirmar, establecerMetodoPago })
+
 watch(
   () => props.modelValue,
   (abierto) => {
-    if (abierto) metodoPago.value = 'efectivo'
+    if (abierto) {
+      metodoPago.value = 'efectivo'
+      // Reset the cash-back input on each open so the operator
+      // doesn't carry the previous sale's value into a new dialog.
+      montoRecibido.value = null
+    }
   },
 )
 
@@ -37,6 +83,24 @@ const totalTexto = new Intl.NumberFormat('es-MX', {
   style: 'currency',
   currency: 'USD',
 }).format(props.total)
+
+const cambioTexto = computed<string>(() => {
+  if (cambio.value === null) return ''
+  return new Intl.NumberFormat('es-MX', {
+    style: 'currency',
+    currency: 'USD',
+  }).format(cambio.value)
+})
+
+function alConfirmar(): void {
+  emit('confirmar', {
+    metodoPago: metodoPago.value,
+    // Only forward montoRecibido when metodo_pago === 'efectivo'. For
+    // other methods the store ignores it anyway, but we keep the
+    // payload narrow to make the contract obvious.
+    montoRecibido: metodoPago.value === 'efectivo' ? montoRecibido.value : undefined,
+  })
+}
 </script>
 
 <template>
@@ -65,6 +129,35 @@ const totalTexto = new Intl.NumberFormat('es-MX', {
           label="Método de pago"
           data-testid="registrar-venta-metodo"
         />
+
+        <!-- pos-redesign (REQ-POS-CAMBIO-1): monto_recibido input
+             shown only when metodo_pago === 'efectivo'. Other
+             methods have no cash-back math. -->
+        <template v-if="metodoPago === 'efectivo'">
+          <v-text-field
+            v-model.number="montoRecibido"
+            type="number"
+            label="Monto recibido"
+            prepend-inner-icon="mdi-cash"
+            data-testid="registrar-venta-monto"
+            class="mt-2"
+            min="0"
+            step="0.01"
+          />
+          <div class="d-flex align-center ga-2 mb-2">
+            <v-btn
+              size="small"
+              variant="tonal"
+              data-testid="registrar-venta-exacto"
+              @click="exacto"
+            >
+              Exacto
+            </v-btn>
+            <span v-if="cambioTexto" class="text-medium-emphasis">
+              Cambio: <strong>{{ cambioTexto }}</strong>
+            </span>
+          </div>
+        </template>
       </v-card-text>
       <v-card-actions>
         <v-spacer />
@@ -78,7 +171,7 @@ const totalTexto = new Intl.NumberFormat('es-MX', {
         <v-btn
           color="primary"
           data-testid="registrar-venta-confirmar"
-          @click="emit('confirmar', metodoPago)"
+          @click="alConfirmar"
         >
           Registrar
         </v-btn>

@@ -26,6 +26,8 @@ const props = withDefaults(
   { valoresIniciales: null, recetaIdInicial: '' },
 )
 
+const MAX_DESCRIPCION = 500
+
 const emit = defineEmits<{
   submit: [input: ProductoInput]
   cancel: []
@@ -35,7 +37,11 @@ const recetaId = ref<string>('')
 const precioVenta = ref<number>(0)
 const disponible = ref<boolean>(true)
 const orden = ref<number>(0)
-const errores = ref<{ precio?: string; receta?: string }>({})
+// productos-mejoras / producto-descripcion: optional free-text field.
+// Nullable in the DB (≤ 500 chars); empty string → null on submit so
+// the form mirrors the DB state without keeping an empty string around.
+const descripcion = ref<string>('')
+const errores = ref<{ precio?: string; receta?: string; descripcion?: string }>({})
 
 watch(
   () => [props.valoresIniciales, props.recetaIdInicial] as const,
@@ -45,11 +51,13 @@ watch(
       precioVenta.value = v.precio_venta
       disponible.value = v.disponible
       orden.value = v.orden
+      descripcion.value = v.descripcion ?? ''
     } else {
       recetaId.value = inicial ?? ''
       precioVenta.value = 0
       disponible.value = true
       orden.value = 0
+      descripcion.value = ''
     }
     errores.value = {}
   },
@@ -57,13 +65,21 @@ watch(
 )
 
 const formularioValido = computed(
-  () => recetaId.value !== '' && precioVenta.value > 0 && Number.isFinite(orden.value) && orden.value >= 0,
+  () =>
+    recetaId.value !== '' &&
+    precioVenta.value > 0 &&
+    Number.isFinite(orden.value) &&
+    orden.value >= 0 &&
+    descripcion.value.length <= MAX_DESCRIPCION,
 )
 
 function validar(): boolean {
   const nuevos: typeof errores.value = {}
   if (!recetaId.value) nuevos.receta = 'Seleccioná una receta'
   if (!(precioVenta.value > 0)) nuevos.precio = 'El precio de venta debe ser mayor a 0'
+  if (descripcion.value.length > MAX_DESCRIPCION) {
+    nuevos.descripcion = `Máximo ${MAX_DESCRIPCION} caracteres`
+  }
   errores.value = nuevos
   return Object.keys(nuevos).length === 0
 }
@@ -75,6 +91,9 @@ function onSubmit() {
     precio_venta: precioVenta.value,
     disponible: disponible.value,
     orden: orden.value,
+    // Coerce empty string to null so the DB row matches the schema
+    // contract (nullable, no defaults).
+    descripcion: descripcion.value.trim() === '' ? null : descripcion.value,
   }
   emit('submit', payload)
 }
@@ -103,6 +122,15 @@ function onCancelar() {
       step="0.01"
       :error-messages="errores.precio ? [errores.precio] : []"
       data-testid="producto-precio"
+    />
+    <v-textarea
+      v-model="descripcion"
+      label="Descripción (opcional)"
+      rows="2"
+      :counter="MAX_DESCRIPCION"
+      :maxlength="MAX_DESCRIPCION"
+      :error-messages="errores.descripcion ? [errores.descripcion] : []"
+      data-testid="producto-descripcion"
     />
     <v-text-field
       v-model.number="orden"

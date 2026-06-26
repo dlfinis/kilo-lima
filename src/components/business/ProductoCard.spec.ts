@@ -21,6 +21,7 @@ const mkProducto = (overrides: Partial<Producto> = {}): Producto => ({
   precio_venta: 5,
   disponible: true,
   orden: 0,
+  descripcion: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -89,5 +90,21 @@ describe('ProductoCard', () => {
     expect(badge.exists()).toBe(true)
     expect(badge.text()).toContain('Contribución')
     expect(badge.text()).toContain('5.00')
+  })
+
+  // productos-mejoras / producto-descripcion: descripcion renders
+  // below the receta name when present, hidden when null.
+  it('renders descripcion as a small caption when present (productos-mejoras)', () => {
+    const wrapper = mountCard({
+      producto: mkProducto({ descripcion: 'Pan de masa madre artesanal' }),
+    })
+    const caption = wrapper.find('[data-testid="producto-card-descripcion"]')
+    expect(caption.exists()).toBe(true)
+    expect(caption.text()).toBe('Pan de masa madre artesanal')
+  })
+
+  it('hides the descripcion caption when descripcion is null', () => {
+    const wrapper = mountCard({ producto: mkProducto({ descripcion: null }) })
+    expect(wrapper.find('[data-testid="producto-card-descripcion"]').exists()).toBe(false)
   })
 })

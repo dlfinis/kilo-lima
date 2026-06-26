@@ -46,6 +46,9 @@ const mkVenta = (overrides: Partial<VentaConItems> = {}): VentaConItems => ({
   fecha: '2026-06-19T00:00:00Z',
   total: 5,
   metodo_pago: 'efectivo',
+  monto_recibido: null,
+  cambio: null,
+  comprobante_numero: null,
   created_at: '2026-06-19T00:00:00Z',
   items: [],
   ...overrides,
@@ -252,5 +255,42 @@ describe('ventas.service — eliminar (REQ-POS-12, REQ-POS-19)', () => {
     const llamadas = __getSupabaseMockCalls()
     expect(llamadas.some((l) => l.metodo === 'delete')).toBe(true)
     expect(llamadas.some((l) => l.metodo === 'eq' && l.args[0] === 'id' && l.args[1] === 'v-1')).toBe(true)
+  })
+})
+
+// pos-redesign (REQ-POS-COMPROBANTE-4): sequential comprobante_numero
+// generation per evento. The mocked Supabase chain returns `count:
+// undefined`, so the service falls back to `count + 1 = 1` → "V-001".
+describe('ventas.service — generarComprobanteNumero (REQ-POS-COMPROBANTE-4)', () => {
+  it('returns V-001 for the first comprobante in an evento', async () => {
+    __pushSupabaseResponse<unknown>({ data: null, error: null })
+    const res = await servicio.generarComprobanteNumero('e-1')
+    expect(res).toBe('V-001')
+    // Verify the query shape: from ventas, scoped to evento_id, and
+    // filtered by comprobante_numero NOT NULL (legacy-safe count).
+    const llamadas = __getSupabaseMockCalls()
+    expect(llamadas.some((l) => l.metodo === 'from' && l.args[0] === 'ventas')).toBe(true)
+    expect(
+      llamadas.some(
+        (l) => l.metodo === 'select' && (l.args[0] as string).includes('*'),
+      ),
+    ).toBe(true)
+    expect(llamadas.some((l) => l.metodo === 'eq' && l.args[0] === 'evento_id' && l.args[1] === 'e-1')).toBe(true)
+    expect(
+      llamadas.some(
+        (l) =>
+          l.metodo === 'not' &&
+          l.args[0] === 'comprobante_numero' &&
+          l.args[1] === 'is' &&
+          l.args[2] === null,
+      ),
+    ).toBe(true)
+  })
+
+  it('returns a 3-digit zero-padded comprobante_numero (format invariant)', async () => {
+    __pushSupabaseResponse<unknown>({ data: null, error: null })
+    const res = await servicio.generarComprobanteNumero('e-1')
+    // V-001 is the only format the helper produces.
+    expect(res).toMatch(/^V-\d{3}$/)
   })
 })

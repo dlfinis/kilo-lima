@@ -24,6 +24,7 @@ const mkProducto = (overrides: Partial<Producto> = {}): Producto => ({
   precio_venta: 5,
   disponible: true,
   orden: 0,
+  descripcion: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -124,6 +125,7 @@ describe('crearProductosService', () => {
         precio_venta: 7.5,
         disponible: true,
         orden: 0,
+        descripcion: null,
       })
 
       expect(error).toBeNull()
@@ -144,6 +146,7 @@ describe('crearProductosService', () => {
         precio_venta: 5,
         disponible: true,
         orden: 0,
+        descripcion: null,
       })
 
       expect(data).toBeNull()
@@ -161,6 +164,7 @@ describe('crearProductosService', () => {
         precio_venta: 5,
         disponible: true,
         orden: 0,
+        descripcion: null,
       })
 
       expect(data).toBeNull()

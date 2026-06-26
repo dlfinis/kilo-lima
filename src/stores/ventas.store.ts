@@ -42,6 +42,7 @@ import type {
   VentaConItems,
 } from '@/types'
 import { estadoEsEditable } from '@/utils/estado'
+import { calcularCambio } from '@/utils/cambio'
 import { crearVentasService, type VentasService } from '@/services/ventas.service'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useEventoProductosStore } from './eventoProductos.store'
@@ -63,6 +64,14 @@ const CODIGO_EVENTO_CERRADO: ServiceError = {
 const CODIGO_VENTA_SIN_ITEMS: ServiceError = {
   code: 'VENTA_SIN_ITEMS',
   message: 'El carrito está vacío',
+}
+// pos-redesign (REQ-POS-CAMBIO-4): the dialog emits `montoRecibido`
+// when metodo_pago === 'efectivo'. If it's below the total the store
+// rejects with this typed error before any optimistic UI fires — the
+// cart is untouched so the operator can correct the input and retry.
+const CODIGO_MONTO_INSUFICIENTE: ServiceError = {
+  code: 'MONTO_INSUFICIENTE',
+  message: 'El monto recibido es menor que el total',
 }
 
 export type ToastVenta =
@@ -201,6 +210,10 @@ export const useVentasStore = defineStore('ventas', () => {
 
   async function registrarVenta(
     metodoPago: MetodoPago,
+    // pos-redesign (REQ-POS-CAMBIO-4): optional montoRecibido from the
+    // dialog when metodo_pago === 'efectivo'. Ignored (null stored) for
+    // other metodos.
+    montoRecibido?: number | null,
   ): Promise<{ data: VentaConItems | null; error: ServiceError | null }> {
     // 1) Empty-cart guard (REQ-POS-15, REQ-POS-17).
     if (carrito.value.length === 0) {
@@ -227,14 +240,40 @@ export const useVentasStore = defineStore('ventas', () => {
       return { data: null, error: CODIGO_EVENTO_CERRADO }
     }
 
+    // pos-redesign (REQ-POS-CAMBIO-4): validate EFECTIVO payment
+    // BEFORE the optimistic clear so a short payment never blows away
+    // the cart. The dialog always supplies `montoRecibido` when
+    // metodo_pago === 'efectivo'; if the caller did NOT pass it
+    // (legacy path / direct store call without dialog), we treat the
+    // validation as "not requested" — the previous behavior — so this
+    // store remains backward compatible with the PR-2b tests.
+    const totalPrev = totalCarrito.value
+    if (metodoPago === 'efectivo' && montoRecibido !== undefined && montoRecibido !== null) {
+      if (montoRecibido < totalPrev) {
+        toast.value = {
+          tipo: 'error',
+          mensaje: CODIGO_MONTO_INSUFICIENTE.message,
+        }
+        return { data: null, error: CODIGO_MONTO_INSUFICIENTE }
+      }
+    }
+
     // 4) Snapshot carrito + clear immediately (REQ-POS-14 optimistic).
     const snapshot = carrito.value.map((l) => ({ ...l }))
-    const total = totalCarrito.value
+    const total = totalPrev
     carrito.value = []
     toast.value = {
       tipo: 'success',
       mensaje: `🎉 Venta registrada: $${total.toFixed(2)}`,
     }
+
+    // pos-redesign (REQ-POS-CAMBIO-2, REQ-POS-CAMBIO-5): derive cambio
+    // for efectivo via the pure util; null for non-efectivo. Receipt
+    // numbering is generated per AD1 (COUNT(*) + 1) — every sale
+    // (regardless of metodo) gets a comprobante_numero so the dialog
+    // can render for non-efectivo too.
+    const cambio = metodoPago === 'efectivo' ? calcularCambio(total, montoRecibido ?? null) : null
+    const comprobanteNumero = await servicio.generarComprobanteNumero(evento.id)
 
     // 5) Call service. On failure: restore snapshot + swap toast.
     // REQ-FIN-31: forward the snapshotted COGS columns so the
@@ -243,6 +282,9 @@ export const useVentasStore = defineStore('ventas', () => {
       evento_id: evento.id,
       metodo_pago: metodoPago,
       total,
+      monto_recibido: metodoPago === 'efectivo' ? (montoRecibido ?? null) : null,
+      cambio,
+      comprobante_numero: comprobanteNumero,
       items: snapshot.map((l) => ({
         producto_id: l.producto_id,
         cantidad: l.cantidad,
@@ -284,5 +326,6 @@ export const useVentasStore = defineStore('ventas', () => {
     CODIGO_SIN_EVENTO,
     CODIGO_EVENTO_CERRADO,
     CODIGO_VENTA_SIN_ITEMS,
+    CODIGO_MONTO_INSUFICIENTE,
   }
 })

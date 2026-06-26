@@ -20,7 +20,29 @@ defineEmits<{
 <template>
   <v-list-item data-testid="producto-item">
     <v-list-item-title>{{ nombreReceta }}</v-list-item-title>
-    <v-list-item-subtitle>
+    <!-- productos-mejoras / producto-descripcion: shown as the
+         subtitle line when present. Falls back to the price-only
+         subtitle when descripcion is null so the row stays compact. -->
+    <v-list-item-subtitle
+      v-if="producto.descripcion"
+      :data-testid="`producto-item-descripcion-${producto.id}`"
+    >
+      {{ producto.descripcion }}
+    </v-list-item-subtitle>
+    <v-list-item-subtitle
+      v-else
+      :data-testid="`producto-item-precio-${producto.id}`"
+    >
+      {{ formatearUSD(producto.precio_venta) }}
+      <span v-if="!producto.disponible" class="text-warning ml-2" data-testid="producto-item-baja">
+        · No disponible
+      </span>
+    </v-list-item-subtitle>
+    <v-list-item-subtitle
+      v-if="producto.descripcion"
+      :data-testid="`producto-item-precio-${producto.id}`"
+      class="text-caption"
+    >
       {{ formatearUSD(producto.precio_venta) }}
       <span v-if="!producto.disponible" class="text-warning ml-2" data-testid="producto-item-baja">
         · No disponible

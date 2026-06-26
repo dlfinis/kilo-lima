@@ -23,6 +23,9 @@ export interface Producto {
   precio_venta: number
   disponible: boolean
   orden: number
+  // productos-mejoras / producto-descripcion: nullable free-text
+  // description (≤ 500 chars, enforced DB-side). Optional on create.
+  descripcion: string | null
   created_at: string
   updated_at: string
 }
@@ -35,6 +38,12 @@ export interface Venta {
   fecha: string
   total: number
   metodo_pago: MetodoPago
+  // pos-redesign (REQ-POS-CAMBIO-5, REQ-POS-COMPROBANTE-5): cash-back
+  // columns + sequential receipt number per evento. Nullable for
+  // legacy rows and non-efectivo sales.
+  monto_recibido: number | null
+  cambio: number | null
+  comprobante_numero: string | null
   created_at: string
 }
 

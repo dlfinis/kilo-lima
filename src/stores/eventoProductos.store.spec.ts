@@ -189,6 +189,72 @@ describe('useEventoProductosStore', () => {
     })
   })
 
+  // productos-mejoras / evento-producto-pricing: the slider must send
+  // null through to the service when the operator hasn't set a manual
+  // override. The old code coerced to 0, which re-wrote the DB row as
+  // "manual price = 0" and broke auto-calc on the next reload.
+  it('actualizarPrecio propagates precioVenta=null to the service (no 0 coercion)', async () => {
+    __pushSupabaseResponse<EventoProducto>({
+      data: mkEP('ep-1', { precio_venta: null, margen: 0.3 }),
+      error: null,
+    })
+
+    await conContexto(async () => {
+      const store = useEventoProductosStore()
+      store.productosPorEvento.set('e-1', [mkEP('ep-1', { precio_venta: null })])
+      const eventsStore = useEventsStore()
+      eventsStore.eventos.push(mkEvento('e-1', 'planificacion'))
+
+      await store.actualizarPrecio('e-1', 'p-ep-1', null, 0.3)
+
+      const fila = store.productosPorEvento.get('e-1')?.[0]
+      expect(fila?.precio_venta).toBeNull()
+      expect(fila?.margen).toBe(0.3)
+    })
+  })
+
+  // productos-mejoras / evento-producto-agregar: high-level action
+  // wraps `servicio.upsert` with auto-calc defaults so the new row
+  // shows up in the POS grid immediately. Idempotent via
+  // UNIQUE(evento_id, producto_id).
+  it('agregar wraps servicio.upsert with auto-calc defaults and refreshes the map', async () => {
+    const rowAgregada = mkEP('ep-new', {
+      producto_id: 'p-new',
+      incluido: true,
+      precio_venta: null,
+      margen: null,
+    })
+    __pushSupabaseResponse<EventoProducto>({ data: rowAgregada, error: null })
+
+    await conContexto(async () => {
+      const store = useEventoProductosStore()
+      const eventsStore = useEventsStore()
+      eventsStore.eventos.push(mkEvento('e-1', 'planificacion'))
+
+      const resultado = await store.agregar('e-1', 'p-new')
+
+      expect(resultado.error).toBeNull()
+      const lista = store.productosPorEvento.get('e-1') ?? []
+      const agregada = lista.find((p) => p.producto_id === 'p-new')
+      expect(agregada).toBeDefined()
+      expect(agregada?.incluido).toBe(true)
+      expect(agregada?.precio_venta).toBeNull()
+      expect(agregada?.margen).toBeNull()
+    })
+  })
+
+  it('agregar blocks the mutation on a cerrado evento', async () => {
+    await conContexto(async () => {
+      const store = useEventoProductosStore()
+      const eventsStore = useEventsStore()
+      eventsStore.eventos.push(mkEvento('e-1', 'cerrado'))
+
+      const resultado = await store.agregar('e-1', 'p-new')
+
+      expect(resultado.error?.code).toBe('EVENTO_CERRADO')
+    })
+  })
+
   it('inicializarDesdeCatalogo fetches productos then reloads the evento row', async () => {
     // 1) Productos catalog (3 rows).
     __pushSupabaseResponse<Array<{ id: string }>>({

@@ -30,8 +30,11 @@ export interface EventoProductosService {
   ): Promise<{ data: EventoProducto | null; error: ServiceError | null }>
   actualizarPrecio(
     id: string,
-    precioVenta: number,
-    margen: number,
+    // productos-mejoras / evento-producto-pricing: both args nullable
+    // (DB column is NUMERIC NULL). null precio_venta means
+    // "auto-calc"; null margen means "inherit evento default".
+    precioVenta: number | null,
+    margen: number | null,
   ): Promise<{ data: EventoProducto | null; error: ServiceError | null }>
   toggleIncluido(
     id: string,

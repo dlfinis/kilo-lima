@@ -58,6 +58,7 @@ const mkProducto = (id: string, overrides: Partial<Producto> = {}): Producto => 
   precio_venta: 5,
   disponible: true,
   orden: 0,
+  descripcion: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -477,6 +478,7 @@ describe('PosView — registrar venta flow (preserved)', () => {
   it('confirming the dialog calls registrarVenta and clears the cart on success (REQ-POS-12, REQ-POS-14)', async () => {
     sembrarEventoEnCurso()
     sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    __pushSupabaseResponse<unknown>({ data: null, error: null })
     __pushSupabaseResponse<VentaConItems>({
       data: {
         id: 'v-1',
@@ -484,6 +486,9 @@ describe('PosView — registrar venta flow (preserved)', () => {
         fecha: '2026-06-19T00:00:00Z',
         total: 5,
         metodo_pago: 'efectivo',
+        monto_recibido: null,
+        cambio: null,
+        comprobante_numero: null,
         created_at: '2026-06-19T00:00:00Z',
         items: [],
       },
@@ -511,11 +516,46 @@ describe('PosView — registrar venta flow (preserved)', () => {
       await cart.vm.$emit('registrar-venta')
       await flushPromises()
       const dialog = wrapper.findComponent(RegistrarVentaDialog)
-      await dialog.vm.$emit('confirmar', 'efectivo')
+      await dialog.vm.$emit('confirmar', { metodoPago: 'efectivo', montoRecibido: 5 })
       await flushPromises()
       const ventas = useVentasStore()
       expect(ventas.carrito).toEqual([])
       expect(ventas.ventas).toHaveLength(1)
+    })
+  })
+})
+
+// pos-redesign (REQ-POS-57, REQ-POS-58): feature flag VITE_FLAG_POS_REDESIGN
+// gates ResumenVentasHoy + ComprobanteVentaDialog. When off (default),
+// the legacy POS surface is unchanged. When on, the panel renders and
+// the comprobante opens after a successful sale.
+//
+// Vitest's jsdom doesn't expose `import.meta.env` updates cleanly, so
+// we toggle the flag via vi.stubEnv before mounting.
+describe('PosView — feature flag VITE_FLAG_POS_REDESIGN (REQ-POS-57, REQ-POS-58)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('renders ResumenVentasHoy when VITE_FLAG_POS_REDESIGN=true (REQ-POS-58)', async () => {
+    vi.stubEnv('VITE_FLAG_POS_REDESIGN', 'true')
+    sembrarEventoEnCurso()
+    __pushSupabaseResponse<unknown>({ data: null, error: null })
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="resumen-hoy"]').exists()).toBe(true)
+    })
+  })
+
+  it('does NOT render ResumenVentasHoy when VITE_FLAG_POS_REDESIGN is unset (REQ-POS-58)', async () => {
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="resumen-hoy"]').exists()).toBe(false)
     })
   })
 })

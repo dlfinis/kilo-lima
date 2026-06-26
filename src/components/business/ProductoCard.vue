@@ -33,6 +33,16 @@ defineEmits<{
 <template>
   <v-card class="pa-4 d-flex flex-column" data-testid="producto-card">
     <div class="text-h6 mb-2">{{ nombreReceta }}</div>
+    <!-- productos-mejoras / producto-descripcion: 2-line ellipsis
+         caption rendered below the receta name. Hidden when the
+         producto has no descripcion set. -->
+    <div
+      v-if="producto.descripcion"
+      class="text-body-2 text-medium-emphasis mb-2 producto-card-descripcion"
+      data-testid="producto-card-descripcion"
+    >
+      {{ producto.descripcion }}
+    </div>
     <div class="text-h5 mb-2" data-testid="producto-card-precio">
       {{ formatearUSD(producto.precio_venta) }}
     </div>
@@ -78,3 +88,13 @@ defineEmits<{
     </div>
   </v-card>
 </template>
+
+<style scoped>
+.producto-card-descripcion {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+</style>

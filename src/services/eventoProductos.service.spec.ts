@@ -143,6 +143,27 @@ describe('crearEventoProductosService', () => {
       const calls = __getSupabaseMockCalls()
       expect(calls.some((c) => c.metodo === 'update')).toBe(true)
     })
+
+    // productos-mejoras / evento-producto-pricing: the slider must
+    // be able to clear a manual override by sending `precioVenta=null`.
+    // The DB column is NUMERIC NULL — the service must propagate the
+    // null instead of coercing it to 0 (which would re-introduce the
+    // "lost override" bug).
+    it('accepts precioVenta=null and writes null to the DB row', async () => {
+      const actualizado = mkEP({ id: 'ep-1', precio_venta: null, margen: null })
+      __pushSupabaseResponse<EventoProducto>({ data: actualizado, error: null })
+
+      const { data, error } = await makeService().actualizarPrecio('ep-1', null, null)
+
+      expect(error).toBeNull()
+      expect(data?.precio_venta).toBeNull()
+      expect(data?.margen).toBeNull()
+      const calls = __getSupabaseMockCalls()
+      const updateCall = calls.find((c) => c.metodo === 'update')
+      const payload = updateCall?.args[0] as Record<string, unknown>
+      expect(payload.precio_venta).toBeNull()
+      expect(payload.margen).toBeNull()
+    })
   })
 
   describe('toggleIncluido', () => {

@@ -109,8 +109,11 @@ export const useEventoProductosStore = defineStore('eventoProductos', () => {
   async function actualizarPrecio(
     eventoId: string,
     productoId: string,
-    precioVenta: number,
-    margen: number,
+    // productos-mejoras / evento-producto-pricing: nullable inputs.
+    // Slider must send null when there is no manual override — coercing
+    // to 0 used to overwrite the override semantics in the DB row.
+    precioVenta: number | null,
+    margen: number | null,
   ): Promise<{ data: EventoProducto | null; error: ServiceError | null }> {
     const cerrado = asegurarEditable(eventoId)
     if (cerrado) {
@@ -132,6 +135,44 @@ export const useEventoProductosStore = defineStore('eventoProductos', () => {
     }
     const idx = lista.findIndex((p) => p.id === ep.id)
     if (idx >= 0) lista[idx] = res.data
+    productosPorEvento.value.set(eventoId, [...lista])
+    return res
+  }
+
+  // productos-mejoras / evento-producto-agregar: high-level action
+  // that adds a single producto to an existing evento. Wraps the
+  // existing `servicio.upsert` with the "auto-calc from evento
+  // default margin" defaults so the new row shows up in the POS grid
+  // immediately. Idempotent via UNIQUE(evento_id, producto_id) — the
+  // UPSERT updates the existing row in place, no duplicate.
+  async function agregar(
+    eventoId: string,
+    productoId: string,
+  ): Promise<{ data: EventoProducto | null; error: ServiceError | null }> {
+    const cerrado = asegurarEditable(eventoId)
+    if (cerrado) {
+      error.value = cerrado.error.message
+      return cerrado
+    }
+    error.value = null
+    const res = await servicio.upsert(eventoId, productoId, {
+      incluido: true,
+      precio_venta: null,
+      margen: null,
+    })
+    if (res.error || !res.data) {
+      error.value = MENSAJE_ERROR_GUARDAR
+      return res
+    }
+    // Refresh the in-memory map so the table shows the new row without
+    // a full reload. Replace by id (UPSERT may return same row id).
+    const lista = productosPorEvento.value.get(eventoId) ?? []
+    const idx = lista.findIndex((p) => p.producto_id === productoId)
+    if (idx >= 0) {
+      lista[idx] = res.data
+    } else {
+      lista.push(res.data)
+    }
     productosPorEvento.value.set(eventoId, [...lista])
     return res
   }
@@ -175,6 +216,7 @@ export const useEventoProductosStore = defineStore('eventoProductos', () => {
     cargarPorEvento,
     toggleIncluido,
     actualizarPrecio,
+    agregar,
     inicializarDesdeCatalogo,
   }
 })

@@ -22,17 +22,23 @@
 //   - Bulk action "APLICAR PRECIO MÍNIMO BREAK-EVEN" — applies the
 //     computed `precioMinimoParaProducto(productoId)` to each row's
 //     `precio_venta` via the existing store path.
-import { computed, onMounted } from 'vue'
+import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import MargenSlider from '@/components/business/MargenSlider.vue'
 import PricingAlert from '@/components/business/PricingAlert.vue'
+import RecetaCostoDesglose from '@/components/business/RecetaCostoDesglose.vue'
 import { useEvents } from '@/composables/useEvents'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
+import { useProductosStore } from '@/stores/productos.store'
+import { useRecipesStore } from '@/stores/recipes.store'
+import { useIngredientsStore } from '@/stores/ingredients.store'
+import { calcularCostoReceta } from '@/composables/useCalculoReceta'
 import { estadoEsEditable } from '@/utils/estado'
 import { formatearUSD } from '@/utils/format'
 import { calcularContribucionUnitaria, calcularPrecioDesdeContribucion } from '@/utils/contribucion'
+import { calcularMargenReal } from '@/utils/pricing'
 import type { EventoProducto, EventoProductoConDetalle } from '@/types'
 
 const route = useRoute()
@@ -45,6 +51,9 @@ const eventoId = computed<string | null>(() => {
 
 const { eventoActual, cargarPorId } = useEvents()
 const epStore = useEventoProductosStore()
+const productosStore = useProductosStore()
+const recipesStore = useRecipesStore()
+const ingredientsStore = useIngredientsStore()
 const { productosDelEvento, precioMinimoParaProducto } = usePreciosEvento(eventoId)
 
 const editable = computed(() =>
@@ -62,6 +71,10 @@ async function cargar() {
   if (!eventoId.value) return
   await cargarPorId(eventoId.value)
   await epStore.cargarPorEvento(eventoId.value)
+  // productos-mejoras: catalog list is loaded lazily when the
+  // operator opens the "Agregar producto" dialog (see `abrirDialogoAgregar`).
+  // Avoids blocking the initial render on a Supabase round-trip when the
+  // operator never opens the dialog (the common path).
 }
 
 onMounted(cargar)
@@ -78,7 +91,9 @@ async function alToggleIncluido(ep: EventoProducto) {
 
 async function alCambiarPrecio(ep: EventoProducto, valor: number) {
   if (!eventoId.value) return
-  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, valor, ep.margen ?? 0)
+  // productos-mejoras: pass margen as-is (null is a valid value
+  // meaning "inherit evento default"). The DB column is NUMERIC NULL.
+  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, valor, ep.margen)
 }
 
 // REQ-CON (Type A calculator): when the operator edits the contribution
@@ -87,30 +102,100 @@ async function alCambiarContribucion(ep: EventoProductoConDetalle, contribucionD
   if (!eventoId.value) return
   const costo = ep.costo_unitario
   const nuevoPrecio = calcularPrecioDesdeContribucion(costo, contribucionDeseada)
-  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, ep.margen ?? 0)
+  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, ep.margen)
 }
 
+// productos-mejoras / evento-producto-pricing: slider fix. Pass
+// `ep.precio_venta` as-is (null OR number) instead of coercing to 0
+// with `?? 0`. The DB row now stays in auto-calc mode unless the
+// operator sets an override via the editable precio field.
 async function alCambiarMargen(ep: EventoProducto, margen: number) {
   if (!eventoId.value) return
-  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, ep.precio_venta ?? 0, margen)
+  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, ep.precio_venta, margen)
 }
 
-// REQ-CON-10 (PR-2): bulk action — apply the break-even minimum price
-// to every included producto. Iterates over `productosDelEvento` and
-// calls `actualizarPrecio` with the minimum so the operator can pivot
-// the table to break-even pricing in one click.
+// REQ-CON-10 (PR-2) + productos-mejoras: bulk action — apply the
+// break-even minimum price to every included producto AND write the
+// matching `margen` so `margen_efectivo` stays coherent with the
+// override. Two-step UX (alert-style confirm) lives in the template.
 async function aplicarPrecioMinimo() {
   if (!eventoId.value) return
   for (const ep of productosDelEvento.value) {
     const minimo = precioMinimoParaProducto.value(ep.producto_id)
     if (minimo === null) continue
-    await epStore.actualizarPrecio(eventoId.value, ep.producto_id, minimo, ep.margen ?? 0)
+    const margenEquivalente = calcularMargenReal(minimo, ep.costo_unitario)
+    await epStore.actualizarPrecio(eventoId.value, ep.producto_id, minimo, margenEquivalente)
   }
 }
 
 function volver() {
   if (eventoId.value) router.push({ name: 'evento-detalle', params: { id: eventoId.value } })
 }
+
+// productos-mejoras / evento-producto-agregar: "Agregar producto"
+// dialog. Lists catalog productos NOT yet in this evento, adds via
+// `epStore.agregar`. Re-uses `productosStore.productos` so the dialog
+// stays in sync with the catalog without a refetch.
+const dialogoAgregarAbierto = ref<boolean>(false)
+const productosDisponibles = computed(() => {
+  // Include all evento_productos rows (incluido=true AND incluido=false)
+  // so the operator can re-enable excluded rows if needed. Anything in
+  // `productosPorEvento` is already in the evento (incluido or not).
+  const todas = new Set(
+    epStore.productosPorEvento.get(eventoId.value ?? '')?.map((ep) => ep.producto_id) ?? [],
+  )
+  return productosStore.productos
+    .filter((p) => !todas.has(p.id))
+    .map((p) => {
+      const receta = recipesStore.recetas.find((r) => r.id === p.receta_id)
+      return {
+        id: p.id,
+        nombre: receta?.nombre ?? '(sin receta)',
+        disponible: p.disponible,
+      }
+    })
+})
+
+function abrirDialogoAgregar() {
+  dialogoAgregarAbierto.value = true
+  // productos-mejoras: lazy-load the catalog list the first time the
+  // dialog opens so existing views (which only push the catalog locally)
+  // don't need a parallel fetch on mount. The promise is intentionally
+  // not awaited — the dialog renders with whatever products are already
+  // in the store and updates once the fetch resolves.
+  if (productosStore.productos.length === 0) {
+    void productosStore.cargarTodas()
+  }
+}
+
+async function alAgregarProducto(productoId: string) {
+  if (!eventoId.value) return
+  await epStore.agregar(eventoId.value, productoId)
+}
+
+// productos-mejoras / cost breakdown: expandable row in the table.
+// Re-uses `RecetaCostoDesglose` (already accepts a `CalculoReceta`).
+// `v-model:expanded` on v-data-table is typed as `readonly string[]` —
+// we keep an array of row `producto_id` keys so multiple rows can be
+// open at once. The data-table writes back via `update:expanded`.
+const expandedRows = ref<string[]>([])
+
+const calculoPorProducto = computed(() => {
+  return (productoId: string) => {
+    const producto = productosStore.productos.find((p) => p.id === productoId)
+    if (!producto) return null
+    const receta = recipesStore.recetas.find((r) => r.id === producto.receta_id)
+    if (!receta || receta.ingredientes.length === 0) return null
+    const materiaMap = new Map(ingredientsStore.materiasPrimas.map((m) => [m.id, m]))
+    return calcularCostoReceta(
+      receta.ingredientes.map((ing) => ({
+        ingrediente: ing,
+        materiaPrima: materiaMap.get(ing.materia_prima_id) ?? null,
+      })),
+      receta.rendimiento_unidades,
+    )
+  }
+})
 </script>
 
 <template>
@@ -165,12 +250,26 @@ function volver() {
         >
           Aplicar precio mínimo break-even
         </v-btn>
+        <!-- productos-mejoras / evento-producto-agregar: open the
+             catalog picker so the operator can add individual
+             productos to the evento. -->
+        <v-btn
+          color="primary"
+          variant="tonal"
+          prepend-icon="mdi-plus"
+          data-testid="evento-productos-agregar"
+          @click="abrirDialogoAgregar"
+        >
+          Agregar producto
+        </v-btn>
       </div>
 
       <v-data-table
         v-if="productosDelEvento.length > 0"
+        v-model:expanded="expandedRows"
         :items="productosDelEvento"
         :headers="[
+          { title: '', key: 'data-table-expand' },
           { title: '', key: 'incluido', sortable: false, width: 60 },
           { title: 'Producto', key: 'producto_nombre' },
           { title: 'Receta', key: 'receta_nombre' },
@@ -180,6 +279,7 @@ function volver() {
           { title: 'Precio de venta', key: 'precio_final' },
         ]"
         density="comfortable"
+        show-expand
         data-testid="evento-productos-tabla"
       >
         <template #[`item.incluido`]="{ item }">
@@ -239,7 +339,69 @@ function volver() {
             />
           </div>
         </template>
+        <!-- productos-mejoras / cost breakdown: expandable row showing
+             the per-producto ingredient breakdown via RecetaCostoDesglose.
+             Recomputes from the catalog recipes store on each render. -->
+        <template #[`expanded-row`]="{ columns, item }">
+          <tr :data-testid="`evento-productos-desglose-${item.producto_id}`" class="bg-grey-lighten-4">
+            <td :colspan="columns.length">
+              <RecetaCostoDesglose
+                v-if="calculoPorProducto(item.producto_id)"
+                :calculo="calculoPorProducto(item.producto_id)!"
+              />
+              <p v-else class="text-disabled mb-0 px-4 py-3">
+                Sin receta asociada — no hay desglose para mostrar.
+              </p>
+            </td>
+          </tr>
+        </template>
       </v-data-table>
+
+      <!-- productos-mejoras / evento-producto-agregar: dialog with the
+           catalog list filtered to productos NOT in this evento. The
+           dialog reuses `productosStore.productos` so it stays in sync
+           with the rest of the view. -->
+      <v-dialog v-model="dialogoAgregarAbierto" max-width="520"
+        data-testid="evento-productos-dialogo-agregar">
+        <v-card>
+          <v-card-title>Agregar producto al evento</v-card-title>
+          <v-card-text>
+            <p v-if="productosDisponibles.length === 0" class="text-disabled mb-0">
+              Todos los productos del catálogo ya están en este evento.
+            </p>
+            <v-list v-else lines="two">
+              <v-list-item
+                v-for="producto in productosDisponibles"
+                :key="producto.id"
+                :data-testid="`evento-productos-dialogo-item-${producto.id}`"
+              >
+                <v-list-item-title>{{ producto.nombre }}</v-list-item-title>
+                <v-list-item-subtitle v-if="!producto.disponible" class="text-warning">
+                  Producto no disponible en el catálogo
+                </v-list-item-subtitle>
+                <template #append>
+                  <v-btn
+                    color="primary"
+                    variant="tonal"
+                    size="small"
+                    :data-testid="`evento-productos-dialogo-agregar-${producto.id}`"
+                    @click="alAgregarProducto(producto.id)"
+                  >
+                    Agregar
+                  </v-btn>
+                </template>
+              </v-list-item>
+            </v-list>
+          </v-card-text>
+          <v-card-actions>
+            <v-spacer />
+            <v-btn variant="text" data-testid="evento-productos-dialogo-cerrar"
+              @click="dialogoAgregarAbierto = false">
+              Cerrar
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-dialog>
     </template>
   </v-container>
 </template>
