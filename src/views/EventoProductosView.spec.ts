@@ -375,7 +375,7 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
     expect(gananciaCell?.querySelector('.text-error')).not.toBeNull()
   })
 
-  it('shows "Manual" chip when precio_venta differs from precio_sugerido', async () => {
+  it('shows contribution margin % below the monetary value', async () => {
     await conContexto(async () => {
       const evStore = useEventsStore()
       const epStore = useEventoProductosStore()
@@ -384,7 +384,7 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
         mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: 20 }),
       ])
     })
-    await prepararCatalogo() // costo = 10, precio_sugerido = 10 / (1 - 0.4) = 16.67
+    await prepararCatalogo() // costo = 10
     __pushSupabaseResponse<EventoProducto[]>({
       data: [mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: 20 })],
       error: null,
@@ -393,32 +393,11 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
     await mountView('e-1')
     await flushPromises()
 
-    // precio_venta (20) differs from precio_sugerido (16.67) → Manual chip
-    const manualChip = document.querySelector('[data-testid="evento-productos-tabla"] .v-chip')
-    expect(manualChip?.textContent).toContain('Manual')
-  })
-
-  it('does NOT show "Manual" chip when precio_venta matches precio_sugerido', async () => {
-    await conContexto(async () => {
-      const evStore = useEventsStore()
-      const epStore = useEventoProductosStore()
-      evStore.eventos.push(mkEvento('e-1'))
-      epStore.productosPorEvento.set('e-1', [
-        mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: null }),
-      ])
-    })
-    await prepararCatalogo() // costo = 10, precio_sugerido = 16.67
-    __pushSupabaseResponse<EventoProducto[]>({
-      data: [mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: null })],
-      error: null,
-    })
-
-    await mountView('e-1')
-    await flushPromises()
-
-    // precio_venta is null → no Manual chip
-    const manualChip = document.querySelector('[data-testid="evento-productos-tabla"] .v-chip')
-    expect(manualChip).toBeNull()
+    // Contribución column shows: $10.00 (monetary) + "c/u · 40%"
+    const gananciaCell = document.querySelector('[data-testid="evento-productos-tabla"] tbody tr td:nth-child(7)')
+    expect(gananciaCell?.textContent).toContain('USD')
+    expect(gananciaCell?.textContent).toContain('10.00')
+    expect(gananciaCell?.textContent).toContain('40%')
   })
 })
 // productos-mejoras / evento-producto-pricing: slider must send

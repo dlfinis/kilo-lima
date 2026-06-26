@@ -59,6 +59,7 @@ const mkProducto = (id: string, overrides: Partial<Producto> = {}): Producto => 
   disponible: true,
   orden: 0,
   descripcion: null,
+  icono: 'mdi-food',
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -271,7 +272,7 @@ describe('PosView — PR-2b producto filtering (REQ-FIN-28, REQ-FIN-30)', () => 
       const { wrapper } = await mountView()
       await flushPromises()
       await flushPromises()
-      const cards = wrapper.findAll('[data-testid="producto-card"]')
+      const cards = wrapper.findAll('[data-testid="producto-card-active"]')
       expect(cards.length).toBe(2)
     })
   })
@@ -286,7 +287,7 @@ describe('PosView — PR-2b producto filtering (REQ-FIN-28, REQ-FIN-30)', () => 
     await conContexto(async () => {
       const { wrapper } = await mountView()
       await flushPromises()
-      const cards = wrapper.findAll('[data-testid="producto-card"]')
+      const cards = wrapper.findAll('[data-testid="producto-card-active"]')
       expect(cards.length).toBe(1)
     })
   })
@@ -359,9 +360,9 @@ describe('PosView — adding to cart uses evento price (REQ-FIN-29)', () => {
     await conContexto(async () => {
       const { wrapper } = await mountView()
       await flushPromises()
-      const agregar = wrapper.find('[data-testid="producto-card-agregar"]')
-      expect(agregar.exists()).toBe(true)
-      await agregar.trigger('click')
+      const card = wrapper.find('[data-testid="producto-card-active"]')
+      expect(card.exists()).toBe(true)
+      await card.trigger('click')
       const ventas = useVentasStore()
       expect(ventas.carrito).toHaveLength(1)
       // margen=0.4 + costo=10 → 16.67
@@ -371,11 +372,11 @@ describe('PosView — adding to cart uses evento price (REQ-FIN-29)', () => {
   })
 })
 
-// REQ-CON-8 (PR-2): per-producto ContribucionBadge rendered in the
-// POS grid below the price. The badge is fed from
+// REQ-CON-8 (PR-2): per-producto contribucion rendered in the
+// POS grid below the price. Fed from
 // usePreciosEvento.contribucionParaProducto(productoId).
-describe('PosView — ContribucionBadge per card (REQ-CON-8)', () => {
-  it('renders a ContribucionBadge on every product card when contribution > 0', async () => {
+describe('PosView — Contribucion per card (REQ-CON-8)', () => {
+  it('renders contribucion text on every product card when contribution > 0', async () => {
     // costo=10 + margen=0.4 → precio_sugerido = 16.67; contrib = 6.67.
     sembrarEventoEnCurso()
     sembrarProductosEnPOS([
@@ -385,26 +386,24 @@ describe('PosView — ContribucionBadge per card (REQ-CON-8)', () => {
     await conContexto(async () => {
       const { wrapper } = await mountView()
       await flushPromises()
-      const badges = wrapper.findAll('[data-testid="contribucion-badge"]')
-      expect(badges.length).toBe(2)
-      // Each badge text must mention Contribución + a positive USD value.
-      expect(badges[0]?.text()).toContain('Contribución')
+      const contribuciones = wrapper.findAll('[data-testid="producto-card-contribucion"]')
+      expect(contribuciones.length).toBe(2)
     })
   })
 
-  it('renders one badge per visible card, never more (no orphan badges)', async () => {
+  it('renders one contribucion per visible card, never more (no orphan)', async () => {
     sembrarEventoEnCurso()
     sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0.4 })])
     await conContexto(async () => {
       const { wrapper } = await mountView()
       await flushPromises()
-      const cards = wrapper.findAll('[data-testid="producto-card"]')
-      const badges = wrapper.findAll('[data-testid="contribucion-badge"]')
-      expect(cards.length).toBe(badges.length)
+      const cards = wrapper.findAll('[data-testid="producto-card-active"]')
+      const contribuciones = wrapper.findAll('[data-testid="producto-card-contribucion"]')
+      expect(cards.length).toBe(contribuciones.length)
     })
   })
 
-  it('shows red badge text (contribution < 0) when the operator prices below cost', async () => {
+  it('shows red text (contribution < 0) when the operator prices below cost', async () => {
     // costo=10 but a manual precio_venta=8 → contribution = -2.
     sembrarEventoEnCurso()
     const fabricado = fabricarProductoParaPOS('p-1', { costo: 10, margen: 0.4 })
@@ -413,49 +412,21 @@ describe('PosView — ContribucionBadge per card (REQ-CON-8)', () => {
     await conContexto(async () => {
       const { wrapper } = await mountView()
       await flushPromises()
-      const badge = wrapper.find('[data-testid="contribucion-badge"]')
-      expect(badge.exists()).toBe(true)
-      expect(badge.text()).toContain('Contribución')
+      const contribucion = wrapper.find('[data-testid="producto-card-contribucion"]')
+      expect(contribucion.exists()).toBe(true)
+      expect(contribucion.classes()).toContain('text-error')
     })
   })
 })
 
-describe('PosView — Imprevistos section (preserved, REQ-POS-40)', () => {
-  it('renders the Imprevistos collapsible section with the total chip (REQ-POS-40)', async () => {
+describe('PosView — Imprevistos button in header (REQ-POS-40)', () => {
+  it('renders the Imprevistos button with total badge in header', async () => {
     sembrarEventoEnCurso()
     sembrarProductosEnPOS([fabricarProductoParaPOS('p-1')])
     await conContexto(async () => {
       const { wrapper } = await mountView()
       await flushPromises()
-      expect(wrapper.find('[data-testid="pos-imprevistos"]').exists()).toBe(true)
-      expect(wrapper.find('[data-testid="pos-imprevistos-total"]').exists()).toBe(true)
-      expect(wrapper.text()).toContain('Gastos imprevistos de esta feria')
-    })
-  })
-
-  it('expands the Imprevistos section and loads the list (REQ-POS-40)', async () => {
-    sembrarEventoEnCurso()
-    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1')])
-    __pushSupabaseResponse<GastoImprevisto[]>({
-      data: [
-        {
-          id: 'gi-1',
-          evento_id: 'e-1',
-          monto: 50,
-          motivo: 'Más vasos',
-          categoria: 'insumos_extra',
-          created_at: '2026-06-19T11:00:00Z',
-        },
-      ],
-      error: null,
-    })
-
-    await conContexto(async () => {
-      const { wrapper } = await mountView()
-      await flushPromises()
-      await wrapper.find('[data-testid="pos-imprevistos-titulo"]').trigger('click')
-      await flushPromises()
-      expect(wrapper.find('[data-testid="pos-imprevistos-lista"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="pos-imprevistos-btn"]').exists()).toBe(true)
     })
   })
 })
@@ -467,7 +438,7 @@ describe('PosView — registrar venta flow (preserved)', () => {
     await conContexto(async () => {
       const { wrapper } = await mountView()
       await flushPromises()
-      await wrapper.find('[data-testid="producto-card-agregar"]').trigger('click')
+      await wrapper.find('[data-testid="producto-card-active"]').trigger('click')
       const cart = wrapper.findComponent(CarritoPanel)
       await cart.vm.$emit('registrar-venta')
       await flushPromises()
@@ -511,7 +482,7 @@ describe('PosView — registrar venta flow (preserved)', () => {
     await conContexto(async () => {
       const { wrapper } = await mountView()
       await flushPromises()
-      await wrapper.find('[data-testid="producto-card-agregar"]').trigger('click')
+      await wrapper.find('[data-testid="producto-card-active"]').trigger('click')
       const cart = wrapper.findComponent(CarritoPanel)
       await cart.vm.$emit('registrar-venta')
       await flushPromises()

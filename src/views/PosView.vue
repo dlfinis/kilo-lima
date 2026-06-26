@@ -302,6 +302,63 @@ function reintentar() {
         >
           {{ online ? 'En línea' : 'Sin conexión' }}
         </v-chip>
+        <!-- Gastos imprevistos: acceso rápido con menú desplegable -->
+        <v-menu v-if="eventoEnCurso" :close-on-content-click="false" location="bottom end">
+          <template #activator="{ props: menuProps }">
+            <v-btn
+              v-bind="menuProps"
+              icon="mdi-cash-remove"
+              size="small"
+              variant="tonal"
+              color="warning"
+              data-testid="pos-imprevistos-btn"
+            >
+              <v-badge
+                v-if="totalImprevistos > 0"
+                :content="`$${totalImprevistos.toFixed(0)}`"
+                color="error"
+                inline
+              />
+            </v-btn>
+          </template>
+          <v-card min-width="320" max-width="400" data-testid="pos-imprevistos-menu">
+            <v-card-title class="d-flex align-center text-body-1">
+              <v-icon class="mr-2">mdi-cash-remove</v-icon>
+              Gastos imprevistos
+              <v-spacer />
+              <v-chip size="x-small" data-testid="pos-imprevistos-total">
+                ${{ totalImprevistos.toFixed(2) }}
+              </v-chip>
+            </v-card-title>
+            <v-divider />
+            <v-card-text class="pa-2" style="max-height: 300px; overflow-y: auto">
+              <v-list v-if="listaImprevistos.length > 0" density="compact" data-testid="pos-imprevistos-lista">
+                <GastoImprevistoListItem
+                  v-for="gasto in listaImprevistos"
+                  :key="gasto.id"
+                  :gasto="gasto"
+                  @eliminar="manejarEliminarImprevisto"
+                />
+              </v-list>
+              <p v-else class="text-medium-emphasis text-center py-4" data-testid="pos-imprevistos-empty">
+                Sin imprevistos registrados
+              </p>
+            </v-card-text>
+            <v-divider />
+            <v-card-actions>
+              <v-btn
+                color="primary"
+                size="small"
+                prepend-icon="mdi-plus"
+                block
+                data-testid="pos-imprevistos-nuevo"
+                @click="dialogoCrearImprevisto = true"
+              >
+                Nuevo imprevisto
+              </v-btn>
+            </v-card-actions>
+          </v-card>
+        </v-menu>
       </div>
     </div>
 
@@ -405,58 +462,6 @@ function reintentar() {
         </v-col>
       </v-row>
     </template>
-
-    <!-- REQ-POS-40: collapsible Gastos Imprevistos de esta feria.
-         Always rendered (even with no evento) so the section is
-         visible — collapsing reveals the CRUD list + total.
-         When no evento en_curso exists, the list stays empty and the
-         add button is disabled (evento is the foreign key target). -->
-    <v-card class="mt-4" data-testid="pos-imprevistos">
-      <v-card-title
-        class="d-flex align-center"
-        data-testid="pos-imprevistos-titulo"
-        @click="toggleImprevistos"
-      >
-        <v-icon class="mr-2">{{ imprevistosAbierto ? 'mdi-chevron-down' : 'mdi-chevron-right' }}</v-icon>
-        <span>Gastos imprevistos de esta feria</span>
-        <v-spacer />
-        <v-chip size="small" data-testid="pos-imprevistos-total">
-          Total: ${{ totalImprevistos.toFixed(2) }}
-        </v-chip>
-      </v-card-title>
-      <v-expand-transition>
-        <div v-show="imprevistosAbierto">
-          <v-card-text>
-            <v-list v-if="listaImprevistos.length > 0" data-testid="pos-imprevistos-lista">
-              <GastoImprevistoListItem
-                v-for="gasto in listaImprevistos"
-                :key="gasto.id"
-                :gasto="gasto"
-                @eliminar="manejarEliminarImprevisto"
-              />
-            </v-list>
-            <p
-              v-else
-              class="text-medium-emphasis"
-              data-testid="pos-imprevistos-empty"
-            >
-              {{ eventoEnCurso ? 'Sin imprevistos todavía.' : 'Activá un evento para registrar imprevistos.' }}
-            </p>
-            <v-btn
-              color="primary"
-              size="small"
-              prepend-icon="mdi-plus"
-              class="mt-2"
-              :disabled="!eventoEnCurso"
-              data-testid="pos-imprevistos-nuevo"
-              @click="dialogoCrearImprevisto = true"
-            >
-              Nuevo imprevisto
-            </v-btn>
-          </v-card-text>
-        </div>
-      </v-expand-transition>
-    </v-card>
 
     <v-dialog
       v-model="dialogoCrearImprevisto"

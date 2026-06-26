@@ -120,6 +120,7 @@ function onCancelar() {
       :error-messages="errores.receta ? [errores.receta] : []"
       data-testid="producto-receta"
     />
+    <SelectorIcono v-model="icono" data-testid="producto-icono" />
     <v-text-field
       v-model.number="precioVenta"
       label="Precio de venta"
@@ -131,7 +132,7 @@ function onCancelar() {
     />
     <v-textarea
       v-model="descripcion"
-      label="Descripción (opcional)"
+      label="Descripcion (opcional)"
       rows="2"
       :counter="MAX_DESCRIPCION"
       :maxlength="MAX_DESCRIPCION"

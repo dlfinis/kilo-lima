@@ -283,8 +283,8 @@ const calculoPorProducto = computed(() => {
           { title: 'Producto', key: 'producto_nombre' },
           { title: 'Costo', key: 'costo_unitario' },
           { title: 'Margen', key: 'margen_efectivo' },
-          { title: 'Precio venta', key: 'precio_final' },
-          { title: 'Ganancia', key: 'ganancia_unitaria' },
+          { title: 'Precio', key: 'precio_final', width: 100, align: 'center' },
+          { title: 'Contribución', key: 'ganancia_unitaria' },
         ]"
         density="comfortable"
         show-expand
@@ -318,7 +318,8 @@ const calculoPorProducto = computed(() => {
             hide-details
             :disabled="!editable"
             :data-testid="`evento-productos-precio-${item.producto_id}`"
-            style="max-width: 120px"
+            style="max-width: 100px; margin: 0 auto"
+            class="text-center"
             prefix="$"
             @update:model-value="(v) => alCambiarPrecio(item, Number(v))"
           />
@@ -332,7 +333,7 @@ const calculoPorProducto = computed(() => {
               {{ formatearUSD(item.precio_final - item.costo_unitario) }}
             </span>
             <span class="text-caption text-medium-emphasis">
-              {{ item.precio_final > 0 ? Math.round(((item.precio_final - item.costo_unitario) / item.precio_final) * 100) : 0 }}%
+              c/u · {{ item.margen_efectivo * 100 }}%
             </span>
           </div>
         </template>
