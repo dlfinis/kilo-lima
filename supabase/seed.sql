@@ -82,9 +82,9 @@ on conflict (receta_id) do nothing;
 -- designed for `supabase db reset` (fresh DB); the cleanup script
 -- `verify-final.mjs` runs against a reset DB. Best-effort.
 insert into public.eventos (nombre, fecha, fecha_fin, margen_ganancia, ubicacion, estado, notas) values
-  ('Feria del dulce',     '2026-08-10', null, 0.40, 'Plaza del Carmen', 'planificacion', 'Pre-producción de galletas'),
-  ('Festival de la galleta', '2026-07-20', '2026-07-21', 0.45, 'Parque Hidalgo', 'en_curso', 'Venta activa + toma de pedidos'),
-  ('Mercado navideño',    '2026-12-15', '2026-12-20', 0.50, 'Centro histórico', 'cerrado', 'Cierre pendiente: caja cuadrada')
+  ('Feria del dulce',     '2026-07-15', null, 0.40, 'Plaza del Carmen', 'planificacion', 'Pre-producción de galletas'),
+  ('Festival de la galleta', '2026-06-20', '2026-06-21', 0.45, 'Parque Hidalgo', 'en_curso', 'Venta activa + toma de pedidos'),
+  ('Mercado de primavera', '2026-05-10', '2026-05-11', 0.50, 'Centro histórico', 'cerrado', 'Cierre completado: caja cuadrada')
 on conflict do nothing;
 
 -- 6. evento_productos (3 rows) — link one producto per evento.
@@ -105,7 +105,7 @@ on conflict (evento_id, producto_id) do nothing;
 insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
 select e.id, p.id, null, null, true
 from public.eventos e, public.productos p
-where e.nombre = 'Mercado navideño' and p.precio_venta = 35.00
+where e.nombre = 'Mercado de primavera' and p.precio_venta = 35.00
 on conflict (evento_id, producto_id) do nothing;
 
 -- 7. plan_produccion (4 rows) — for "Festival de la galleta" (2
@@ -126,13 +126,13 @@ on conflict (evento_id, receta_id) do nothing;
 insert into public.plan_produccion (evento_id, receta_id, unidades_a_producir)
 select e.id, r.id, 120
 from public.eventos e, public.recetas r
-where e.nombre = 'Mercado navideño' and r.nombre = 'Galleta de chocolate'
+where e.nombre = 'Mercado de primavera' and r.nombre = 'Galleta de chocolate'
 on conflict (evento_id, receta_id) do nothing;
 
 insert into public.plan_produccion (evento_id, receta_id, unidades_a_producir)
 select e.id, r.id, 60
 from public.eventos e, public.recetas r
-where e.nombre = 'Mercado navideño' and r.nombre = 'Pan básico'
+where e.nombre = 'Mercado de primavera' and r.nombre = 'Pan básico'
 on conflict (evento_id, receta_id) do nothing;
 
 -- 8. gastos_fijos (5 rows) — 2 for each non-planificación evento,
@@ -158,44 +158,46 @@ on conflict do nothing;
 insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
 select e.id, 'renta', 2000.00, 'Renta del stand (5 días)'
 from public.eventos e
-where e.nombre = 'Mercado navideño'
+where e.nombre = 'Mercado de primavera'
 on conflict do nothing;
 
 insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
 select e.id, 'permisos', 600.00, 'Permiso municipal'
 from public.eventos e
-where e.nombre = 'Mercado navideño'
+where e.nombre = 'Mercado de primavera'
 on conflict do nothing;
 
 -- 9. ventas (4 rows) — 2 for "Festival de la galleta" (en_curso) and
--- 2 for "Mercado navideño" (cerrado). PK-only, best-effort.
+-- 2 for "Mercado de primavera" (cerrado). PK-only, best-effort.
 insert into public.ventas (evento_id, fecha, total, metodo_pago)
-select e.id, '2026-07-20T10:30:00Z', 75.00, 'efectivo'
+select e.id, '2026-06-20T10:30:00Z', 75.00, 'efectivo'
 from public.eventos e
 where e.nombre = 'Festival de la galleta'
 on conflict do nothing;
 
 insert into public.ventas (evento_id, fecha, total, metodo_pago)
-select e.id, '2026-07-20T14:15:00Z', 120.00, 'transferencia'
-from public.eventos e
+select e.id, '2026-06-20T14:15:00Z', 105.00, 'transferencia'
+from public eventos e
 where e.nombre = 'Festival de la galleta'
 on conflict do nothing;
 
 insert into public.ventas (evento_id, fecha, total, metodo_pago)
-select e.id, '2026-12-15T11:00:00Z', 280.00, 'mixto'
+select e.id, '2026-05-10T11:00:00Z', 180.00, 'mixto'
 from public.eventos e
-where e.nombre = 'Mercado navideño'
+where e.nombre = 'Mercado de primavera'
 on conflict do nothing;
 
 insert into public.ventas (evento_id, fecha, total, metodo_pago)
-select e.id, '2026-12-15T16:45:00Z', 210.00, 'tarjeta'
+select e.id, '2026-05-11T16:45:00Z', 140.00, 'tarjeta'
 from public.eventos e
-where e.nombre = 'Mercado navideño'
+where e.nombre = 'Mercado de primavera'
 on conflict do nothing;
 
--- 10. venta_items (5 rows) — 2 ítems for the first venta of each
--- evento with ventas, plus 1 ítem for the second venta of
--- "Mercado navideño". PK-only, best-effort.
+-- 10. venta_items (8 rows) — items for all 4 ventas. Totales deben coincidir con ventas.total.
+-- Venta 1 (efectivo, total 75): 3 galletas @ 15 = 45 + 2 galletas @ 15 = 30 → 75
+-- Venta 2 (transferencia, total 105): 3 panes @ 35 = 105
+-- Venta 3 (mixto, total 180): 3 panes @ 35 = 105 + 5 galletas @ 15 = 75 → 180
+-- Venta 4 (tarjeta, total 140): 4 panes @ 35 = 140
 insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
 select v.id, p.id, 3, 15.00, 45.00
 from public.ventas v, public.productos p
@@ -209,38 +211,44 @@ where v.metodo_pago = 'efectivo' and v.total = 75.00 and p.precio_venta = 15.00
 on conflict do nothing;
 
 insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
-select v.id, p.id, 4, 35.00, 140.00
+select v.id, p.id, 3, 35.00, 105.00
 from public.ventas v, public.productos p
-where v.metodo_pago = 'mixto' and v.total = 280.00 and p.precio_venta = 35.00
+where v.metodo_pago = 'transferencia' and v.total = 105.00 and p.precio_venta = 35.00
+on conflict do nothing;
+
+insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
+select v.id, p.id, 3, 35.00, 105.00
+from public.ventas v, public.productos p
+where v.metodo_pago = 'mixto' and v.total = 180.00 and p.precio_venta = 35.00
+on conflict do nothing;
+
+insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
+select v.id, p.id, 5, 15.00, 75.00
+from public.ventas v, public.productos p
+where v.metodo_pago = 'mixto' and v.total = 180.00 and p.precio_venta = 15.00
 on conflict do nothing;
 
 insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
 select v.id, p.id, 4, 35.00, 140.00
 from public.ventas v, public.productos p
-where v.metodo_pago = 'mixto' and v.total = 280.00 and p.precio_venta = 35.00
+where v.metodo_pago = 'tarjeta' and v.total = 140.00 and p.precio_venta = 35.00
 on conflict do nothing;
 
-insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
-select v.id, p.id, 2, 35.00, 70.00
-from public.ventas v, public.productos p
-where v.metodo_pago = 'tarjeta' and v.total = 210.00 and p.precio_venta = 35.00
-on conflict do nothing;
-
--- 11. gastos_imprevistos (2 rows) — for "Mercado navideño" only.
+-- 11. gastos_imprevistos (2 rows) — for "Mercado de primavera" only.
 -- PK-only, best-effort.
 insert into public.gastos_imprevistos (evento_id, monto, motivo, categoria)
 select e.id, 120.00, 'Reparación de horno eléctrico', 'reparacion'
 from public.eventos e
-where e.nombre = 'Mercado navideño'
+where e.nombre = 'Mercado de primavera'
 on conflict do nothing;
 
 insert into public.gastos_imprevistos (evento_id, monto, motivo, categoria)
 select e.id, 80.00, 'Compra extra de harina', 'insumos_extra'
 from public.eventos e
-where e.nombre = 'Mercado navideño'
+where e.nombre = 'Mercado de primavera'
 on conflict do nothing;
 
--- 12. cierres_caja (1 row) — for "Mercado navideño". UNIQUE on
+-- 12. cierres_caja (1 row) — for "Mercado de primavera". UNIQUE on
 -- evento_id makes this section idempotent.
 insert into public.cierres_caja (
   evento_id, fecha_cierre,
@@ -248,10 +256,10 @@ insert into public.cierres_caja (
   utilidad_bruta,
   efectivo_esperado, efectivo_real, diferencia, notas
 )
-select e.id, '2026-12-20T20:00:00Z',
-       490.00, 2600.00, 200.00,
-       -2310.00,
-       490.00, 490.00, 0.00, 'Cierre preliminar: caja cuadrada, gastos altos'
+select e.id, '2026-05-11T20:00:00Z',
+        320.00, 2600.00, 200.00,
+        -2480.00,
+        320.00, 320.00, 0.00, 'Cierre final: evento pequeño con gastos fijos altos'
 from public.eventos e
-where e.nombre = 'Mercado navideño'
+where e.nombre = 'Mercado de primavera'
 on conflict (evento_id) do nothing;
