@@ -53,6 +53,8 @@ const mkVenta = (overrides: Partial<VentaConItems> = {}): VentaConItems => ({
       subtotal: 20,
       costo_unitario: 5,
       margen_aplicado: 0.4,
+      // Review finding #6: VentaItem now exposes evento_producto_id.
+      evento_producto_id: null,
       created_at: '2026-06-19T12:00:00Z',
     },
     {
@@ -64,6 +66,7 @@ const mkVenta = (overrides: Partial<VentaConItems> = {}): VentaConItems => ({
       subtotal: 15,
       costo_unitario: 8,
       margen_aplicado: 0.3,
+      evento_producto_id: null,
       created_at: '2026-06-19T12:00:00Z',
     },
   ],

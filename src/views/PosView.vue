@@ -48,8 +48,10 @@ import { useRouter } from 'vue-router'
 
 import ComprobanteVentaDialog from '@/components/business/ComprobanteVentaDialog.vue'
 import CarritoPanel from '@/components/business/CarritoPanel.vue'
+import EditarVentaDialog from '@/components/business/EditarVentaDialog.vue'
 import GastoImprevistoForm from '@/components/business/GastoImprevistoForm.vue'
 import GastoImprevistoListItem from '@/components/business/GastoImprevistoListItem.vue'
+import HistorialVentasEventoDialog from '@/components/business/HistorialVentasEventoDialog.vue'
 import ProductoCardGrid from '@/components/business/ProductoCardGrid.vue'
 import RegistrarVentaDialog from '@/components/business/RegistrarVentaDialog.vue'
 import ResumenVentasHoy from '@/components/business/ResumenVentasHoy.vue'
@@ -60,6 +62,8 @@ import { useProductos } from '@/composables/useProductos'
 import { useRecipes } from '@/composables/useRecipes'
 import { useVentas } from '@/composables/useVentas'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
+import { estadoEsEditable } from '@/utils/estado'
+import { logInfo } from '@/utils/logger'
 import type {
   GastoImprevistoInput,
   MetodoPago,
@@ -79,11 +83,13 @@ const {
   carrito,
   ventas,
   cargando: cargandoVentas,
+  error: errorVentas,
   totalCarrito,
   eventoEnCurso,
   agregarAlCarrito,
   vaciarCarrito,
   registrarVenta,
+  corregirVenta,
   cargarPorEvento,
   actualizarCantidad,
   quitarDelCarrito,
@@ -178,6 +184,70 @@ const dialogoRegistrarAbierto = ref(false)
 // v-if can mount the dialog reactively.
 const comprobanteVenta = ref<VentaConItems | null>(null)
 const comprobanteAbierto = ref(false)
+
+// Event sales history (REQ-POS-HISTORIAL-1..3): operator-accessible
+// detailed view of every venta for the active evento. Gated by the
+// same feature flag as the rest of the pos-redesign surface.
+const historialAbierto = ref(false)
+
+// REQ-POS-CORRECCION-1..3: edit/correction flow. The history dialog
+// surfaces an "Editar" button per row when the evento is editable;
+// clicking it mounts the EditarVentaDialog with the venta's current
+// state. On apply, we call useVentas().corregirVenta which writes the
+// audit row + updates the live venta.
+const ventaEnEdicion = ref<VentaConItems | null>(null)
+const dialogoEdicionAbierto = ref(false)
+
+// Productos disponibles for the EditarVentaDialog product-name lookup.
+// We map the evento_productos shape into the minimal {id, nombre,
+// precio_venta} the dialog needs.
+const productosParaEdicion = computed(() =>
+  productosParaGrid.value.map((ep) => ({
+    id: ep.producto_id,
+    nombre: ep.producto_nombre,
+    precio_venta: ep.precio_final,
+  })),
+)
+
+function abrirEdicion(venta: VentaConItems): void {
+  ventaEnEdicion.value = venta
+  dialogoEdicionAbierto.value = true
+}
+
+async function aplicarCorreccion(payload: {
+  ventaId: string
+  nuevoTotal: number
+  nuevoMetodoPago: MetodoPago
+  nuevoMontoRecibido: number | null
+  nuevosItems: Array<{
+    producto_id: string
+    cantidad: number
+    precio_unitario: number
+    subtotal: number
+    costo_unitario?: number | null
+    margen_aplicado?: number | null
+    evento_producto_id?: string | null
+  }>
+  motivo: string
+}): Promise<void> {
+  const venta = ventas.value.find((v) => v.id === payload.ventaId)
+  if (!venta) return
+  // Issue: edit dialog closes on correction failure.
+  // Only close the dialog on success — on failure the operator
+  // loses motivo/items/payment edits otherwise. The store still
+  // surfaces the failure as an error toast.
+  const res = await corregirVenta({
+    venta,
+    nuevoTotal: payload.nuevoTotal,
+    nuevoMetodoPago: payload.nuevoMetodoPago,
+    nuevoMontoRecibido: payload.nuevoMontoRecibido,
+    nuevosItems: payload.nuevosItems,
+    motivo: payload.motivo,
+  })
+  if (res.error) return
+  dialogoEdicionAbierto.value = false
+  ventaEnEdicion.value = null
+}
 
 // CargarEventos ensures eventoEnCurso is computed. The view fetches
 // eventos, productos, and recetas independently so the guard works
@@ -286,6 +356,18 @@ function cerrarComprobante() {
 function reintentar() {
   cargarTodas()
 }
+
+// Review finding #5: history-dialog retry. The dialog surfaces load
+// errors with a "Reintentar" button; tapping it re-runs
+// cargarPorEvento for the active evento so the operator can recover
+// from transient network failures without leaving the POS.
+async function reintentarHistorial() {
+  if (!eventoEnCurso.value) return
+  logInfo('reintentarHistorial', 'retrying history load', {
+    eventoId: eventoEnCurso.value.id,
+  })
+  await cargarPorEvento(eventoEnCurso.value.id)
+}
 </script>
 
 <template>
@@ -309,6 +391,20 @@ function reintentar() {
         >
           {{ online ? 'En línea' : 'Sin conexión' }}
         </v-chip>
+        <!-- pos-redesign (REQ-POS-HISTORIAL-1): operator-accessible
+             detailed event sales history. Gated by the same feature
+             flag as the rest of the pos-redesign surface. -->
+        <v-btn
+          v-if="FLAG_POS_REDESIGN && eventoEnCurso"
+          size="small"
+          variant="tonal"
+          color="primary"
+          prepend-icon="mdi-history"
+          data-testid="pos-historial-btn"
+          @click="historialAbierto = true"
+        >
+          Ver historial
+        </v-btn>
         <!-- Gastos imprevistos: acceso rápido con menú desplegable -->
         <v-menu v-if="eventoEnCurso" :close-on-content-click="false" location="bottom end">
           <template #activator="{ props: menuProps }">
@@ -504,6 +600,37 @@ function reintentar() {
       :venta="comprobanteVenta"
       :evento="eventoEnCurso"
       @update:model-value="cerrarComprobante"
+    />
+
+    <!-- pos-redesign (REQ-POS-HISTORIAL-1..3): detailed per-sale
+         history dialog for the active evento. Reuses the ventas
+         array already loaded by cargarPorEvento. Review finding #5
+         forwards the load error + retry so the operator sees a real
+         error banner instead of a misleading empty list. -->
+    <HistorialVentasEventoDialog
+      v-if="FLAG_POS_REDESIGN && eventoEnCurso"
+      :model-value="historialAbierto"
+      :ventas="ventas"
+      :evento="eventoEnCurso"
+      :editable="estadoEsEditable(eventoEnCurso.estado)"
+      :cargando="cargandoVentas"
+      :error="errorVentas"
+      @update:model-value="(v) => { historialAbierto = v }"
+      @editar="abrirEdicion"
+      @reintentar="reintentarHistorial"
+    />
+
+    <!-- REQ-POS-CORRECCION-1..3: edit dialog mounts when the operator
+         clicks "Editar" in the history dialog. Closes itself on
+         success or cancel; the store handles the audit trail and
+         the EVENTO_CERRADO guard. -->
+    <EditarVentaDialog
+      v-if="FLAG_POS_REDESIGN && ventaEnEdicion"
+      :model-value="dialogoEdicionAbierto"
+      :venta="ventaEnEdicion"
+      :productos-disponibles="productosParaEdicion"
+      @update:model-value="(v) => { dialogoEdicionAbierto = v }"
+      @corregir="aplicarCorreccion"
     />
   </v-container>
 </template>

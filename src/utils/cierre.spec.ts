@@ -45,6 +45,8 @@ const mkItem = (
   subtotal: 5 * (overrides.cantidad ?? 1),
   costo_unitario: overrides.costo_unitario ?? null,
   margen_aplicado: null,
+  // Review finding #6: VentaItem now exposes evento_producto_id.
+  evento_producto_id: null,
   created_at: '2026-06-19T10:00:00Z',
 })
 

@@ -49,10 +49,15 @@ export function calcularProyeccion(
 ): ProyeccionResultado {
   // Recetas arrive with embedded `ingredientes` from the store's joined
   // query; cast to the catalog-shaped shape so the lookup stays typed.
-  const recetaMap = new Map(recetas.map((r) => [r.id, r]))
-  const materiaMap = new Map(materiasPrimas.map((m) => [m.id, m]))
+  const recetasLista = Array.isArray(recetas) ? recetas : []
+  const materiasLista = Array.isArray(materiasPrimas) ? materiasPrimas : []
+  const planLista = Array.isArray(plan) ? plan : []
+  const gastosLista = Array.isArray(gastosFijos) ? gastosFijos : []
 
-  const lineas: LineaProyeccion[] = plan.map((fila) => {
+  const recetaMap = new Map(recetasLista.map((r) => [r.id, r]))
+  const materiaMap = new Map(materiasLista.map((m) => [m.id, m]))
+
+  const lineas: LineaProyeccion[] = planLista.map((fila) => {
     const receta = recetaMap.get(fila.receta_id)
     if (!receta) {
       return {
@@ -90,7 +95,7 @@ export function calcularProyeccion(
     }
   })
 
-  const desgloseFijos: DesgloseFijo[] = gastosFijos.map((g) => ({
+  const desgloseFijos: DesgloseFijo[] = gastosLista.map((g) => ({
     gastoId: g.id,
     categoria: g.categoria,
     monto: g.monto,
@@ -128,7 +133,7 @@ export function calcularProyeccion(
     // Build contribuciones array: for each plan row, find matching
     // producto price, compute contribution per unit.
     const contribuciones: ContribucionConVolumen[] = []
-    for (const fila of plan) {
+    for (const fila of planLista) {
       const precioVenta = precioPorReceta.get(fila.receta_id) ?? 0
       const linea = lineas.find((l) => l.recetaId === fila.receta_id)
       const costoPorUnidad = linea?.costoPorUnidad ?? 0
@@ -157,7 +162,7 @@ export function calcularProyeccion(
     }
 
     // Per-product break-even minimum price
-    for (const fila of plan) {
+    for (const fila of planLista) {
       const linea = lineas.find((l) => l.recetaId === fila.receta_id)
       if (linea && linea.costoPorUnidad > 0 && fila.unidades_a_producir > 0) {
         precioMinimoSugeridoPorProducto[fila.receta_id] = calcularPrecioMinimoBreakEven(

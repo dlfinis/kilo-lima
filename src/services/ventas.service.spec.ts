@@ -36,6 +36,8 @@ const mkItem = (overrides: Partial<VentaItem> = {}): VentaItem => ({
   subtotal: 5,
   costo_unitario: null,
   margen_aplicado: null,
+  // Review finding #6: VentaItem now exposes evento_producto_id.
+  evento_producto_id: null,
   created_at: '2026-06-19T00:00:00Z',
   ...overrides,
 })
@@ -292,5 +294,225 @@ describe('ventas.service — generarComprobanteNumero (REQ-POS-COMPROBANTE-4)', 
     const res = await servicio.generarComprobanteNumero('e-1')
     // V-001 is the only format the helper produces.
     expect(res).toMatch(/^V-\d{3}$/)
+  })
+})
+
+// REQ-POS-CORRECCION-1..3: sale correction service with audit trail.
+// v2: the previous v1 flow did 4 non-transactional calls
+// (delete items, re-insert items, insert audit row, update header)
+// which could leave the live data, the audit row, and the items
+// array inconsistent on partial failure (review finding #1). The
+// new flow collapses everything into a single `public.corregir_venta`
+// RPC call. The tests below verify:
+//   - the RPC receives the right input shape (motivo + financial
+//     deltas + items array)
+//   - the motivo guard short-circuits before any wire call
+//   - the typed ServiceError mapping for the documented RPC error
+//     codes (EVENTO_CERRADO, MONTO_INSUFICIENTE, etc.)
+//   - the items array includes `evento_producto_id` end-to-end
+//     (review finding #6)
+describe('ventas.service — corregirVenta (REQ-POS-CORRECCION-1..3, v2 atomic RPC)', () => {
+  const mkCorreccionInput = () => ({
+    venta_id: 'v-1',
+    evento_id: 'e-1',
+    total_anterior: 5,
+    total_nuevo: 10,
+    metodo_pago_anterior: 'efectivo' as const,
+    metodo_pago_nuevo: 'transferencia' as const,
+    monto_recibido_anterior: 5,
+    monto_recibido_nuevo: null,
+    motivo: 'Cliente pidió cambio de método',
+    items_anteriores: [mkItem({ id: 'vi-1', venta_id: 'v-1', subtotal: 5 })],
+    items_nuevos: [
+      mkItem({ id: 'vi-1', venta_id: 'v-1', cantidad: 2, subtotal: 10 }),
+    ],
+  })
+
+  it('invokes the corregir_venta RPC with the full payload (atomic path, finding #1)', async () => {
+    // The RPC returns the post-correction state — { venta, items }.
+    const updatedVenta = mkVenta({
+      id: 'v-1',
+      total: 10,
+      metodo_pago: 'transferencia',
+      monto_recibido: null,
+      cambio: null,
+    })
+    const updatedItem = mkItem({
+      id: 'vi-1',
+      venta_id: 'v-1',
+      cantidad: 2,
+      subtotal: 10,
+    })
+    __pushSupabaseResponse<unknown>({
+      data: { venta: updatedVenta, items: [updatedItem] },
+      error: null,
+    })
+
+    const res = await servicio.corregirVenta(mkCorreccionInput())
+    expect(res.error).toBeNull()
+    expect(res.data?.id).toBe('v-1')
+    expect(res.data?.total).toBe(10)
+    expect(res.data?.metodo_pago).toBe('transferencia')
+    expect(res.data?.items).toHaveLength(1)
+
+    // The wire call should be a single RPC, not 4 separate ops.
+    const llamadas = __getSupabaseMockCalls()
+    const rpcCalls = llamadas.filter((l) => l.metodo === 'rpc')
+    expect(rpcCalls).toHaveLength(1)
+    // No table-level insert/update/delete from corregirVenta anymore.
+    expect(llamadas.filter((l) => l.metodo === 'insert').length).toBe(0)
+    expect(llamadas.filter((l) => l.metodo === 'update').length).toBe(0)
+    expect(llamadas.filter((l) => l.metodo === 'delete').length).toBe(0)
+  })
+
+  it('forwards the RPC payload shape (motivo + financial deltas + items)', async () => {
+    const updatedVenta = mkVenta({
+      id: 'v-1',
+      total: 10,
+      metodo_pago: 'transferencia',
+    })
+    __pushSupabaseResponse<unknown>({
+      data: { venta: updatedVenta, items: [] },
+      error: null,
+    })
+
+    await servicio.corregirVenta(mkCorreccionInput())
+    const llamadas = __getSupabaseMockCalls()
+    const rpcCall = llamadas.find((l) => l.metodo === 'rpc')
+    expect(rpcCall).toBeDefined()
+    // First arg is the RPC function name; second is the params object.
+    expect(rpcCall?.args[0]).toBe('corregir_venta')
+    const payload = (rpcCall?.args[1] as { payload: Record<string, unknown> })
+      .payload
+    expect(payload).toMatchObject({
+      venta_id: 'v-1',
+      evento_id: 'e-1',
+      total_nuevo: 10,
+      metodo_pago_nuevo: 'transferencia',
+      monto_recibido_nuevo: null,
+      motivo: 'Cliente pidió cambio de método',
+    })
+    expect(Array.isArray(payload.items)).toBe(true)
+  })
+
+  it('forwards evento_producto_id in the items payload (finding #6 — type contract)', async () => {
+    const updatedVenta = mkVenta({
+      id: 'v-1',
+      total: 10,
+      metodo_pago: 'efectivo',
+    })
+    const itemConEp: VentaItemInput = {
+      producto_id: 'p-1',
+      cantidad: 2,
+      precio_unitario: 5,
+      subtotal: 10,
+      costo_unitario: 3,
+      margen_aplicado: 0.4,
+      evento_producto_id: 'ep-1',
+    }
+    __pushSupabaseResponse<unknown>({
+      data: {
+        venta: updatedVenta,
+        items: [{ ...mkItem(), id: 'vi-new', evento_producto_id: 'ep-1' }],
+      },
+      error: null,
+    })
+
+    await servicio.corregirVenta({
+      ...mkCorreccionInput(),
+      metodo_pago_nuevo: 'efectivo',
+      monto_recibido_nuevo: 10,
+      items_nuevos: [itemConEp],
+    })
+    const rpcCall = __getSupabaseMockCalls().find((l) => l.metodo === 'rpc')
+    const payload = (rpcCall?.args[1] as { payload: { items: Array<Record<string, unknown>> } })
+      .payload
+    expect(payload.items[0]?.evento_producto_id).toBe('ep-1')
+  })
+
+  it('rejects when motivo is empty (REQ-POS-CORRECCION-3 — traceability invariant)', async () => {
+    const res = await servicio.corregirVenta({
+      ...mkCorreccionInput(),
+      motivo: '',
+    })
+    expect(res.error?.code).toBe('CORRECCION_SIN_MOTIVO')
+    expect(res.data).toBeNull()
+    // No wire call at all — short-circuit before the RPC.
+    const llamadas = __getSupabaseMockCalls()
+    expect(llamadas.filter((l) => l.metodo === 'rpc').length).toBe(0)
+    expect(llamadas.filter((l) => l.metodo === 'insert').length).toBe(0)
+    expect(llamadas.filter((l) => l.metodo === 'update').length).toBe(0)
+  })
+
+  it('does NOT call the RPC when motivo is whitespace-only (triangulation)', async () => {
+    const res = await servicio.corregirVenta({
+      ...mkCorreccionInput(),
+      motivo: '   ',
+    })
+    expect(res.error?.code).toBe('CORRECCION_SIN_MOTIVO')
+    const llamadas = __getSupabaseMockCalls()
+    expect(llamadas.filter((l) => l.metodo === 'rpc').length).toBe(0)
+  })
+
+  it('maps RPC EVENTO_CERRADO error to typed ServiceError (finding #2 — backend enforcement)', async () => {
+    // The RPC raises `raise exception 'EVENTO_CERRADO' using errcode = 'P0001'`.
+    // Supabase surfaces that as { message: 'EVENTO_CERRADO', ... }.
+    __pushSupabaseResponse<unknown>({
+      data: null,
+      error: { code: 'P0001', message: 'EVENTO_CERRADO' },
+    })
+
+    const res = await servicio.corregirVenta(mkCorreccionInput())
+    expect(res.error?.code).toBe('EVENTO_CERRADO')
+    expect(res.data).toBeNull()
+  })
+
+  it('maps RPC MONTO_INSUFICIENTE error to typed ServiceError (finding #4 — payment validation)', async () => {
+    __pushSupabaseResponse<unknown>({
+      data: null,
+      error: { code: 'P0001', message: 'MONTO_INSUFICIENTE' },
+    })
+
+    const res = await servicio.corregirVenta({
+      ...mkCorreccionInput(),
+      metodo_pago_nuevo: 'efectivo',
+      monto_recibido_nuevo: 3,
+    })
+    expect(res.error?.code).toBe('MONTO_INSUFICIENTE')
+    expect(res.data).toBeNull()
+  })
+
+  it('maps RPC CORRECCION_SIN_ITEMS error to VENTA_SIN_ITEMS (finding #4 — defense in depth)', async () => {
+    __pushSupabaseResponse<unknown>({
+      data: null,
+      error: { code: 'P0001', message: 'CORRECCION_SIN_ITEMS' },
+    })
+
+    const res = await servicio.corregirVenta(mkCorreccionInput())
+    expect(res.error?.code).toBe('VENTA_SIN_ITEMS')
+    expect(res.data).toBeNull()
+  })
+
+  it('maps RPC VENTA_NO_ENCONTRADA to typed ServiceError (stale edit guard)', async () => {
+    __pushSupabaseResponse<unknown>({
+      data: null,
+      error: { code: 'P0001', message: 'VENTA_NO_ENCONTRADA' },
+    })
+
+    const res = await servicio.corregirVenta(mkCorreccionInput())
+    expect(res.error?.code).toBe('VENTA_NO_ENCONTRADA')
+    expect(res.data).toBeNull()
+  })
+
+  it('falls back to the original error when the RPC raises an unknown code', async () => {
+    __pushSupabaseResponse<unknown>({
+      data: null,
+      error: { code: 'P0001', message: 'SOMETHING_NEW_BROKE' },
+    })
+
+    const res = await servicio.corregirVenta(mkCorreccionInput())
+    expect(res.error?.code).toBe('P0001')
+    expect(res.error?.message).toBe('SOMETHING_NEW_BROKE')
+    expect(res.data).toBeNull()
   })
 })

@@ -8,12 +8,15 @@ import { computed, ref, watch } from 'vue'
 
 import type { CategoriaImprevisto, GastoImprevistoInput } from '@/types'
 
+type SocioOption = { id: string; nombre: string }
+
 const props = withDefaults(
   defineProps<{
     valoresIniciales?: GastoImprevistoInput | null
     editable?: boolean
+    socios?: SocioOption[]
   }>(),
-  { valoresIniciales: null, editable: true },
+  { valoresIniciales: null, editable: true, socios: () => [] },
 )
 
 const emit = defineEmits<{
@@ -33,6 +36,7 @@ const eventoId = ref<string>('')
 const categoria = ref<CategoriaImprevisto>('insumos_extra')
 const monto = ref<number>(0)
 const motivo = ref<string>('')
+const socioId = ref<string | null>(null)
 
 const errores = ref<{ monto?: string; motivo?: string }>({})
 
@@ -44,6 +48,7 @@ watch(
       categoria.value = 'insumos_extra'
       monto.value = 0
       motivo.value = ''
+      socioId.value = null
       errores.value = {}
       return
     }
@@ -51,6 +56,7 @@ watch(
     categoria.value = v.categoria ?? 'insumos_extra'
     monto.value = v.monto
     motivo.value = v.motivo
+    socioId.value = v.socio_id ?? null
     errores.value = {}
   },
   { immediate: true },
@@ -77,6 +83,7 @@ function onSubmit() {
     categoria: categoria.value,
     monto: monto.value,
     motivo: motivo.value.trim(),
+    socio_id: socioId.value || null,
   })
 }
 
@@ -115,6 +122,16 @@ function onCancelar() {
       :disabled="!editable"
       :error-messages="errores.motivo ? [errores.motivo] : []"
       data-testid="imprevisto-motivo"
+    />
+    <v-select
+      v-model="socioId"
+      :items="socios"
+      item-title="nombre"
+      item-value="id"
+      label="Pagado por (opcional)"
+      :disabled="!editable"
+      clearable
+      data-testid="imprevisto-socio"
     />
     <div class="d-flex ga-2 mt-2">
       <v-btn

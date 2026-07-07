@@ -11,6 +11,19 @@
 // columns at write time — the service does NOT re-read
 // `productos.precio_venta` on insert. The caller (cart) hands them
 // in already snapshotted.
+//
+// FUTURE: authorization hardening. Today this is a single-user PWA
+// using Supabase anon key + RLS policies. The `corregir_venta` RPC
+// runs as SECURITY DEFINER and bypasses RLS for its writes, which is
+// correct for the current design (trusted single-user device). When
+// multi-user auth is introduced (useAuth composable, JWT sessions,
+// per-socio ownership), the RPC should be audited to ensure it only
+// operates on ventas that belong to the calling user's active evento.
+// The migration at 20260708000000 already narrows RLS on
+// venta_correcciones to deny-by-default — the same pattern should be
+// extended to ventas + venta_items when auth goes live.
+// See: supabase/migrations/20260708000000_venta_correcciones_rpc.sql §1
+// and src/composables/useAuth.ts (placeholder for future auth slice).
 import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type {
@@ -18,6 +31,7 @@ import type {
   MetodoPago,
   ServiceError,
   VentaConItems,
+  VentaCorreccionInput,
   VentaItem,
   VentaItemInput,
 } from '@/types'
@@ -53,11 +67,89 @@ export interface VentasService {
   // concurrent writers in practice; the unique partial index catches
   // a rare collision (23505) so the caller can retry.
   generarComprobanteNumero(eventoId: string): Promise<string>
+  // REQ-POS-CORRECCION-1..3: apply a sale correction atomically.
+  //
+  // The previous v1 flow did four non-transactional calls (delete
+  // items, re-insert items, insert audit, update header) and could
+  // leave the live data, the audit row, and the items array
+  // inconsistent on partial failure. The new implementation collapses
+  // all of this into a single RPC call (`public.corregir_venta`) that
+  // runs as a SECURITY DEFINER PL/pgSQL transaction in the database.
+  // Benefits:
+  //   - atomicity (review finding #1)
+  //   - backend-enforced evento-state guard (review finding #2)
+  //   - append-only audit guaranteed at the schema level (finding #3)
+  //   - server-validated MONTO_INSUFICIENTE + monto_recibido/cambio
+  //     normalization (review finding #4)
+  // The store still applies defense-in-depth checks (motivo,
+  // MONTO_INSUFICIENTE, evento state) so the operator gets the error
+  // before any wire round-trip.
+  corregirVenta(
+    input: VentaCorreccionInput,
+  ): Promise<{ data: VentaConItems | null; error: ServiceError | null }>
 }
 
 const SIN_ITEMS: ServiceError = {
   code: 'VENTA_SIN_ITEMS',
   message: 'Una venta debe tener al menos un item',
+}
+// REQ-POS-CORRECCION-3: motivo is the human-readable audit invariant.
+// The DB also enforces non-empty motivo via CHECK, but we short-circuit
+// at the service layer so the user gets the error before any write.
+const CORRECCION_SIN_MOTIVO: ServiceError = {
+  code: 'CORRECCION_SIN_MOTIVO',
+  message: 'Una corrección debe tener un motivo registrado',
+}
+
+// RPC → typed ServiceError mapper. The `public.corregir_venta` RPC
+// raises PG exceptions with our domain codes as the exception text
+// (e.g. `raise exception 'EVENTO_CERRADO' using errcode = 'P0001'`).
+// Supabase surfaces the exception text in `error.message`. We parse
+// that text and remap to a typed `ServiceError` so the rest of the
+// app can keep its never-throw contract (LSP) and render specific
+// toasts / banners per error code.
+function mapearErrorRpc(error: { message?: string; code?: string } | null): ServiceError {
+  const msg = (error?.message ?? '').toString()
+  if (msg === 'EVENTO_CERRADO') {
+    return { code: 'EVENTO_CERRADO', message: 'El evento está cerrado' }
+  }
+  if (msg === 'CORRECCION_SIN_MOTIVO') {
+    return { code: 'CORRECCION_SIN_MOTIVO', message: 'Una corrección debe tener un motivo registrado' }
+  }
+  if (msg === 'CORRECCION_MOTIVO_MUY_LARGO') {
+    return { code: 'CORRECCION_MOTIVO_MUY_LARGO', message: 'El motivo es demasiado largo (máx. 500 caracteres)' }
+  }
+  if (msg === 'MONTO_INSUFICIENTE') {
+    return { code: 'MONTO_INSUFICIENTE', message: 'El monto recibido es menor que el total' }
+  }
+  if (msg === 'MONTO_REQUERIDO_PARA_EFECTIVO') {
+    return { code: 'MONTO_INSUFICIENTE', message: 'El monto recibido es obligatorio para ventas en efectivo' }
+  }
+  if (msg === 'CORRECCION_SIN_ITEMS') {
+    return { code: 'VENTA_SIN_ITEMS', message: 'Una venta debe tener al menos un item' }
+  }
+  if (msg === 'VENTA_NO_ENCONTRADA') {
+    return { code: 'VENTA_NO_ENCONTRADA', message: 'La venta que querés corregir ya no existe' }
+  }
+  if (msg === 'METODO_PAGO_INVALIDO') {
+    return { code: 'METODO_PAGO_INVALIDO', message: 'Método de pago no soportado' }
+  }
+  if (msg === 'TOTAL_NEGATIVO' || msg === 'TOTAL_REQUERIDO') {
+    return { code: 'TOTAL_INVALIDO', message: 'El total de la venta no es válido' }
+  }
+  if (msg === 'TOTAL_INCONSISTENTE') {
+    // Issue #4: client-sent total_nuevo disagreed with the server-
+    // recomputed sum of subtotals. The RPC refused the correction
+    // to keep the audit trail tamper-proof.
+    return {
+      code: 'TOTAL_INVALIDO',
+      message: 'El total enviado no coincide con la suma de los items',
+    }
+  }
+  return {
+    code: (error?.code ?? 'UNKNOWN').toString(),
+    message: msg || 'Error desconocido al corregir la venta',
+  }
 }
 
 export function crearVentasService(supabase: SupabaseClient<Database>): VentasService {
@@ -172,6 +264,78 @@ export function crearVentasService(supabase: SupabaseClient<Database>): VentasSe
       // swallowed as a generation failure — the caller can retry. We
       // do not throw (never-throw LSP contract).
       return `V-${String(count + 1).padStart(3, '0')}`
+    },
+
+    async corregirVenta(input) {
+      // REQ-POS-CORRECCION-3: traceability invariant — every edit must
+      // have a motivo. The RPC also enforces this server-side, but we
+      // short-circuit so the operator gets the error before any wire
+      // round-trip.
+      if (!input.motivo || input.motivo.trim().length === 0) {
+        return { data: null, error: CORRECCION_SIN_MOTIVO }
+      }
+      // Atomic correction via the public.corregir_venta RPC. See the
+      // migration 20260708000000_venta_correcciones_rpc.sql for the
+      // full contract. The RPC handles:
+      //   - motivo non-empty check
+      //   - items non-empty check
+      //   - venta existence + evento state (closes #2)
+      //   - monto_recibido >= total for efectivo (closes #4)
+      //   - monto_recibido/cambio normalization for non-efectivo (#4)
+      //   - audit row insert + venta header update + items replace
+      //     in a single transaction (closes #1)
+      //   - audit row is append-only at the schema level (#3)
+      //
+      // The generated supabase-js types don't know about our custom
+      // RPC (the typegen is regenerated when we run `supabase gen
+      // types` against the live DB), so we cast the params/response
+      // through `unknown` to keep the typed client happy without a
+      // run-time schema regeneration cycle.
+      const rpc = await (
+        supabase.rpc as unknown as (
+          fn: string,
+          args: Record<string, unknown>,
+        ) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>
+      )('corregir_venta', {
+        payload: {
+          venta_id: input.venta_id,
+          evento_id: input.evento_id,
+          motivo: input.motivo.trim(),
+          total_nuevo: input.total_nuevo,
+          metodo_pago_nuevo: input.metodo_pago_nuevo,
+          // cambio is always recomputed server-side for efectivo, and
+          // always null for non-efectivo. We forward the caller's
+          // `monto_recibido_nuevo` as-is for the efectivo branch; the
+          // RPC will validate it.
+          monto_recibido_nuevo: input.monto_recibido_nuevo,
+          // cambio_nuevo is intentionally NOT forwarded — the RPC is
+          // the source of truth. Forwarding a stale client value would
+          // race the server-computed one.
+          items: input.items_nuevos.map((it) => ({
+            producto_id: it.producto_id,
+            cantidad: it.cantidad,
+            precio_unitario: it.precio_unitario,
+            subtotal: it.subtotal,
+            costo_unitario: it.costo_unitario ?? null,
+            margen_aplicado: it.margen_aplicado ?? null,
+            evento_producto_id: it.evento_producto_id ?? null,
+          })),
+        },
+      })
+      if (rpc.error) {
+        return { data: null, error: mapearErrorRpc(rpc.error) }
+      }
+      // (rpc.data already typed as unknown above)
+      // The RPC returns { venta: {...}, items: [...] }. Stitch them
+      // into the VentaConItems shape the rest of the app expects.
+      const rpcData = rpc.data as { venta?: VentaConItems; items?: VentaItem[] } | null
+      if (!rpcData?.venta) {
+        return { data: null, error: { code: 'UNKNOWN', message: 'RPC devolvió respuesta vacía' } }
+      }
+      return {
+        data: { ...rpcData.venta, items: rpcData.items ?? [] },
+        error: null,
+      }
     },
   }
 }

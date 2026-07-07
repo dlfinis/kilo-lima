@@ -30,10 +30,12 @@ export function useVentas() {
     vaciarCarrito: store.vaciarCarrito,
     cargarPorEvento: store.cargarPorEvento,
     registrarVenta: store.registrarVenta,
+    corregirVenta: store.corregirVenta,
     descartarToast: store.descartarToast,
     // pos-redesign: typed error constants exposed for views that
     // need to render specific messages (e.g., MONTO_INSUFICIENTE in
     // RegistrarVentaDialog).
     CODIGO_MONTO_INSUFICIENTE: store.CODIGO_MONTO_INSUFICIENTE,
+    CODIGO_CORRECCION_SIN_MOTIVO: store.CODIGO_CORRECCION_SIN_MOTIVO,
   }
 }

@@ -40,10 +40,13 @@ import type {
   MetodoPago,
   ServiceError,
   VentaConItems,
+  VentaItem,
+  VentaItemInput,
 } from '@/types'
 import { estadoEsEditable } from '@/utils/estado'
 import { calcularCambio } from '@/utils/cambio'
 import { crearVentasService, type VentasService } from '@/services/ventas.service'
+import { createTraceId, logTrace, logError, logInfo } from '@/utils/logger'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useEventoProductosStore } from './eventoProductos.store'
 import { useEventsStore } from './events.store'
@@ -73,6 +76,12 @@ const CODIGO_MONTO_INSUFICIENTE: ServiceError = {
   code: 'MONTO_INSUFICIENTE',
   message: 'El monto recibido es menor que el total',
 }
+// REQ-POS-CORRECCION-3: motivo is the human-readable audit invariant.
+// Service-level guard also enforces it (defense in depth).
+const CODIGO_CORRECCION_SIN_MOTIVO: ServiceError = {
+  code: 'CORRECCION_SIN_MOTIVO',
+  message: 'Una corrección debe tener un motivo registrado',
+}
 
 export type ToastVenta =
   | { tipo: 'success'; mensaje: string }
@@ -92,6 +101,14 @@ export const useVentasStore = defineStore('ventas', () => {
   const servicio: VentasService = crearVentasService(supabase)
 
   const ventas = ref<VentaConItems[]>([])
+  // Track which evento the ventas array belongs to. The history
+  // dialog labels its rows with the active evento's name, so a
+  // mismatched cache would mislead the operator (review finding #6).
+  // When `ventasEventoId` differs from the evento we're loading, the
+  // cached rows are stale and must be discarded before the new load
+  // settles — even on failure — to avoid rendering one evento's
+  // sales under another evento's name.
+  const ventasEventoId = ref<string | null>(null)
   const carrito = ref<LineaCarrito[]>([])
   const cargando = ref<boolean>(false)
   const error = ref<string | null>(null)
@@ -192,16 +209,63 @@ export const useVentasStore = defineStore('ventas', () => {
   )
 
   async function cargarPorEvento(eventoId: string): Promise<void> {
+    // Review finding #6: stale-cache safety. If the operator switched
+    // the active evento, the cached ventas belong to the PREVIOUS
+    // evento. Showing them under the new evento's name in the history
+    // dialog would be a UX bug. Clear the cache immediately when the
+    // requested evento doesn't match what we last loaded for.
+    if (ventasEventoId.value !== null && ventasEventoId.value !== eventoId) {
+      ventas.value = []
+      ventasEventoId.value = null
+      error.value = null
+    }
     cargando.value = true
     error.value = null
+    const traceId = createTraceId()
+    logTrace('cargarPorEvento', 'load-start', { eventoId, traceId })
+    logInfo('cargarPorEvento', 'loading ventas', { eventoId })
     const res = await servicio.listarPorEvento(eventoId)
     cargando.value = false
     if (res.error) {
+      // Issue #6: minimum observability for history-load failures.
+      // The dialog surfaces the user-facing banner; the log line
+      // preserves the underlying Supabase error code so a future
+      // log aggregator can group by code/scope.
+      logError('cargarPorEvento', 'failed to load ventas', {
+        eventoId,
+        cachedEventoId: ventasEventoId.value,
+        errorCode: res.error.code,
+        errorMessage: res.error.message,
+      })
+      // Review finding #5: do NOT clear the ventas array on error
+      // when the failing load targets the SAME evento — the operator
+      // already saw those rows and clearing would render the
+      // misleading "Aún no hay ventas" empty state instead of the
+      // real error.
+      // Review finding #6 (combined): if the failing load targets a
+      // DIFFERENT evento (caller switched and the new load failed),
+      // we already cleared the stale cache at function entry. Setting
+      // ventasEventoId = null here guarantees the next successful
+      // load (any evento) writes its own tag and the dialog never
+      // shows another evento's data.
+      if (ventasEventoId.value !== eventoId) {
+        ventas.value = []
+        ventasEventoId.value = null
+      }
       error.value = MENSAJE_ERROR_CARGA
-      ventas.value = []
       return
     }
     ventas.value = res.data ?? []
+    ventasEventoId.value = eventoId
+    logTrace('cargarPorEvento', 'load-done', {
+      eventoId,
+      traceId,
+      count: ventas.value.length,
+    })
+    logInfo('cargarPorEvento', 'ventas loaded', {
+      eventoId,
+      count: ventas.value.length,
+    })
   }
 
   function descartarToast(): void {
@@ -307,12 +371,205 @@ export const useVentasStore = defineStore('ventas', () => {
     return { data: res.data, error: null }
   }
 
+  // REQ-POS-CORRECCION-1..3: edit a previously-registered sale with
+  // a durable audit trail. The store is the UX gate (early rejects
+  // + toasts); the database RPC is the source of truth for atomicity
+  // and the evento-state guard.
+  //
+  // v2 changes (post-review):
+  //   - All items / header / audit writes happen inside a single
+  //     `public.corregir_venta` RPC transaction. The previous v1
+  //     flow did 4 non-transactional calls and could leave the live
+  //     data, the audit row, and the items array inconsistent on
+  //     partial failure (review finding #1).
+  //   - The closed-evento guard is now backend-enforced — the RPC
+  //     reads the live evento state and refuses the correction
+  //     even if a direct client bypasses the store (#2).
+  //   - The audit log is append-only at the schema level — the new
+  //     migration drops the FOR ALL policy and replaces it with
+  //     narrow SELECT + INSERT, so UPDATE/DELETE attempts are
+  //     denied by RLS (#3).
+  //   - MONTO_INSUFICIENTE is validated client-side (fast feedback
+  //     for the operator) AND server-side (defense in depth).
+  //     monto_recibido / cambio are normalized to null for
+  //     non-efectivo methods so stale values from a previous
+  //     effective payment don't leak into the new record (#4).
+  async function corregirVenta(input: {
+    venta: VentaConItems
+    nuevoTotal: number
+    nuevoMetodoPago: MetodoPago
+    nuevoMontoRecibido: number | null
+    nuevosItems: VentaItemInput[]
+    motivo: string
+  }): Promise<{ data: VentaConItems | null; error: ServiceError | null }> {
+    // 1) Policy: motivo is required (REQ-POS-CORRECCION-3).
+    if (!input.motivo || input.motivo.trim().length === 0) {
+      return { data: null, error: CODIGO_CORRECCION_SIN_MOTIVO }
+    }
+    // 2) Policy: evento must be editable (REQ-POS-CORRECCION-2).
+    // Defense-in-depth: the RPC also enforces this server-side, but
+    // we check here so the operator gets the error before the
+    // wire round-trip. Look up the venta's own evento by id (not
+    // the active evento) so the guard is independent of which
+    // evento the operator is currently viewing — the sale itself
+    // must belong to an editable evento. If the events store
+    // doesn't know the evento (legacy / stale data), default to
+    // cerrado so the guard is fail-closed.
+    const eventoDeLaVenta = eventsStore.eventos.find(
+      (e) => e.id === input.venta.evento_id,
+    )
+    const estadoParaValidar = eventoDeLaVenta?.estado ?? 'cerrado'
+    if (!estadoEsEditable(estadoParaValidar)) {
+      toast.value = { tipo: 'error', mensaje: CODIGO_EVENTO_CERRADO.message }
+      return { data: null, error: CODIGO_EVENTO_CERRADO }
+    }
+    // 3) Validate items non-empty (the RPC also enforces this, but
+    // short-circuit here so the operator gets a clearer error).
+    if (input.nuevosItems.length === 0) {
+      return {
+        data: null,
+        error: { code: 'VENTA_SIN_ITEMS', message: 'La venta debe tener al menos un item' },
+      }
+    }
+    // 4) Payment-state validation + normalization (REQ-POS-CORRECCION-4).
+    // For efectivo: monto_recibido must be provided AND >= total.
+    // For non-efectivo: monto_recibido / cambio are forced to null
+    // so a stale value from a previous edit doesn't leak through.
+    let nuevoMontoRecibidoNormalizado: number | null
+    if (input.nuevoMetodoPago === 'efectivo') {
+      if (input.nuevoMontoRecibido === null || input.nuevoMontoRecibido === undefined) {
+        toast.value = {
+          tipo: 'error',
+          mensaje: '❌ Para ventas en efectivo indicá el monto recibido',
+        }
+        return { data: null, error: CODIGO_MONTO_INSUFICIENTE }
+      }
+      if (input.nuevoMontoRecibido < input.nuevoTotal) {
+        toast.value = {
+          tipo: 'error',
+          mensaje: CODIGO_MONTO_INSUFICIENTE.message,
+        }
+        return { data: null, error: CODIGO_MONTO_INSUFICIENTE }
+      }
+      nuevoMontoRecibidoNormalizado = input.nuevoMontoRecibido
+    } else {
+      // Stale cash-back values from a previous efectivo correction
+      // would otherwise leak into the new record. Normalize to null.
+      nuevoMontoRecibidoNormalizado = null
+    }
+    // `cambio` is derived consistently in one place: the RPC
+    // recomputes it server-side (server is the source of truth).
+    // We do NOT compute it client-side here to avoid a client/server
+    // disagreement.
+    // 5) Snapshot the BEFORE items so the audit row records what was
+    // actually there at the moment of the edit. The RPC also captures
+    // its own server-side snapshot, but the client-side snapshot is
+    // what the operator sees if the response is missing the items
+    // array (defense in depth for the error path).
+    const itemsAnteriores: VentaItem[] = input.venta.items.map((it) => ({ ...it }))
+
+    // 6) Single RPC call → the database does the rest atomically.
+    const traceId = createTraceId()
+    logTrace('corregirVenta', 'correction-requested', {
+      ventaId: input.venta.id,
+      eventoId: input.venta.evento_id,
+      traceId,
+      totalAnterior: input.venta.total,
+      totalNuevo: input.nuevoTotal,
+    })
+    logInfo('corregirVenta', 'correction started', {
+      ventaId: input.venta.id,
+      eventoId: input.venta.evento_id,
+      totalAnterior: input.venta.total,
+      totalNuevo: input.nuevoTotal,
+      metodoPagoNuevo: input.nuevoMetodoPago,
+      itemsCount: input.nuevosItems.length,
+    })
+    const res = await servicio.corregirVenta({
+      venta_id: input.venta.id,
+      evento_id: input.venta.evento_id,
+      total_anterior: input.venta.total,
+      total_nuevo: input.nuevoTotal,
+      metodo_pago_anterior: input.venta.metodo_pago,
+      metodo_pago_nuevo: input.nuevoMetodoPago,
+      monto_recibido_anterior: input.venta.monto_recibido,
+      monto_recibido_nuevo: nuevoMontoRecibidoNormalizado,
+      motivo: input.motivo,
+      items_anteriores: itemsAnteriores,
+      items_nuevos: input.nuevosItems,
+    })
+    if (res.error || !res.data) {
+      // Distinguish typed domain errors (which already have a clear
+      // user-facing message) from generic RPC failures. Domain
+      // errors: surface as-is. Generic failures: fall back to the
+      // connection hint.
+      const code = res.error?.code
+      const isDomainError =
+        code === 'EVENTO_CERRADO' ||
+        code === 'CORRECCION_SIN_MOTIVO' ||
+        code === 'MONTO_INSUFICIENTE' ||
+        code === 'VENTA_SIN_ITEMS' ||
+        code === 'VENTA_NO_ENCONTRADA' ||
+        code === 'METODO_PAGO_INVALIDO'
+      // Issue #6: log correction failures with structured context.
+      // Domain errors are expected (operator error) so we still log
+      // them at error level for the future log aggregator — they're
+      // diagnostic signal, not noise.
+      logTrace('corregirVenta', 'correction-failed', {
+        ventaId: input.venta.id,
+        eventoId: input.venta.evento_id,
+        traceId,
+        errorCode: code,
+      })
+      logError('corregirVenta', 'failed to apply correction', {
+        eventoId: input.venta.evento_id,
+        ventaId: input.venta.id,
+        errorCode: code,
+        isDomainError,
+      })
+      toast.value = {
+        tipo: 'error',
+        mensaje: isDomainError
+          ? res.error?.message ?? '❌ No se pudo registrar la corrección'
+          : '❌ Error al registrar la corrección — revisá tu conexión',
+      }
+      return { data: null, error: res.error }
+    }
+    // 7) Update local state so the history view reflects the edit
+    // without a re-fetch.
+    const idx = ventas.value.findIndex((v) => v.id === res.data?.id)
+    if (idx >= 0 && res.data) {
+      ventas.value = [
+        ...ventas.value.slice(0, idx),
+        res.data,
+        ...ventas.value.slice(idx + 1),
+      ]
+    }
+    toast.value = {
+      tipo: 'success',
+      mensaje: `✏️ Venta ${res.data.comprobante_numero ?? res.data.id} corregida`,
+    }
+    logTrace('corregirVenta', 'correction-done', {
+      ventaId: res.data.id,
+      eventoId: res.data.evento_id,
+      traceId,
+      comprobanteNumero: res.data.comprobante_numero,
+    })
+    logInfo('corregirVenta', 'correction applied', {
+      ventaId: res.data.id,
+      eventoId: res.data.evento_id,
+      comprobanteNumero: res.data.comprobante_numero,
+    })
+    return { data: res.data, error: null }
+  }
+
   return {
     ventas,
     carrito,
     cargando,
     error,
     toast,
+    ventasEventoId,
     eventoEnCurso,
     totalCarrito,
     cantidadItems,
@@ -322,10 +579,12 @@ export const useVentasStore = defineStore('ventas', () => {
     vaciarCarrito,
     cargarPorEvento,
     registrarVenta,
+    corregirVenta,
     descartarToast,
     CODIGO_SIN_EVENTO,
     CODIGO_EVENTO_CERRADO,
     CODIGO_VENTA_SIN_ITEMS,
     CODIGO_MONTO_INSUFICIENTE,
+    CODIGO_CORRECCION_SIN_MOTIVO,
   }
 })

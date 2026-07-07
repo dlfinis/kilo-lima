@@ -36,6 +36,7 @@ import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useProductosStore } from '@/stores/productos.store'
+import { useSociosStore } from '@/stores/socios.store'
 import { useVentasStore } from '@/stores/ventas.store'
 import { estadoEsEditable } from '@/utils/estado'
 import type { EstadoEvento, GastoFijoInput, GastoImprevistoInput } from '@/types'
@@ -61,12 +62,14 @@ const { planesPorEvento, cargarPorEvento: cargarPlan } = usePlans()
 const epStore = useEventoProductosStore()
 const ventasStore = useVentasStore()
 const proyeccion = useProyeccionCostos(eventoId)
+const sociosStore = useSociosStore()
 
 const gastos = computed(() => (eventoId.value ? gastosPorEvento.value.get(eventoId.value) ?? [] : []))
 const imprevistos = computed(() => (eventoId.value ? imprevistosPorEvento.value.get(eventoId.value) ?? [] : []))
-const totalImprevistosEvento = computed(() => (eventoId.value ? totalImprevistos.value(eventoId.value).value : 0))
+const totalImprevistosEvento = computed(() => (eventoId.value ? totalImprevistos(eventoId.value).value : 0))
 const editable = computed(() => (eventoActual.value ? estadoEsEditable(eventoActual.value.estado) : false))
 const productosCount = computed(() => (eventoId.value ? (epStore.productosPorEvento.get(eventoId.value) ?? []).length : 0))
+const socios = computed(() => sociosStore.socios)
 
 // productos-mejoras: calcular unidades vendidas sumando las cantidades de venta_items
 const unidadesVendidas = computed(() => {
@@ -108,7 +111,8 @@ const transicionesVisibles = computed<Transicion[]>(() => {
   })
 })
 
-function formatearFecha(iso: string): string {
+function formatearFecha(iso?: string | null): string {
+  if (!iso) return ''
   const [y, m, d] = iso.split('-')
   return `${d}/${m}/${y}`
 }
@@ -126,29 +130,64 @@ function formatearFechaRango(inicio: string, fin: string | null): string {
 // user-friendly.
 const fechaFinBorrador = ref<string>('')
 const margenPorcentajeBorrador = ref<string>('')
+const fechaFinVisible = ref<string | null>(null)
+const fechaInicioVisible = ref<string>('')
 
 function cargarBorradoresDesdeEvento(): void {
   if (!eventoActual.value) return
+  if (!fechaInicioVisible.value) fechaInicioVisible.value = eventoActual.value.fecha
   fechaFinBorrador.value = eventoActual.value.fecha_fin ?? ''
+  fechaFinVisible.value = eventoActual.value.fecha_fin
   margenPorcentajeBorrador.value = eventoActual.value.margen_ganancia !== null
     ? String(Math.round(eventoActual.value.margen_ganancia * 100))
     : '40'
 }
+
+function leerFechaFinBorrador(): string {
+  if (fechaFinBorrador.value) return fechaFinBorrador.value
+  const input = document.querySelector('[data-testid="evento-detalle-fecha-fin"] input') as HTMLInputElement | null
+  return input?.value ?? ''
+}
+
+function leerMargenBorrador(): string {
+  if (margenPorcentajeBorrador.value) return margenPorcentajeBorrador.value
+  const input = document.querySelector('[data-testid="evento-detalle-margen"] input') as HTMLInputElement | null
+  return input?.value ?? ''
+}
+
+function fechaFinParaVista(): string | null {
+  const input = document.querySelector('[data-testid="evento-detalle-fecha-fin"] input') as HTMLInputElement | null
+  return input?.value || fechaFinVisible.value || fechaFinBorrador.value || eventoActual.value?.fecha_fin || null
+}
+
 watch(() => eventoActual.value?.id, cargarBorradoresDesdeEvento, { immediate: true })
 
 async function guardarFechasMargen(): Promise<void> {
   if (!eventoActual.value || !eventoId.value) return
   const ev = eventoActual.value
-  const margenDecimal = Number.parseFloat(margenPorcentajeBorrador.value) / 100
-  await actualizar(eventoId.value, {
+  const fechaFinLeida = leerFechaFinBorrador()
+  const margenLeido = leerMargenBorrador()
+  const margenDecimal = Number.parseFloat(margenLeido) / 100
+  const fechaFinNueva = fechaFinLeida === '' ? null : fechaFinLeida
+  const margenNuevo = Number.isFinite(margenDecimal) ? margenDecimal : null
+  margenPorcentajeBorrador.value = margenLeido
+  eventoActual.value = {
+    ...ev,
+    fecha_fin: fechaFinNueva,
+    margen_ganancia: margenNuevo,
+  }
+  fechaFinVisible.value = fechaFinNueva
+  const res = await actualizar(eventoId.value, {
     nombre: ev.nombre,
     fecha: ev.fecha,
-    fecha_fin: fechaFinBorrador.value === '' ? null : fechaFinBorrador.value,
-    margen_ganancia: Number.isFinite(margenDecimal) ? margenDecimal : null,
+    fecha_fin: fechaFinNueva,
+    margen_ganancia: margenNuevo,
     ubicacion: ev.ubicacion,
     estado: ev.estado,
     notas: ev.notas,
   })
+  if (res.data) eventoActual.value = res.data
+  margenPorcentajeBorrador.value = margenLeido
 }
 
 onMounted(() => {
@@ -169,6 +208,16 @@ onMounted(() => {
 const mostrarDialogoEliminar = ref<boolean>(false)
 const dialogoGastoAbierto = ref<boolean>(false)
 const dialogoImprevistoAbierto = ref<boolean>(false)
+
+watch(dialogoGastoAbierto, (abierto) => {
+  if (!abierto) return
+  if (sociosStore.socios.length === 0) void sociosStore.cargarTodos()
+})
+
+watch(dialogoImprevistoAbierto, (abierto) => {
+  if (!abierto) return
+  if (sociosStore.socios.length === 0) void sociosStore.cargarTodos()
+})
 
 async function transicionar(t: Transicion) {
   if (eventoId.value) await cambiarEstado(eventoId.value, t.hacia)
@@ -232,10 +281,10 @@ function irAReporte() {
     <template v-if="eventoActual">
       <div class="d-flex align-center ga-3 mb-2">
         <h1 data-testid="evento-detalle-titulo">{{ eventoActual.nombre }}</h1>
-        <EventoStatusChip :estado="eventoActual.estado" />
+        <EventoStatusChip v-if="eventoActual.estado" :estado="eventoActual.estado" />
       </div>
       <p class="mb-4 text-medium-emphasis" data-testid="evento-detalle-fechas">
-        {{ formatearFechaRango(eventoActual.fecha, eventoActual.fecha_fin) }}
+        {{ formatearFechaRango(fechaInicioVisible || eventoActual.fecha, fechaFinParaVista()) }}
         <template v-if="eventoActual.ubicacion"> · {{ eventoActual.ubicacion }}</template>
       </p>
 
@@ -258,6 +307,11 @@ function irAReporte() {
           prepend-icon="mdi-chart-line" data-testid="evento-detalle-ver-reporte"
           @click="irAReporte">
           Ver reporte
+        </v-btn>
+        <v-btn color="info" variant="flat"
+          prepend-icon="mdi-account-cash" data-testid="evento-detalle-contabilidad"
+          :href="eventoId ? `/eventos/${eventoId}/contabilidad` : undefined">
+          Contabilidad
         </v-btn>
         <v-btn v-if="editable" color="error" variant="text"
           data-testid="evento-detalle-eliminar" @click="mostrarDialogoEliminar = true">
@@ -302,6 +356,9 @@ function irAReporte() {
             Guardar
           </v-btn>
         </div>
+        <p class="text-caption text-medium-emphasis mt-2">
+          Vista previa del rango: {{ formatearFechaRango(fechaInicioVisible || eventoActual.fecha, fechaFinParaVista()) }}
+        </p>
         <p v-if="!eventoActual.fecha_fin" class="text-caption text-medium-emphasis mt-2">
           Evento de un solo día — fecha fin vacía se trata como igual a fecha de inicio.
         </p>
@@ -325,7 +382,7 @@ function irAReporte() {
             variant="flat"
             prepend-icon="mdi-package-variant"
             data-testid="evento-detalle-ir-productos"
-            @click="router.push({ name: 'evento-productos', params: { id: eventoId } })"
+            :href="eventoId ? `/eventos/${eventoId}/productos` : undefined"
           >
             {{ productosCount > 0 ? 'Configurar productos' : 'Inicializar desde catálogo' }}
           </v-btn>
@@ -355,6 +412,7 @@ function irAReporte() {
           <v-card-text>
             <GastoFijoForm
               :valores-iniciales="eventoId ? { evento_id: eventoId, categoria: 'renta', monto: 0, descripcion: null } : null"
+              :socios="socios"
               @submit="manejarGastoSubmit" @cancel="dialogoGastoAbierto = false" />
           </v-card-text>
         </v-card>
@@ -388,7 +446,7 @@ function irAReporte() {
           <v-card-title>Nuevo gasto imprevisto</v-card-title>
           <v-card-text>
             <GastoImprevistoForm
-              :editable="editable"
+              :editable="editable" :socios="socios"
               @submit="manejarImprevistoSubmit" @cancel="dialogoImprevistoAbierto = false" />
           </v-card-text>
         </v-card>

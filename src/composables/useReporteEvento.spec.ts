@@ -105,6 +105,8 @@ const mkVentaConItems = (
     subtotal: it.cantidad * it.precioUnitario,
     costo_unitario: it.costoUnitario,
     margen_aplicado: null,
+    // Review finding #6: VentaItem now exposes evento_producto_id.
+    evento_producto_id: null,
     created_at: it.createdAt ?? fecha,
   })),
 })

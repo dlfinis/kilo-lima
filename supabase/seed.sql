@@ -1,31 +1,60 @@
--- seed.sql
--- Idempotent seed for the catalog slice.
--- 6 sample materias_primas (5 ingredientes + 1 empaque), 2 recetas, 5 receta_ingredientes rows.
--- Uses ON CONFLICT DO NOTHING so it is safe to re-run.
--- Per REQ-CATALOG-23.
+-- =====================================================================
+-- Kilo-Lima · seed.sql
+-- ---------------------------------------------------------------------
+-- Seed legible para el entorno de desarrollo.
 --
--- Extends with full lifecycle test data: 2 productos, 3 eventos
--- (one per estado), evento_productos, plan_produccion, ventas +
--- venta_items, gastos_fijos, gastos_imprevistos, and 1 cierre_caja.
--- Required for testing the evento cascade-delete behavior introduced
--- by the `cascade_ventas_evento` migration. Per REQ-EVENTS-39.
+-- Deja un dataset completo que cubre cada pantalla:
+--   * Home               → 1 evento en curso y 1 cerrado (números vivos)
+--   * Materias primas    → 6 filas (5 ingredientes + 1 empaque)
+--   * Recetas            → 2 recetas (galletas + pan básico)
+--   * Productos          → 1 por receta con margen y costo trazable
+--   * Eventos            → 3 eventos (uno por estado) con productos
+--                          + plan de producción + gastos fijos
+--   * POS                → ventas con sus items en el evento en curso
+--                          y en el cerrado, más una corrección
+--                          documentada
+--   * Cierre de caja     → 1 cierre del evento cerrado (cuadra)
+--   * Contabilidad       → 2 socios, aportes por evento, compras de
+--                          insumo y gastos asignados al socio que
+--                          puso la lana
+--
+-- Idempotente: cada `INSERT` usa `ON CONFLICT DO NOTHING` sobre la
+-- unique constraint que aplique, así que se puede correr contra una
+-- base que ya tenga datos sin duplicarlos.
+--
+-- Aplicación:
+--   1. Reset completo (recomendado en dev):
+--        node scripts/db-reset.mjs
+--      → confirma, trunca todas las tablas y re-corre este seed.
+--   2. Manual desde Supabase SQL editor: pegar este archivo entero.
+-- =====================================================================
+
+begin;
+
+-- =====================================================================
+-- 1. MATERIAS PRIMAS (catálogo)
+-- 6 filas · 5 ingredientes + 1 empaque · costos en USD
+-- =====================================================================
 insert into public.materias_primas (nombre, unidad, costo_por_unidad, categoria, notas) values
-  ('Azúcar', 'g', 0.05, 'ingrediente', null),
-  ('Harina', 'kg', 2.50, 'ingrediente', 'Harina de trigo todo uso'),
-  ('Mantequilla', 'g', 0.12, 'ingrediente', null),
-  ('Huevo', 'unidad', 0.30, 'ingrediente', 'Huevo de gallina tamaño grande'),
-  ('Chocolate', 'kg', 15.00, 'ingrediente', 'Chocolate semiamargo'),
-  ('Envase cartón', 'unidad', 1.50, 'empaque', 'Envase para pan de caja')
-on conflict do nothing;
+  ('Azúcar',          'g',      0.05,  'ingrediente', null),
+  ('Harina',          'kg',     2.50,  'ingrediente', 'Harina de trigo todo uso'),
+  ('Mantequilla',     'g',      0.12,  'ingrediente', null),
+  ('Huevo',           'unidad', 0.30,  'ingrediente', 'Huevo de gallina grande'),
+  ('Chocolate',       'kg',    15.00,  'ingrediente', 'Chocolate semiamargo'),
+  ('Caja para pan',   'unidad', 1.50,  'empaque',     'Caja de cartón kraft para 2 piezas')
+on conflict (nombre) do nothing;
 
--- 2. recetas (2 rows)
+-- =====================================================================
+-- 2. RECETAS + INGREDIENTES
+-- Galleta de chocolate → 24 unidades por lote
+-- Pan básico           → 2 piezas por lote
+-- =====================================================================
 insert into public.recetas (nombre, descripcion, rendimiento_unidades, notas) values
-  ('Galleta de chocolate', 'Galleta clásica con chispas de chocolate', 24, 'Rinde 24 galletas'),
-  ('Pan básico', 'Pan de caja artesanal', 2, 'Rinde 2 piezas')
-on conflict do nothing;
+  ('Galleta de chocolate', 'Galleta clásica con chispas',         24, 'Lote de 24 piezas'),
+  ('Pan básico',           'Pan de caja artesanal masa madre',    2, 'Lote de 2 piezas')
+on conflict (nombre) do nothing;
 
--- 3. receta_ingredientes (5 rows)
--- Galleta: Harina 0.5 kg, Azúcar 200 g, Mantequilla 100 g, Huevo 2 unidad, Chocolate 0.15 kg
+-- Receta 1: Galleta de chocolate
 insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
 select r.id, m.id, 0.5
 from public.recetas r, public.materias_primas m
@@ -56,211 +85,366 @@ from public.recetas r, public.materias_primas m
 where r.nombre = 'Galleta de chocolate' and m.nombre = 'Chocolate'
 on conflict do nothing;
 
--- ============================================================
--- Lifecycle test data: productos → eventos → evento_productos →
--- plan_produccion / ventas + venta_items / gastos_fijos /
--- gastos_imprevistos / cierres_caja.
--- ============================================================
+-- Receta 2: Pan básico
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 1.0
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan básico' and m.nombre = 'Harina'
+on conflict do nothing;
 
--- 4. productos (2 rows) — one per receta.
--- producto_id is referenced by venta_items and evento_productos, so
--- it must exist before either table is populated.
-insert into public.productos (receta_id, precio_venta, disponible, orden)
-select r.id, 15.00, true, 1
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.05
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan básico' and m.nombre = 'Azúcar'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.05
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan básico' and m.nombre = 'Mantequilla'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 1
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan básico' and m.nombre = 'Huevo'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 1
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan básico' and m.nombre = 'Caja para pan'
+on conflict do nothing;
+
+-- =====================================================================
+-- 3. SOCIOS (contabilidad)
+-- 2 socios · porcentajes de ganancia para el evento "Festival 2026"
+-- =====================================================================
+insert into public.socios (nombre, email, telefono, notas) values
+  ('Diego León',    'diego@example.com',   '+52 55 0000 0001', 'Encargado de producción'),
+  ('Lucía Reyes',   'lucia@example.com',   '+52 55 0000 0002', 'Encargada de ventas')
+on conflict (nombre) do nothing;
+
+-- =====================================================================
+-- 4. EVENTOS
+-- 3 eventos · uno por estado · fechas legibles
+-- =====================================================================
+insert into public.eventos (nombre, fecha, fecha_fin, margen_ganancia, ubicacion, estado, notas) values
+  ('Feria del Centro',       '2026-08-10', null,                  0.45, 'Plaza del Carmen',     'planificacion', 'Pre-producción de galletas y pan'),
+  ('Festival Primavera 2026','2026-06-20', '2026-06-21',          0.50, 'Parque Hidalgo',      'en_curso',      'Venta activa con caja abierta'),
+  ('Mercado Navideño 2025',  '2025-12-12', '2025-12-13',          0.40, 'Centro histórico',     'cerrado',       'Cierre ejecutado: caja cuadrada')
+on conflict do nothing;
+
+-- =====================================================================
+-- 5. PRODUCTOS
+-- 1 por receta · con margen override para que se vea la calculadora
+-- =====================================================================
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 15.00, true, 1, 'Galleta clásica con chispas', 'mdi-cookie',  '#A0522D'
 from public.recetas r
 where r.nombre = 'Galleta de chocolate'
 on conflict (receta_id) do nothing;
 
-insert into public.productos (receta_id, precio_venta, disponible, orden)
-select r.id, 35.00, true, 2
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 35.00, true, 2, 'Pan de caja artesanal',      'mdi-bread-slice', '#D2691E'
 from public.recetas r
 where r.nombre = 'Pan básico'
 on conflict (receta_id) do nothing;
 
--- 5. eventos (3 rows) — one per estado.
--- eventos has no unique constraint besides PK, so re-running the
--- seed on a populated DB will produce duplicates. The seed is
--- designed for `supabase db reset` (fresh DB); the cleanup script
--- `verify-final.mjs` runs against a reset DB. Best-effort.
-insert into public.eventos (nombre, fecha, fecha_fin, margen_ganancia, ubicacion, estado, notas) values
-  ('Feria del dulce',     '2026-07-15', null, 0.40, 'Plaza del Carmen', 'planificacion', 'Pre-producción de galletas'),
-  ('Festival de la galleta', '2026-06-20', '2026-06-21', 0.45, 'Parque Hidalgo', 'en_curso', 'Venta activa + toma de pedidos'),
-  ('Mercado de primavera', '2026-05-10', '2026-05-11', 0.50, 'Centro histórico', 'cerrado', 'Cierre completado: caja cuadrada')
-on conflict do nothing;
-
--- 6. evento_productos (3 rows) — link one producto per evento.
--- Uses UNIQUE(evento_id, producto_id) so this section is fully
--- idempotent.
+-- =====================================================================
+-- 6. EVENTO_PRODUCTOS (receta → evento con margen override)
+-- =====================================================================
 insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
-select e.id, p.id, null, null, true
+select e.id, p.id, 18.00, 0.55, true
 from public.eventos e, public.productos p
-where e.nombre = 'Feria del dulce' and p.precio_venta = 15.00
+where e.nombre = 'Festival Primavera 2026' and p.precio_venta = 15.00
+on conflict (evento_id, producto_id) do nothing;
+
+insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
+select e.id, p.id, 42.00, 0.45, true
+from public.eventos e, public.productos p
+where e.nombre = 'Festival Primavera 2026' and p.precio_venta = 35.00
 on conflict (evento_id, producto_id) do nothing;
 
 insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
 select e.id, p.id, null, null, true
 from public.eventos e, public.productos p
-where e.nombre = 'Festival de la galleta' and p.precio_venta = 15.00
+where e.nombre = 'Feria del Centro' and p.precio_venta = 15.00
 on conflict (evento_id, producto_id) do nothing;
 
 insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
 select e.id, p.id, null, null, true
 from public.eventos e, public.productos p
-where e.nombre = 'Mercado de primavera' and p.precio_venta = 35.00
+where e.nombre = 'Mercado Navideño 2025' and p.precio_venta = 35.00
 on conflict (evento_id, producto_id) do nothing;
 
--- 7. plan_produccion (4 rows) — for "Festival de la galleta" (2
--- recetas) and "Mercado navideño" (2 recetas). UNIQUE(evento_id,
--- receta_id) makes this section idempotent.
+-- =====================================================================
+-- 7. PLAN DE PRODUCCIÓN
+-- Lotes planeados por receta para cada evento
+-- =====================================================================
 insert into public.plan_produccion (evento_id, receta_id, unidades_a_producir)
 select e.id, r.id, 240
 from public.eventos e, public.recetas r
-where e.nombre = 'Festival de la galleta' and r.nombre = 'Galleta de chocolate'
+where e.nombre = 'Festival Primavera 2026' and r.nombre = 'Galleta de chocolate'
 on conflict (evento_id, receta_id) do nothing;
 
 insert into public.plan_produccion (evento_id, receta_id, unidades_a_producir)
 select e.id, r.id, 40
 from public.eventos e, public.recetas r
-where e.nombre = 'Festival de la galleta' and r.nombre = 'Pan básico'
+where e.nombre = 'Festival Primavera 2026' and r.nombre = 'Pan básico'
 on conflict (evento_id, receta_id) do nothing;
 
 insert into public.plan_produccion (evento_id, receta_id, unidades_a_producir)
 select e.id, r.id, 120
 from public.eventos e, public.recetas r
-where e.nombre = 'Mercado de primavera' and r.nombre = 'Galleta de chocolate'
+where e.nombre = 'Mercado Navideño 2025' and r.nombre = 'Galleta de chocolate'
 on conflict (evento_id, receta_id) do nothing;
 
 insert into public.plan_produccion (evento_id, receta_id, unidades_a_producir)
 select e.id, r.id, 60
 from public.eventos e, public.recetas r
-where e.nombre = 'Mercado de primavera' and r.nombre = 'Pan básico'
+where e.nombre = 'Mercado Navideño 2025' and r.nombre = 'Pan básico'
 on conflict (evento_id, receta_id) do nothing;
 
--- 8. gastos_fijos (5 rows) — 2 for each non-planificación evento,
--- 1 for planificación. PK-only, best-effort idempotency.
-insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
-select e.id, 'renta', 800.00, 'Renta del stand'
+-- =====================================================================
+-- 8. EVENTO_SOCIOS + APORTES
+-- Para "Festival Primavera 2026": 2 socios con aportes de capital
+-- =====================================================================
+insert into public.evento_socios (evento_id, socio_id, porcentaje_ganancia)
+select e.id, s.id, 0.60
+from public.eventos e, public.socios s
+where e.nombre = 'Festival Primavera 2026' and s.nombre = 'Diego León'
+on conflict (evento_id, socio_id) do nothing;
+
+insert into public.evento_socios (evento_id, socio_id, porcentaje_ganancia)
+select e.id, s.id, 0.40
+from public.eventos e, public.socios s
+where e.nombre = 'Festival Primavera 2026' and s.nombre = 'Lucía Reyes'
+on conflict (evento_id, socio_id) do nothing;
+
+insert into public.aportes (evento_id, socio_id, monto, fecha, descripcion)
+select e.id, s.id, 1500.00, '2026-06-15', 'Aporte inicial de capital'
+from public.eventos e, public.socios s
+where e.nombre = 'Festival Primavera 2026' and s.nombre = 'Diego León';
+
+insert into public.aportes (evento_id, socio_id, monto, fecha, descripcion)
+select e.id, s.id, 1000.00, '2026-06-15', 'Aporte inicial de capital'
+from public.eventos e, public.socios s
+where e.nombre = 'Festival Primavera 2026' and s.nombre = 'Lucía Reyes';
+
+-- =====================================================================
+-- 9. COMPRAS DE INSUMOS
+-- Compras para reponer stock atribuidas a Diego
+-- =====================================================================
+insert into public.compras_insumos (evento_id, socio_id, materia_prima_id, cantidad, costo_total, fecha, descripcion)
+select e.id, s.id, m.id, 10, 25.00, '2026-06-16', 'Harina para Festival Primavera'
+from public.eventos e, public.socios s, public.materias_primas m
+where e.nombre = 'Festival Primavera 2026' and s.nombre = 'Diego León' and m.nombre = 'Harina';
+
+insert into public.compras_insumos (evento_id, socio_id, materia_prima_id, cantidad, costo_total, fecha, descripcion)
+select e.id, s.id, m.id, 3, 45.00, '2026-06-17', 'Chocolate para Festival Primavera'
+from public.eventos e, public.socios s, public.materias_primas m
+where e.nombre = 'Festival Primavera 2026' and s.nombre = 'Diego León' and m.nombre = 'Chocolate';
+
+-- =====================================================================
+-- 10. GASTOS FIJOS (con socio_id opcional)
+-- =====================================================================
+insert into public.gastos_fijos (evento_id, categoria, monto, descripcion, socio_id)
+select e.id, 'renta', 800.00, 'Renta del stand', s.id
+from public.eventos e, public.socios s
+where e.nombre = 'Feria del Centro' and s.nombre = 'Diego León';
+
+insert into public.gastos_fijos (evento_id, categoria, monto, descripcion, socio_id)
+select e.id, 'publicidad', 250.00, 'Diseño + impresión de mantas', s.id
+from public.eventos e, public.socios s
+where e.nombre = 'Festival Primavera 2026' and s.nombre = 'Lucía Reyes';
+
+insert into public.gastos_fijos (evento_id, categoria, monto, descripcion, socio_id)
+select e.id, 'renta', 1200.00, 'Renta del stand (2 días)', s.id
+from public.eventos e, public.socios s
+where e.nombre = 'Festival Primavera 2026' and s.nombre = 'Diego León';
+
+insert into public.gastos_fijos (evento_id, categoria, monto, descripcion, socio_id)
+select e.id, 'renta', 1500.00, 'Renta del stand (2 días)', s.id
+from public.eventos e, public.socios s
+where e.nombre = 'Mercado Navideño 2025' and s.nombre = 'Diego León';
+
+insert into public.gastos_fijos (evento_id, categoria, monto, descripcion, socio_id)
+select e.id, 'permisos', 600.00, 'Permiso municipal', null
 from public.eventos e
-where e.nombre = 'Feria del dulce'
-on conflict do nothing;
+where e.nombre = 'Mercado Navideño 2025';
 
-insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
-select e.id, 'renta', 1200.00, 'Renta del stand'
+-- =====================================================================
+-- 11. GASTOS IMPREVISTOS (con socio_id opcional)
+-- =====================================================================
+insert into public.gastos_imprevistos (evento_id, monto, motivo, categoria, socio_id)
+select e.id, 120.00, 'Reparación de horno eléctrico', 'reparacion', s.id
+from public.eventos e, public.socios s
+where e.nombre = 'Mercado Navideño 2025' and s.nombre = 'Diego León';
+
+insert into public.gastos_imprevistos (evento_id, monto, motivo, categoria, socio_id)
+select e.id, 80.00, 'Compra extra de harina',         'insumos_extra', s.id
+from public.eventos e, public.socios s
+where e.nombre = 'Mercado Navideño 2025' and s.nombre = 'Diego León';
+
+insert into public.gastos_imprevistos (evento_id, monto, motivo, categoria, socio_id)
+select e.id, 60.00, 'Propinas al staff',             'propina', s.id
+from public.eventos e, public.socios s
+where e.nombre = 'Festival Primavera 2026' and s.nombre = 'Lucía Reyes';
+
+-- =====================================================================
+-- 12. VENTAS + ITEMS
+-- 3 ventas en "Festival Primavera 2026" (en_curso)
+-- 2 ventas en "Mercado Navideño 2025" (cerrado)
+-- =====================================================================
+insert into public.ventas (evento_id, fecha, total, metodo_pago, monto_recibido, cambio, comprobante_numero)
+select e.id, '2026-06-20T10:30:00Z', 90.00,  'efectivo',     100.00, 10.00, 'FPR-001'
 from public.eventos e
-where e.nombre = 'Festival de la galleta'
-on conflict do nothing;
+where e.nombre = 'Festival Primavera 2026';
 
-insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
-select e.id, 'publicidad', 350.00, 'Impresión de mantas'
+insert into public.ventas (evento_id, fecha, total, metodo_pago, monto_recibido, cambio, comprobante_numero)
+select e.id, '2026-06-20T11:15:00Z', 126.00, 'tarjeta',      null,    null,  'FPR-002'
 from public.eventos e
-where e.nombre = 'Festival de la galleta'
-on conflict do nothing;
+where e.nombre = 'Festival Primavera 2026';
 
-insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
-select e.id, 'renta', 2000.00, 'Renta del stand (5 días)'
+insert into public.ventas (evento_id, fecha, total, metodo_pago, monto_recibido, cambio, comprobante_numero)
+select e.id, '2026-06-20T13:45:00Z', 60.00,  'efectivo',     60.00,  0.00,  'FPR-003'
 from public.eventos e
-where e.nombre = 'Mercado de primavera'
-on conflict do nothing;
+where e.nombre = 'Festival Primavera 2026';
 
-insert into public.gastos_fijos (evento_id, categoria, monto, descripcion)
-select e.id, 'permisos', 600.00, 'Permiso municipal'
+insert into public.ventas (evento_id, fecha, total, metodo_pago, monto_recibido, cambio, comprobante_numero)
+select e.id, '2025-12-12T11:00:00Z', 180.00, 'mixto',        200.00, 20.00, 'MNA-001'
 from public.eventos e
-where e.nombre = 'Mercado de primavera'
-on conflict do nothing;
+where e.nombre = 'Mercado Navideño 2025';
 
--- 9. ventas (4 rows) — 2 for "Festival de la galleta" (en_curso) and
--- 2 for "Mercado de primavera" (cerrado). PK-only, best-effort.
-insert into public.ventas (evento_id, fecha, total, metodo_pago)
-select e.id, '2026-06-20T10:30:00Z', 75.00, 'efectivo'
+insert into public.ventas (evento_id, fecha, total, metodo_pago, monto_recibido, cambio, comprobante_numero)
+select e.id, '2025-12-13T16:45:00Z', 140.00, 'efectivo',     140.00, 0.00,  'MNA-002'
 from public.eventos e
-where e.nombre = 'Festival de la galleta'
-on conflict do nothing;
+where e.nombre = 'Mercado Navideño 2025';
 
-insert into public.ventas (evento_id, fecha, total, metodo_pago)
-select e.id, '2026-06-20T14:15:00Z', 105.00, 'transferencia'
-from public.eventos e
-where e.nombre = 'Festival de la galleta'
-on conflict do nothing;
+-- Venta 1 (Festival, efectivo, 90): 5 galletas @ 18 = 90
+insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal, costo_unitario, margen_aplicado, evento_producto_id)
+select v.id, p.id, 5, 18.00, 90.00, 7.27, 0.60, ep.id
+from public.ventas v
+join public.eventos e on e.id = v.evento_id
+join public.productos p on p.precio_venta = 15.00
+join public.evento_productos ep
+  on ep.evento_id = e.id and ep.producto_id = p.id
+where e.nombre = 'Festival Primavera 2026' and v.comprobante_numero = 'FPR-001';
 
-insert into public.ventas (evento_id, fecha, total, metodo_pago)
-select e.id, '2026-05-10T11:00:00Z', 180.00, 'mixto'
-from public.eventos e
-where e.nombre = 'Mercado de primavera'
-on conflict do nothing;
+-- Venta 2 (Festival, tarjeta, 126): 3 panes @ 42 = 126
+insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal, costo_unitario, margen_aplicado, evento_producto_id)
+select v.id, p.id, 3, 42.00, 126.00, 23.10, 0.45, ep.id
+from public.ventas v
+join public.eventos e on e.id = v.evento_id
+join public.productos p on p.precio_venta = 35.00
+join public.evento_productos ep
+  on ep.evento_id = e.id and ep.producto_id = p.id
+where e.nombre = 'Festival Primavera 2026' and v.comprobante_numero = 'FPR-002';
 
-insert into public.ventas (evento_id, fecha, total, metodo_pago)
-select e.id, '2026-05-11T16:45:00Z', 140.00, 'tarjeta'
-from public.eventos e
-where e.nombre = 'Mercado de primavera'
-on conflict do nothing;
+-- Venta 3 (Festival, efectivo, 60): 2 panes @ 42 = 84 (REBAJA: se cobra 60) → corrección posterior
+insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal, costo_unitario, margen_aplicado, evento_producto_id)
+select v.id, p.id, 2, 30.00, 60.00, 23.10, 0.23, ep.id
+from public.ventas v
+join public.eventos e on e.id = v.evento_id
+join public.productos p on p.precio_venta = 35.00
+join public.evento_productos ep
+  on ep.evento_id = e.id and ep.producto_id = p.id
+where e.nombre = 'Festival Primavera 2026' and v.comprobante_numero = 'FPR-003';
 
--- 10. venta_items (8 rows) — items for all 4 ventas. Totales deben coincidir con ventas.total.
--- Venta 1 (efectivo, total 75): 3 galletas @ 15 = 45 + 2 galletas @ 15 = 30 → 75
--- Venta 2 (transferencia, total 105): 3 panes @ 35 = 105
--- Venta 3 (mixto, total 180): 3 panes @ 35 = 105 + 5 galletas @ 15 = 75 → 180
--- Venta 4 (tarjeta, total 140): 4 panes @ 35 = 140
-insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
-select v.id, p.id, 3, 15.00, 45.00
-from public.ventas v, public.productos p
-where v.metodo_pago = 'efectivo' and v.total = 75.00 and p.precio_venta = 15.00
-on conflict do nothing;
-
-insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
-select v.id, p.id, 2, 15.00, 30.00
-from public.ventas v, public.productos p
-where v.metodo_pago = 'efectivo' and v.total = 75.00 and p.precio_venta = 15.00
-on conflict do nothing;
-
+-- Venta 4 (Navideño, mixto, 180): 3 panes catálogo @ 35 = 105 + 5 galletas catálogo @ 15 = 75 → 180
 insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
 select v.id, p.id, 3, 35.00, 105.00
-from public.ventas v, public.productos p
-where v.metodo_pago = 'transferencia' and v.total = 105.00 and p.precio_venta = 35.00
-on conflict do nothing;
-
-insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
-select v.id, p.id, 3, 35.00, 105.00
-from public.ventas v, public.productos p
-where v.metodo_pago = 'mixto' and v.total = 180.00 and p.precio_venta = 35.00
-on conflict do nothing;
+from public.ventas v
+join public.eventos e on e.id = v.evento_id
+join public.productos p on p.precio_venta = 35.00
+where e.nombre = 'Mercado Navideño 2025' and v.comprobante_numero = 'MNA-001';
 
 insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
 select v.id, p.id, 5, 15.00, 75.00
-from public.ventas v, public.productos p
-where v.metodo_pago = 'mixto' and v.total = 180.00 and p.precio_venta = 15.00
-on conflict do nothing;
+from public.ventas v
+join public.eventos e on e.id = v.evento_id
+join public.productos p on p.precio_venta = 15.00
+where e.nombre = 'Mercado Navideño 2025' and v.comprobante_numero = 'MNA-001';
 
+-- Venta 5 (Navideño, efectivo, 140): 4 panes @ 35 = 140
 insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
 select v.id, p.id, 4, 35.00, 140.00
-from public.ventas v, public.productos p
-where v.metodo_pago = 'tarjeta' and v.total = 140.00 and p.precio_venta = 35.00
-on conflict do nothing;
+from public.ventas v
+join public.eventos e on e.id = v.evento_id
+join public.productos p on p.precio_venta = 35.00
+where e.nombre = 'Mercado Navideño 2025' and v.comprobante_numero = 'MNA-002';
 
--- 11. gastos_imprevistos (2 rows) — for "Mercado de primavera" only.
--- PK-only, best-effort.
-insert into public.gastos_imprevistos (evento_id, monto, motivo, categoria)
-select e.id, 120.00, 'Reparación de horno eléctrico', 'reparacion'
-from public.eventos e
-where e.nombre = 'Mercado de primavera'
-on conflict do nothing;
+-- =====================================================================
+-- 13. CORRECCIÓN DE VENTA (auditoría)
+-- El operador corrigió FPR-003 después de registrarlo: ajustó
+-- precio_unitario y dejó el motivo registrado.
+-- =====================================================================
+insert into public.venta_correcciones (
+  venta_id, evento_id,
+  total_anterior, total_nuevo,
+  metodo_pago_anterior, metodo_pago_nuevo,
+  monto_recibido_anterior, monto_recibido_nuevo,
+  motivo,
+  items_anteriores, items_nuevos
+)
+select
+  v.id, v.evento_id,
+  84.00, 60.00,
+  'efectivo', 'efectivo',
+  100.00, 60.00,
+  'Cliente frecuente: descuento de cortesía autorizado por Diego',
+  '[{"producto_id":"' || p.id::text || '","cantidad":2,"precio_unitario":42.00,"subtotal":84.00}]'::jsonb,
+  '[{"producto_id":"' || p.id::text || '","cantidad":2,"precio_unitario":30.00,"subtotal":60.00}]'::jsonb
+from public.ventas v
+join public.eventos e on e.id = v.evento_id
+join public.productos p on p.precio_venta = 35.00
+where e.nombre = 'Festival Primavera 2026' and v.comprobante_numero = 'FPR-003';
 
-insert into public.gastos_imprevistos (evento_id, monto, motivo, categoria)
-select e.id, 80.00, 'Compra extra de harina', 'insumos_extra'
-from public.eventos e
-where e.nombre = 'Mercado de primavera'
-on conflict do nothing;
-
--- 12. cierres_caja (1 row) — for "Mercado de primavera". UNIQUE on
--- evento_id makes this section idempotent.
+-- =====================================================================
+-- 14. CIERRE DE CAJA
+-- Mercado Navideño 2025 cerró bien. Sus totales:
+--   ventas = 180 + 140 = 320
+--   gastos_fijos = 1500 + 600 = 2100
+--   imprevistos = 120 + 80 = 200
+--   utilidad_bruta = 320 - 2100 - 200 = -1980
+--   efectivo_esperado = 140 (solo ventas en efectivo)
+--   efectivo_real = 140, diferencia = 0
+-- =====================================================================
 insert into public.cierres_caja (
   evento_id, fecha_cierre,
   total_ventas, total_gastos_fijos, total_gastos_imprevistos,
-  utilidad_bruta,
+  utilidad_bruta, total_cogs, total_utilidad_bruta, total_utilidad_neta,
   efectivo_esperado, efectivo_real, diferencia, notas
 )
-select e.id, '2026-05-11T20:00:00Z',
-        320.00, 2600.00, 200.00,
-        -2480.00,
-        320.00, 320.00, 0.00, 'Cierre final: evento pequeño con gastos fijos altos'
+select e.id, '2025-12-13T20:00:00Z',
+       320.00, 2100.00, 200.00,
+       -1980.00, 0.00, -1980.00, -1980.00,
+       140.00, 140.00, 0.00,
+       'Cierre final: caja cuadrada. Gastos fijos altos (stand + permiso) superan la venta.'
 from public.eventos e
-where e.nombre = 'Mercado de primavera'
+where e.nombre = 'Mercado Navideño 2025'
 on conflict (evento_id) do nothing;
+
+commit;
+
+-- =====================================================================
+-- RESUMEN (corre al final del seed — útil para inspección manual)
+-- =====================================================================
+\echo '--- RESUMEN DEL SEED ---'
+select 'materias_primas'    as tabla, count(*)::text as filas from public.materias_primas
+union all select 'recetas',        count(*)::text from public.recetas
+union all select 'productos',      count(*)::text from public.productos
+union all select 'socios',         count(*)::text from public.socios
+union all select 'eventos',        count(*)::text from public.eventos
+union all select 'evento_productos', count(*)::text from public.evento_productos
+union all select 'plan_produccion',count(*)::text from public.plan_produccion
+union all select 'gastos_fijos',   count(*)::text from public.gastos_fijos
+union all select 'gastos_imprevistos', count(*)::text from public.gastos_imprevistos
+union all select 'aportes',        count(*)::text from public.aportes
+union all select 'compras_insumos',count(*)::text from public.compras_insumos
+union all select 'ventas',         count(*)::text from public.ventas
+union all select 'venta_items',    count(*)::text from public.venta_items
+union all select 'venta_correcciones', count(*)::text from public.venta_correcciones
+union all select 'cierres_caja',   count(*)::text from public.cierres_caja
+order by tabla;

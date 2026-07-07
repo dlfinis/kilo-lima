@@ -37,6 +37,7 @@ import { useVentasStore } from '@/stores/ventas.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import CarritoPanel from '@/components/business/CarritoPanel.vue'
+import EditarVentaDialog from '@/components/business/EditarVentaDialog.vue'
 import RegistrarVentaDialog from '@/components/business/RegistrarVentaDialog.vue'
 import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
@@ -528,6 +529,220 @@ describe('PosView — feature flag VITE_FLAG_POS_REDESIGN (REQ-POS-57, REQ-POS-5
       const { wrapper } = await mountView()
       await flushPromises()
       expect(wrapper.find('[data-testid="resumen-hoy"]').exists()).toBe(false)
+    })
+  })
+})
+
+// Event sales history from POS (REQ-POS-HISTORIAL-1..3): the operator
+// must be able to open a detailed per-sale list from the POS view.
+// The button is gated by the feature flag (matches the rest of the
+// pos-redesign surface).
+describe('PosView — Historial de ventas button (REQ-POS-HISTORIAL)', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('does NOT render the Historial button when the feature flag is off', async () => {
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="pos-historial-btn"]').exists()).toBe(false)
+    })
+  })
+
+  it('renders the Historial button when the feature flag is on', async () => {
+    vi.stubEnv('VITE_FLAG_POS_REDESIGN', 'true')
+    sembrarEventoEnCurso()
+    __pushSupabaseResponse<unknown>({ data: null, error: null })
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="pos-historial-btn"]').exists()).toBe(true)
+    })
+  })
+})
+
+// Issue: edit dialog closes on correction failure.
+//
+// On RPC / network / domain failure the operator loses in-progress
+// edits (motivo, item quantities, payment method) because the view
+// always flipped `dialogoEdicionAbierto = false` and `ventaEnEdicion
+// = null` after `await corregirVenta`. Fix: only close the dialog on
+// success — on failure the dialog must stay open AND keep its input
+// so the operator can retry or correct.
+describe('PosView — EditarVentaDialog failure preserves dialog state', () => {
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  const mkVenta = (overrides: Partial<VentaConItems> = {}): VentaConItems => ({
+    id: 'v-1',
+    evento_id: 'e-1',
+    fecha: '2026-06-19T00:00:00Z',
+    total: 5,
+    metodo_pago: 'efectivo',
+    monto_recibido: 10,
+    cambio: 5,
+    comprobante_numero: 'V-001',
+    created_at: '2026-06-19T00:00:00Z',
+    items: [
+      {
+        id: 'vi-1',
+        venta_id: 'v-1',
+        producto_id: 'p-1',
+        cantidad: 1,
+        precio_unitario: 5,
+        subtotal: 5,
+        costo_unitario: null,
+        margen_aplicado: null,
+        evento_producto_id: null,
+        created_at: '2026-06-19T00:00:00Z',
+      },
+    ],
+    ...overrides,
+  })
+
+  it('keeps the edit dialog open when the RPC returns an error', async () => {
+    vi.stubEnv('VITE_FLAG_POS_REDESIGN', 'true')
+    sembrarEventoEnCurso()
+    const venta = mkVenta()
+    const fabricado = fabricarProductoParaPOS('p-1', { margen: 0 })
+    // FLAG_POS_REDESIGN=true makes cargarDatosPOS run:
+    //   cargarEventos → Promise.all([catalogo, cargarPorEvento]) → cargarRecetas.
+    // The two parallel awaits consume responses in the order they
+    // were scheduled (catalogo first, then cargarPorEvento). Push
+    // responses in that exact order so the right data lands in the
+    // right store.
+    __pushSupabaseResponse<Producto[]>({
+      data: [fabricado.producto],
+      error: null,
+    })
+    __pushSupabaseResponse<VentaConItems[]>({ data: [venta], error: null })
+    __pushSupabaseResponse<RecetaConIngredientes[]>({
+      data: [fabricado.receta],
+      error: null,
+    })
+    // Stage a generic RPC failure for the corregirVenta call.
+    __pushSupabaseResponse<unknown>({
+      data: null,
+      error: { code: 'PGRST301', message: 'connection lost' },
+    })
+
+    await conContexto(async () => {
+      const ventas = useVentasStore()
+      const { wrapper } = await mountView()
+      await flushPromises()
+      // Sanity: the venta survived the parallel cargarPorEvento.
+      expect(ventas.ventas.map((v) => v.id)).toContain('v-1')
+
+      // Open the edit dialog for the seeded venta via PosView's vm
+      // (wrapper.vm is the Shell — PosView is the router-view child).
+      const posView = wrapper.findComponent(PosView)
+      const vm = posView.vm as unknown as {
+        abrirEdicion: (v: VentaConItems) => void
+      }
+      vm.abrirEdicion(venta)
+      await flushPromises()
+
+      const dialogAntes = wrapper.findComponent(EditarVentaDialog)
+      expect(dialogAntes.exists()).toBe(true)
+      expect((dialogAntes.props('modelValue') as boolean)).toBe(true)
+
+      // Emit the 'corregir' payload. The view forwards it to the
+      // store which calls the RPC; we queued an RPC error above.
+      await dialogAntes.vm.$emit('corregir', {
+        ventaId: 'v-1',
+        nuevoTotal: 5,
+        nuevoMetodoPago: 'efectivo',
+        nuevoMontoRecibido: 10,
+        nuevosItems: [
+          {
+            producto_id: 'p-1',
+            cantidad: 1,
+            precio_unitario: 5,
+            subtotal: 5,
+          },
+        ],
+        motivo: 'ajuste',
+      })
+      await flushPromises()
+
+      // Dialog must still be mounted (not unmounted by v-if on
+      // ventaEnEdicion) AND must still be visible (modelValue=true).
+      // Observable behavior: the operator's input is preserved so
+      // they can retry without re-typing motivo/items.
+      const dialogDespues = wrapper.findComponent(EditarVentaDialog)
+      expect(dialogDespues.exists()).toBe(true)
+      expect((dialogDespues.props('modelValue') as boolean)).toBe(true)
+    })
+  })
+
+  it('still closes the dialog on a successful correction (no regression)', async () => {
+    vi.stubEnv('VITE_FLAG_POS_REDESIGN', 'true')
+    sembrarEventoEnCurso()
+    const venta = mkVenta()
+    const fabricado = fabricarProductoParaPOS('p-1', { margen: 0 })
+    __pushSupabaseResponse<Producto[]>({
+      data: [fabricado.producto],
+      error: null,
+    })
+    __pushSupabaseResponse<VentaConItems[]>({ data: [venta], error: null })
+    __pushSupabaseResponse<RecetaConIngredientes[]>({
+      data: [fabricado.receta],
+      error: null,
+    })
+    // Successful RPC: returns the post-correction { venta, items } shape.
+    __pushSupabaseResponse<unknown>({
+      data: {
+        venta: {
+          ...mkVenta({ id: 'v-1', total: 10, metodo_pago: 'transferencia' }),
+        },
+        items: [],
+      },
+      error: null,
+    })
+
+    await conContexto(async () => {
+      const ventas = useVentasStore()
+      const { wrapper } = await mountView()
+      await flushPromises()
+      expect(ventas.ventas.map((v) => v.id)).toContain('v-1')
+
+      const posView = wrapper.findComponent(PosView)
+      const vm = posView.vm as unknown as {
+        abrirEdicion: (v: VentaConItems) => void
+      }
+      vm.abrirEdicion(venta)
+      await flushPromises()
+
+      const dialog = wrapper.findComponent(EditarVentaDialog)
+      expect(dialog.exists()).toBe(true)
+
+      await dialog.vm.$emit('corregir', {
+        ventaId: 'v-1',
+        nuevoTotal: 10,
+        nuevoMetodoPago: 'transferencia',
+        nuevoMontoRecibido: null,
+        nuevosItems: [
+          {
+            producto_id: 'p-1',
+            cantidad: 2,
+            precio_unitario: 5,
+            subtotal: 10,
+          },
+        ],
+        motivo: 'fix',
+      })
+      await flushPromises()
+
+      // On success the view unmounts the dialog (v-if drops).
+      expect(wrapper.findComponent(EditarVentaDialog).exists()).toBe(false)
+      // Local state reflects the correction.
+      expect(ventas.ventas[0]?.total).toBe(10)
+      expect(ventas.ventas[0]?.metodo_pago).toBe('transferencia')
     })
   })
 })

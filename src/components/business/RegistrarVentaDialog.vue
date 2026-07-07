@@ -12,7 +12,7 @@
 // are hidden and the emit omits montoRecibido.
 import { computed, ref, watch } from 'vue'
 
-import type { Evento, MetodoPago } from '@/types'
+import { METODOS_PAGO, type Evento, type MetodoPago } from '@/types'
 
 const props = defineProps<{
   modelValue: boolean
@@ -29,11 +29,11 @@ const emit = defineEmits<{
 }>()
 
 const metodoPago = ref<MetodoPago>('efectivo')
-const opciones: { value: MetodoPago; label: string }[] = [
-  { value: 'efectivo', label: 'Efectivo' },
-  { value: 'transferencia', label: 'Transferencia' },
-  { value: 'tarjeta', label: 'Tarjeta' },
-]
+// Single source of truth — `METODOS_PAGO` lives in pos.types.ts so the
+// history dialog and the edit dialog stay in lockstep with the
+// `MetodoPago` union. Adding a new method only requires updating
+// pos.types.ts.
+const opciones = METODOS_PAGO
 
 // Billetes rápidos para velocidad en feria. Tapping uno de estos
 // suma ese monto al monto_recibido (acumulativo — el operador puede
@@ -161,7 +161,7 @@ function alConfirmar(): void {
               :data-testid="`registrar-venta-billete-${billete}`"
               @click="agregarBillete(billete)"
             >
-              +${billete}
+              +{{ billete }}
             </v-btn>
           </div>
           <div class="d-flex align-center ga-2 mb-2">

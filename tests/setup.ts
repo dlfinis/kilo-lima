@@ -121,6 +121,15 @@ function crearBuilder(): Record<string, unknown> {
     return consumir()
   }
   builder.then = (resolve: (v: unknown) => void) => resolve(consumir())
+  // supabase.rpc(fnName, args) is thenable: `await supabase.rpc(...)`
+  // resolves to { data, error }. Register the call so tests can assert
+  // the RPC name + payload, then resolve with the next queued response.
+  builder.rpc = (...args: unknown[]) => {
+    registrar('rpc')(...args)
+    return {
+      then: (resolve: (v: unknown) => void) => resolve(consumir()),
+    }
+  }
   return builder
 }
 

@@ -12,8 +12,9 @@ describe('formatearUnidad', () => {
     expect(formatearUnidad(12.5, 'g')).toBe('12.5 g')
   })
 
-  it('renders "unidad" with the "(es)" plural suffix', () => {
-    expect(formatearUnidad(3, 'unidad')).toBe('3 unidad(es)')
+  it('renders "unidad" as "u" and "und" as "unds"', () => {
+    expect(formatearUnidad(3, 'unidad')).toBe('3 u')
+    expect(formatearUnidad(3, 'und')).toBe('3 unds')
   })
 
   it('renders kilograms as integer with "kg" suffix', () => {

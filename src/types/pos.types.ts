@@ -10,6 +10,19 @@
 
 export type MetodoPago = 'efectivo' | 'transferencia' | 'tarjeta' | 'mixto'
 
+// Single source of truth for the operator-facing payment-method list
+// (REQ-POS-CORRECCION-2 follow-up: previously the registrar dialog
+// and the edit dialog hard-coded their own subsets, which drifted
+// from the `MetodoPago` union and from the history dialog's
+// `METODOS_ETIQUETA` map). Add new methods here and the union above
+// in the same change.
+export const METODOS_PAGO: { value: MetodoPago; label: string }[] = [
+  { value: 'efectivo', label: 'Efectivo' },
+  { value: 'transferencia', label: 'Transferencia' },
+  { value: 'tarjeta', label: 'Tarjeta' },
+  { value: 'mixto', label: 'Mixto' },
+]
+
 export type CategoriaImprevisto =
   | 'insumos_extra'
   | 'transporte'
@@ -66,6 +79,14 @@ export interface VentaItem {
   // (PD-4: no historical backfill). `costo_unitario ?? 0` in COGS math.
   costo_unitario: number | null
   margen_aplicado: number | null
+  // REQ-FIN-9 / REQ-POS-CORRECCION type fix: the DB column
+  // `evento_producto_id` is the FK back to the evento_productos row
+  // that was active at sale time. The hand-rolled domain type
+  // previously omitted it, which forced the edit dialog to read
+  // `it.evento_producto_id` on a shape that didn't declare the
+  // field. The column is nullable — Fase 1 ventas and any path
+  // that doesn't snapshot the link leave it null.
+  evento_producto_id: string | null
   created_at: string
 }
 
@@ -92,12 +113,70 @@ export interface VentaConItems extends Venta {
   items: VentaItem[]
 }
 
+// REQ-POS-CORRECCION-1..3: traceability of sale corrections.
+// `venta_correcciones` is an append-only audit table — one row per
+// edit. The header columns capture the financial deltas (totals,
+// metodo, monto_recibido) and `motivo` carries the operator's
+// reason. `items_anteriores` + `items_nuevos` are jsonb snapshots
+// of the venta_items arrays before/after the correction so the
+// audit row is self-contained — the report can reconstruct the
+// entire sale at the time of the edit even if the live venta_items
+// rows were further edited (v2 — single edit allowed here).
+export interface VentaCorreccion {
+  id: string
+  venta_id: string
+  evento_id: string
+  total_anterior: number
+  total_nuevo: number
+  metodo_pago_anterior: MetodoPago
+  metodo_pago_nuevo: MetodoPago
+  monto_recibido_anterior: number | null
+  monto_recibido_nuevo: number | null
+  motivo: string
+  // Full item snapshots — not a delta, the full VentaItem[] at the
+  // moment of the edit. Operators auditing the report expect to see
+  // "this is exactly what was sold before / after", not just a diff.
+  items_anteriores: VentaItem[]
+  items_nuevos: VentaItem[]
+  created_at: string
+}
+
+export interface VentaCorreccionInput {
+  venta_id: string
+  evento_id: string
+  total_anterior: number
+  total_nuevo: number
+  metodo_pago_anterior: MetodoPago
+  metodo_pago_nuevo: MetodoPago
+  monto_recibido_anterior: number | null
+  monto_recibido_nuevo: number | null
+  motivo: string
+  // Snapshot of the items BEFORE the edit — the audit row stores this
+  // verbatim (jsonb) so the report can reconstruct the sale without
+  // joining the live venta_items table. VentaItem[] (full DB row)
+  // because the data is read, not written.
+  items_anteriores: VentaItem[]
+  // Items AFTER the edit. VentaItemInput[] (writeable subset) because
+  // the caller (the dialog) doesn't have id/created_at at hand — the
+  // DB generates them on insert.
+  items_nuevos: VentaItemInput[]
+}
+
+// Snapshot of a venta at the moment the edit dialog opens. The
+// store / dialog reads it once so the user can compare "before" vs
+// the new edit form values without re-fetching from the server.
+export interface VentaEdicionContexto {
+  venta: VentaConItems
+  evento: Evento
+}
+
 export interface GastoImprevisto {
   id: string
   evento_id: string
   monto: number
   motivo: string
   categoria: CategoriaImprevisto | null
+  socio_id?: string | null
   created_at: string
 }
 
@@ -224,5 +303,5 @@ export interface CierreResultado {
 // Re-export the events' GastoFijo so consumers can import CierreInput
 // from a single path. Kept inline to avoid pulling events.types into
 // the closure when only the shape is needed.
-import type { GastoFijo } from './events.types'
+import type { Evento, GastoFijo } from './events.types'
 export type { GastoFijo }

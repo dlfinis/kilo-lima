@@ -89,7 +89,6 @@ async function cargar() {
   if (!eventoId.value) return
   await cargarPorId(eventoId.value)
   await epStore.cargarPorEvento(eventoId.value)
-  await ventasStore.cargarPorEvento(eventoId.value)
   // productos-mejoras: catalog list is loaded lazily when the
   // operator opens the "Agregar producto" dialog (see `abrirDialogoAgregar`).
   // Avoids blocking the initial render on a Supabase round-trip when the

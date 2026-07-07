@@ -111,6 +111,137 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['eventos']['Insert']>
         Relationships: []
       }
+      socios: {
+        Row: {
+          id: string
+          nombre: string
+          email: string | null
+          telefono: string | null
+          notas: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          nombre: string
+          email?: string | null
+          telefono?: string | null
+          notas?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['socios']['Insert']>
+        Relationships: []
+      }
+      evento_socios: {
+        Row: {
+          id: string
+          evento_id: string
+          socio_id: string
+          porcentaje_ganancia: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          evento_id: string
+          socio_id: string
+          porcentaje_ganancia: number
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['evento_socios']['Insert']>
+        Relationships: [
+          {
+            foreignKeyName: 'evento_socios_evento_id_fkey'
+            columns: ['evento_id']
+            referencedRelation: 'eventos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'evento_socios_socio_id_fkey'
+            columns: ['socio_id']
+            referencedRelation: 'socios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      aportes: {
+        Row: {
+          id: string
+          evento_id: string
+          socio_id: string
+          monto: number
+          fecha: string
+          descripcion: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          evento_id: string
+          socio_id: string
+          monto: number
+          fecha?: string
+          descripcion?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['aportes']['Insert']>
+        Relationships: [
+          {
+            foreignKeyName: 'aportes_evento_id_fkey'
+            columns: ['evento_id']
+            referencedRelation: 'eventos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'aportes_socio_id_fkey'
+            columns: ['socio_id']
+            referencedRelation: 'socios'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      compras_insumos: {
+        Row: {
+          id: string
+          evento_id: string | null
+          socio_id: string
+          materia_prima_id: string
+          cantidad: number
+          costo_total: number
+          fecha: string
+          descripcion: string | null
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          evento_id?: string | null
+          socio_id: string
+          materia_prima_id: string
+          cantidad: number
+          costo_total: number
+          fecha?: string
+          descripcion?: string | null
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['compras_insumos']['Insert']>
+        Relationships: [
+          {
+            foreignKeyName: 'compras_insumos_evento_id_fkey'
+            columns: ['evento_id']
+            referencedRelation: 'eventos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'compras_insumos_socio_id_fkey'
+            columns: ['socio_id']
+            referencedRelation: 'socios'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'compras_insumos_materia_prima_id_fkey'
+            columns: ['materia_prima_id']
+            referencedRelation: 'materias_primas'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       gastos_fijos: {
         Row: {
           id: string
@@ -118,6 +249,7 @@ export interface Database {
           categoria: 'renta' | 'transporte' | 'permisos' | 'publicidad' | 'servicios' | 'otro'
           monto: number
           descripcion: string | null
+          socio_id: string | null
           created_at: string
         }
         Insert: {
@@ -126,6 +258,7 @@ export interface Database {
           categoria: 'renta' | 'transporte' | 'permisos' | 'publicidad' | 'servicios' | 'otro'
           monto: number
           descripcion?: string | null
+          socio_id?: string | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['gastos_fijos']['Insert']>
@@ -333,6 +466,7 @@ export interface Database {
           monto: number
           motivo: string
           categoria: 'insumos_extra' | 'transporte' | 'reparacion' | 'propina' | 'otro' | null
+          socio_id: string | null
           created_at: string
         }
         Insert: {
@@ -341,6 +475,7 @@ export interface Database {
           monto: number
           motivo: string
           categoria?: 'insumos_extra' | 'transporte' | 'reparacion' | 'propina' | 'otro' | null
+          socio_id?: string | null
           created_at?: string
         }
         Update: Partial<Database['public']['Tables']['gastos_imprevistos']['Insert']>
@@ -392,6 +527,58 @@ export interface Database {
         Relationships: [
           {
             foreignKeyName: 'cierres_caja_evento_id_fkey'
+            columns: ['evento_id']
+            referencedRelation: 'eventos'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      // REQ-POS-CORRECCION-1: append-only audit table for sale
+      // corrections. The header rows capture financial deltas;
+      // `items_anteriores` / `items_nuevos` carry full item
+      // snapshots so the audit row is self-contained. `motivo` is
+      // required — operators must record a reason for every edit.
+      venta_correcciones: {
+        Row: {
+          id: string
+          venta_id: string
+          evento_id: string
+          total_anterior: number
+          total_nuevo: number
+          metodo_pago_anterior: 'efectivo' | 'transferencia' | 'tarjeta' | 'mixto'
+          metodo_pago_nuevo: 'efectivo' | 'transferencia' | 'tarjeta' | 'mixto'
+          monto_recibido_anterior: number | null
+          monto_recibido_nuevo: number | null
+          motivo: string
+          items_anteriores: unknown
+          items_nuevos: unknown
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          venta_id: string
+          evento_id: string
+          total_anterior: number
+          total_nuevo: number
+          metodo_pago_anterior: 'efectivo' | 'transferencia' | 'tarjeta' | 'mixto'
+          metodo_pago_nuevo: 'efectivo' | 'transferencia' | 'tarjeta' | 'mixto'
+          monto_recibido_anterior?: number | null
+          monto_recibido_nuevo?: number | null
+          motivo: string
+          items_anteriores: unknown
+          items_nuevos: unknown
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['venta_correcciones']['Insert']>
+        Relationships: [
+          {
+            foreignKeyName: 'venta_correcciones_venta_id_fkey'
+            columns: ['venta_id']
+            referencedRelation: 'ventas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'venta_correcciones_evento_id_fkey'
             columns: ['evento_id']
             referencedRelation: 'eventos'
             referencedColumns: ['id']

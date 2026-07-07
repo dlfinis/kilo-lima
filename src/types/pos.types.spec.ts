@@ -5,6 +5,7 @@
 // *Input variants exclude the DB-only fields (id, created_at,
 // updated_at). Mirrors events.types.spec.ts.
 import { describe, expect, it } from 'vitest'
+import { METODOS_PAGO } from '@/types'
 import type {
   CategoriaImprevisto,
   CierreCaja,
@@ -59,6 +60,10 @@ const mkVentaItem = (overrides: Partial<VentaItem> = {}): VentaItem => ({
   subtotal: 10,
   costo_unitario: null,
   margen_aplicado: null,
+  // Review finding #6: VentaItem now exposes evento_producto_id (it
+  // was previously missing from the hand-rolled type even though the
+  // column exists in venta_items and was used in the edit dialog).
+  evento_producto_id: null,
   created_at: '2026-06-19T10:00:00Z',
   ...overrides,
 })
@@ -167,6 +172,18 @@ describe('pos.types surface', () => {
     expect(itemNull.margen_aplicado).toBeNull()
   })
 
+  it('VentaItem exposes evento_producto_id (finding #6 — type contract fix)', () => {
+    // The DB column already exists; the hand-rolled domain type
+    // previously omitted it which forced the edit dialog to read
+    // `it.evento_producto_id` on a shape that didn't declare the
+    // field. This test pins the contract: nullable for legacy
+    // ventas, populated for Fase 2 sales.
+    const itemConLink: VentaItem = mkVentaItem({ evento_producto_id: 'ep-1' })
+    expect(itemConLink.evento_producto_id).toBe('ep-1')
+    const itemSinLink: VentaItem = mkVentaItem({ evento_producto_id: null })
+    expect(itemSinLink.evento_producto_id).toBeNull()
+  })
+
   it('VentaItemInput accepts optional COGS snapshot fields (REQ-FIN-12)', () => {
     const input: VentaItemInput = {
       producto_id: 'p-1',
@@ -240,6 +257,21 @@ describe('pos.types surface', () => {
       cantidadItems: 2,
     }
     expect(resumen.cantidadItems).toBe(2)
+  })
+
+  it('METODOS_PAGO is the single source of truth for the payment-method list (finding #7)', () => {
+    // The registrar dialog, edit dialog, and history dialog all
+    // source their option list / label map from this constant.
+    // Adding a new MetodoPago value MUST also extend this list.
+    const values = METODOS_PAGO.map((m) => m.value)
+    // Mirrors the `MetodoPago` union — if a new method is added
+    // to the union, this assertion fails until the constant is
+    // updated.
+    expect(values).toEqual(['efectivo', 'transferencia', 'tarjeta', 'mixto'])
+    // Every entry has a non-empty label.
+    for (const m of METODOS_PAGO) {
+      expect(m.label).toBeTruthy()
+    }
   })
 
   it('CierreInput and CierreResultado are the cierre pure-function shapes (REQ-POS-44, REQ-POS-31)', () => {

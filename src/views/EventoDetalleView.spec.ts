@@ -52,17 +52,19 @@ const mkGasto = (id: string, overrides: Partial<GastoFijo> = {}): GastoFijo => (
 let aplicacion: App
 let router: Router
 
-beforeEach(() => {
-  setActivePinia(createPinia())
-  __resetSupabaseMock()
-  document.body.innerHTML = ''
-  router = createRouter({
-    history: createMemoryHistory(),
-    routes: [
-      { path: '/eventos', name: 'eventos', component: { template: '<div/>' } },
-      { path: '/eventos/:id', name: 'evento-detalle', component: EventoDetalleView },
-    ],
-  })
+  beforeEach(() => {
+    setActivePinia(createPinia())
+    __resetSupabaseMock()
+    document.body.innerHTML = ''
+    router = createRouter({
+      history: createMemoryHistory(),
+      routes: [
+        { path: '/eventos', name: 'eventos', component: { template: '<div/>' } },
+        { path: '/eventos/:id', name: 'evento-detalle', component: EventoDetalleView },
+        { path: '/eventos/:id/contabilidad', name: 'contabilidad-evento', component: { template: '<div/>' } },
+        { path: '/eventos/:id/productos', name: 'evento-productos', component: { template: '<div/>' } },
+      ],
+    })
   aplicacion = createApp({})
   aplicacion.use(createPinia())
   aplicacion.provide('supabase', createClient('http://x', 'anon'))
@@ -167,6 +169,17 @@ describe('EventoDetalleView', () => {
 
     expect(wrapper.text()).toContain('15/07/2026')
     expect(wrapper.text()).toContain('22/07/2026')
+  })
+
+  it('navigates to contabilidad when clicking the contabilidad button', async () => {
+    const evento = mkEvento('e-1', { estado: 'planificacion' })
+    await prepararStore(evento)
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="evento-detalle-contabilidad"]').attributes('href'))
+      .toContain('/eventos/e-1/contabilidad')
   })
 
   it('saves fecha_fin + margen_ganancia via the store (REQ-FIN-2, REQ-FIN)', async () => {

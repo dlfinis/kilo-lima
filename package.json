@@ -31,7 +31,10 @@
     "verify:contribucion-pr1": "node scripts/verify-contribucion-pr1.mjs",
     "verify:contribucion-pr2": "node scripts/verify-contribucion-pr2.mjs",
     "verify:contribucion-all": "node scripts/verify-contribucion-pr1.mjs && node scripts/verify-contribucion-pr2.mjs",
-    "verify:all": "node scripts/verify-all.mjs"
+    "verify:all": "node scripts/verify-all.mjs",
+    "db:reset": "node scripts/db-reset.mjs",
+    "db:reset:yes": "node scripts/db-reset.mjs --yes",
+    "db:summary": "node scripts/db-reset.mjs --print"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",

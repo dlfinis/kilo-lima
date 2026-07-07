@@ -36,6 +36,7 @@ export interface GastoFijo {
   categoria: CategoriaGasto
   monto: number
   descripcion: string | null
+  socio_id?: string | null
   created_at: string
 }
 

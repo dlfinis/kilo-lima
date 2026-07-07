@@ -4,6 +4,19 @@ import App from './App.vue'
 import { vuetify } from '@/plugins/vuetify'
 import { router } from '@/router'
 import { servicesPlugin } from '@/plugins/services'
+import { enableTraceBuffer, getTraceBuffer, clearTraceBuffer } from '@/utils/trace'
+
+// Developer/operator observability hook: exposes the in-memory trace
+// buffer at `window.__kiloLima__.traces` so the team can inspect the
+// flow timeline without filtering console levels. Enabled only in
+// development mode — zero overhead in production builds.
+if (import.meta.env.DEV) {
+  enableTraceBuffer()
+  ;(window as unknown as Record<string, unknown>).__kiloLima__ = {
+    traces: getTraceBuffer,
+    clearTraces: clearTraceBuffer,
+  }
+}
 
 // Plugin order matters (design section 2): Pinia → Vuetify → Router →
 // servicesPlugin → mount. servicesPlugin must run BEFORE mount so every

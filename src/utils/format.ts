@@ -13,7 +13,7 @@ export function formatearUSD(monto: number): string {
 // REQ-CATALOG-21: renders "12.5 g" / "3 unidad(es)". The "(es)" suffix on
 // the discrete "unidad" unit avoids the awkward "3 unidad" singular form.
 export function formatearUnidad(cantidad: number, unidad: string): string {
-  const sufijo = unidad === 'und' ? 'unds' : unidad
+  const sufijo = unidad === 'unidad' ? 'u' : unidad === 'und' ? 'unds' : unidad
   return `${cantidad} ${sufijo}`
 }
 

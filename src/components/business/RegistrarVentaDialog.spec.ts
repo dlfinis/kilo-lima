@@ -114,13 +114,18 @@ describe('RegistrarVentaDialog', () => {
     expect(cancelar?.textContent).toContain('Cancelar')
   })
 
-  it('offers 3 metodo_pago options in the selector (REQ-POS-12)', () => {
+  it('offers 4 metodo_pago options in the selector, including mixto (REQ-POS-12, REQ-POS-CORRECCION-2)', () => {
+    // Review finding #7: the registrar dialog used to hard-code a
+    // 3-option subset (efectivo, transferencia, tarjeta) that drifted
+    // from the `MetodoPago` union (which includes 'mixto') and from
+    // the history dialog. Now both dialogs source their option list
+    // from the centralized `METODOS_PAGO` constant.
     const wrapper = mountDialog()
     const opciones = (wrapper.vm as unknown as {
       opciones: { value: MetodoPago; label: string }[]
     }).opciones
     const values = opciones.map((o) => o.value)
-    expect(values).toEqual(['efectivo', 'transferencia', 'tarjeta'])
+    expect(values).toEqual(['efectivo', 'transferencia', 'tarjeta', 'mixto'])
   })
 
   it('renders without an evento (the view still allows the dialog)', () => {
@@ -216,6 +221,29 @@ describe('RegistrarVentaDialog — efectivo UX (REQ-POS-CAMBIO-1, REQ-POS-CAMBIO
     expect(
       document.querySelector('[data-testid="registrar-venta-billete-20"]'),
     ).toBeTruthy()
+  })
+
+  // Regression: the visible denomination on each quick-bill button must
+  // show the interpolated value (`+1`, `+5`, `+10`, `+20`, `+50`).
+  // Earlier the template rendered the literal string `+${billete}`
+  // (Vue templates require `{{ }}` for interpolation) so the operator
+  // could not see which bill value they were tapping.
+  it('renders the interpolated denomination as the visible label (regression: +${billete} bug)', async () => {
+    const wrapper = mountDialog()
+    await cambiarMetodoPago(wrapper, 'efectivo')
+    // Verify each of the 5 quick-bill buttons shows its denomination,
+    // not the literal string `+${billete}`.
+    for (const monto of [1, 5, 10, 20, 50]) {
+      const boton = document.querySelector(
+        `[data-testid="registrar-venta-billete-${monto}"]`,
+      )
+      expect(boton, `button for ${monto} should exist`).toBeTruthy()
+      const texto = boton?.textContent?.trim() ?? ''
+      expect(texto, `denomination ${monto} should render with "+" prefix`).toBe(`+${monto}`)
+    }
+    // Also confirm the buggy literal `+${billete}` is NOT anywhere in
+    // the document body — that was the bug surface.
+    expect(document.body.textContent).not.toContain('+${billete}')
   })
 
   it('confirmar emits { metodoPago, montoRecibido? } (REQ-POS-CAMBIO-3, widened contract)', async () => {

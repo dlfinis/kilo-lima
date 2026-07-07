@@ -37,6 +37,9 @@ export type {
   VentaItem,
   VentaItemInput,
   VentaConItems,
+  VentaCorreccion,
+  VentaCorreccionInput,
+  VentaEdicionContexto,
   GastoImprevisto,
   GastoImprevistoInput,
   CierreCaja,
@@ -48,9 +51,31 @@ export type {
   DesgloseDia,
   DesgloseProducto,
 } from './pos.types'
+// METODOS_PAGO is a runtime constant (not a type) — exported as a
+// value alongside the type-only re-exports above so the registrar
+// dialog, edit dialog, and history dialog all source their option
+// list from the same place.
+export { METODOS_PAGO } from './pos.types'
 export type {
   EventoProducto,
   EventoProductoConDetalle,
   CrearEventoProductoInput,
   ActualizarMargenInput,
 } from './evento_productos.types'
+export type {
+  Socio,
+  SocioInput,
+  EventoSocio,
+  EventoSocioInput,
+  Aporte,
+  AporteInput,
+  CompraInsumo,
+  CompraInsumoInput,
+  SocioConDetalle,
+  EventoSocioConDetalle,
+  AporteConDetalle,
+  CompraInsumoConDetalle,
+  InversionSocio,
+  DistribucionResultado,
+  MovimientoTimeline,
+} from './socios.types'

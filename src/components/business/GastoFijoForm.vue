@@ -7,12 +7,15 @@ import { computed, ref, watch } from 'vue'
 
 import type { CategoriaGasto, GastoFijoInput } from '@/types'
 
+type SocioOption = { id: string; nombre: string }
+
 const props = withDefaults(
   defineProps<{
     valoresIniciales?: GastoFijoInput | null
     editable?: boolean
+    socios?: SocioOption[]
   }>(),
-  { valoresIniciales: null, editable: true },
+  { valoresIniciales: null, editable: true, socios: () => [] },
 )
 
 const emit = defineEmits<{
@@ -33,6 +36,7 @@ const eventoId = ref<string>('')
 const categoria = ref<CategoriaGasto>('renta')
 const monto = ref<number>(0)
 const descripcion = ref<string>('')
+const socioId = ref<string | null>(null)
 
 const errores = ref<{ monto?: string }>({})
 
@@ -44,6 +48,7 @@ watch(
       categoria.value = 'renta'
       monto.value = 0
       descripcion.value = ''
+      socioId.value = null
       errores.value = {}
       return
     }
@@ -51,6 +56,7 @@ watch(
     categoria.value = v.categoria
     monto.value = v.monto
     descripcion.value = v.descripcion ?? ''
+    socioId.value = v.socio_id ?? null
     errores.value = {}
   },
   { immediate: true },
@@ -75,6 +81,7 @@ function onSubmit() {
     categoria: categoria.value,
     monto: monto.value,
     descripcion: descripcion.value.trim() || null,
+    socio_id: socioId.value || null,
   })
 }
 
@@ -112,6 +119,16 @@ function onCancelar() {
       label="Descripción (opcional)"
       :disabled="!editable"
       data-testid="gasto-descripcion"
+    />
+    <v-select
+      v-model="socioId"
+      :items="socios"
+      item-title="nombre"
+      item-value="id"
+      label="Pagado por (opcional)"
+      :disabled="!editable"
+      clearable
+      data-testid="gasto-socio"
     />
     <div class="d-flex ga-2 mt-2">
       <v-btn
