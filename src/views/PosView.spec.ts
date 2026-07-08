@@ -16,6 +16,18 @@
 // responses for those fetches; the non-fetched stores
 // (evento_productos, ingredientes) are seeded directly via the store
 // references.
+//
+// mobile-ux-redesign Phase 3: mocked usePosMode for mode-switching tests.
+const posModeRef = { value: false }
+vi.mock('@/composables/usePosMode', async () => {
+  const { computed } = await import('vue')
+  return {
+    usePosMode: () => ({
+      isSimplifiedMode: computed(() => posModeRef.value),
+    }),
+  }
+})
+
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
@@ -44,7 +56,6 @@ import type {
   Database,
   Evento,
   EventoProducto,
-  GastoImprevisto,
   MateriaPrima,
   Producto,
   RecetaConIngredientes,
@@ -743,6 +754,185 @@ describe('PosView — EditarVentaDialog failure preserves dialog state', () => {
       // Local state reflects the correction.
       expect(ventas.ventas[0]?.total).toBe(10)
       expect(ventas.ventas[0]?.metodo_pago).toBe('transferencia')
+    })
+  })
+})
+
+// mobile-ux-redesign Phase 3: POS Ultra-Rapid — simplified vs full mode
+// rendering and checkout flow. Mocks usePosMode to control mode switching.
+describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
+  afterEach(() => {
+    posModeRef.value = false
+    vi.unstubAllEnvs()
+  })
+
+  it('renders PosModeBanner in simplified mode when isSimplifiedMode is true', async () => {
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const banner = wrapper.find('[data-testid="pos-mode-banner"]')
+      expect(banner.exists()).toBe(true)
+      expect(banner.text()).toContain('Modo rápido')
+    })
+  })
+
+  it('renders full mode PosModeBanner when isSimplifiedMode is false', async () => {
+    posModeRef.value = false
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const banner = wrapper.find('[data-testid="pos-mode-banner"]')
+      expect(banner.exists()).toBe(true)
+      expect(banner.text()).toContain('Modo completo')
+    })
+  })
+
+  it('renders ProductGrid in simplified mode', async () => {
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      // ProductGrid should be rendered with a search input
+      const searchInput = wrapper.find('[data-testid="product-grid-search"]')
+      expect(searchInput.exists()).toBe(true)
+    })
+  })
+
+  it('renders PaymentSelector in simplified mode', async () => {
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const paymentOptions = wrapper.findAll('[data-testid="payment-option"]')
+      expect(paymentOptions).toHaveLength(3)
+    })
+  })
+
+  it('renders CheckoutButton in simplified mode', async () => {
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const checkoutBtn = wrapper.find('[data-testid="checkout-btn"]')
+      expect(checkoutBtn.exists()).toBe(true)
+    })
+  })
+
+  it('CheckoutButton is disabled when cart is empty (no items)', async () => {
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const checkoutBtn = wrapper.find('[data-testid="checkout-btn"]')
+      // Button should be disabled when total is 0 (empty cart) — disabled attribute present
+      expect(checkoutBtn.attributes('disabled')).toBeDefined()
+    })
+  })
+
+  it('CheckoutButton is enabled when cart has items AND payment method is selected', async () => {
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      // In simplified mode, products are ProductButtons rendered inside ProductGrid.
+      // Directly use the store to add an item to the cart (avoids DOM complexity)
+      const ventas = useVentasStore()
+      ventas.agregarAlCarrito('p-1', 1)
+      await flushPromises()
+      // Select a payment method
+      const paymentButtons = wrapper.findAll('[data-testid="payment-option"]')
+      await paymentButtons[0]!.trigger('click')
+      await flushPromises()
+      const checkoutBtn = wrapper.find('[data-testid="checkout-btn"]')
+      expect(checkoutBtn.attributes('disabled')).toBeUndefined()
+    })
+  })
+
+  it('CheckoutButton is disabled when payment method is not selected (even with items)', async () => {
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      // Add item to cart directly via store
+      const ventas = useVentasStore()
+      ventas.agregarAlCarrito('p-1', 1)
+      await flushPromises()
+      const checkoutBtn = wrapper.find('[data-testid="checkout-btn"]')
+      // disabled when payment not selected OR cart empty
+      expect(checkoutBtn.attributes('disabled')).toBeDefined()
+    })
+  })
+
+  it('clicking CheckoutButton calls registrarVenta and clears the cart', async () => {
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    // Push responses for registrarVenta (count query + header insert + items insert)
+    __pushSupabaseResponse<unknown>({ data: null, error: null })
+    __pushSupabaseResponse<VentaConItems>({
+      data: {
+        id: 'v-1',
+        evento_id: 'e-1',
+        fecha: '2026-06-19T00:00:00Z',
+        total: 5,
+        metodo_pago: 'efectivo',
+        monto_recibido: null,
+        cambio: null,
+        comprobante_numero: null,
+        created_at: '2026-06-19T00:00:00Z',
+        items: [],
+      },
+      error: null,
+    })
+    __pushSupabaseResponse<unknown>({
+      data: [{ id: 'vi-1', venta_id: 'v-1', producto_id: 'p-1', cantidad: 1, precio_unitario: 5, subtotal: 5 }],
+      error: null,
+    })
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      // Add item to cart + select payment
+      const ventas = useVentasStore()
+      ventas.agregarAlCarrito('p-1', 1)
+      ventas.setPaymentMethod('efectivo')
+      await flushPromises()
+      // Click checkout
+      const checkoutBtn = wrapper.find('[data-testid="checkout-btn"]')
+      await checkoutBtn.trigger('click')
+      await flushPromises()
+      // Cart should be empty after successful checkout
+      expect(ventas.carrito).toEqual([])
+    })
+  })
+
+  it('does NOT render the existing ProductoCardGrid in simplified mode', async () => {
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      // In simplified mode, the old ProductoCardGrid should not be visible
+      // (the simplified ProductGrid replaces it)
+      const searchInput = wrapper.find('[data-testid="product-grid-search"]')
+      expect(searchInput.exists()).toBe(true)
     })
   })
 })

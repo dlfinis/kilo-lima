@@ -110,6 +110,9 @@ export const useVentasStore = defineStore('ventas', () => {
   // sales under another evento's name.
   const ventasEventoId = ref<string | null>(null)
   const carrito = ref<LineaCarrito[]>([])
+  // mobile-ux-redesign Phase 3: payment method state for the simplified
+  // POS flow. Persisted until the cart is cleared or explicitly reset.
+  const paymentMethod = ref<string | null>(null)
   const cargando = ref<boolean>(false)
   const error = ref<string | null>(null)
   const toast = ref<ToastVenta>(null)
@@ -199,6 +202,18 @@ export const useVentasStore = defineStore('ventas', () => {
 
   function vaciarCarrito(): void {
     carrito.value = []
+    // mobile-ux-redesign Phase 3: reset payment method when the
+    // cart is emptied so the operator must re-select for the next sale.
+    paymentMethod.value = null
+  }
+
+  // mobile-ux-redesign Phase 3: payment method state for simplified POS flow.
+  function setPaymentMethod(method: string): void {
+    paymentMethod.value = method
+  }
+
+  function clearPaymentMethod(): void {
+    paymentMethod.value = null
   }
 
   const totalCarrito = computed<number>(() =>
@@ -566,6 +581,7 @@ export const useVentasStore = defineStore('ventas', () => {
   return {
     ventas,
     carrito,
+    paymentMethod,
     cargando,
     error,
     toast,
@@ -577,6 +593,8 @@ export const useVentasStore = defineStore('ventas', () => {
     actualizarCantidad,
     quitarDelCarrito,
     vaciarCarrito,
+    setPaymentMethod,
+    clearPaymentMethod,
     cargarPorEvento,
     registrarVenta,
     corregirVenta,

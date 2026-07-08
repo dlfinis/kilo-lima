@@ -46,6 +46,10 @@
 import { computed, onActivated, onMounted, ref } from 'vue'
 import { useRouter } from 'vue-router'
 
+import CheckoutButton from '@/components/pos/CheckoutButton.vue'
+import PaymentSelector from '@/components/pos/PaymentSelector.vue'
+import PosModeBanner from '@/components/pos/PosModeBanner.vue'
+import ProductGrid from '@/components/pos/ProductGrid.vue'
 import ComprobanteVentaDialog from '@/components/business/ComprobanteVentaDialog.vue'
 import CarritoPanel from '@/components/business/CarritoPanel.vue'
 import EditarVentaDialog from '@/components/business/EditarVentaDialog.vue'
@@ -57,6 +61,7 @@ import RegistrarVentaDialog from '@/components/business/RegistrarVentaDialog.vue
 import ResumenVentasHoy from '@/components/business/ResumenVentasHoy.vue'
 import { useEvents } from '@/composables/useEvents'
 import { useGastosImprevistos } from '@/composables/useGastosImprevistos'
+import { usePosMode } from '@/composables/usePosMode'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useProductos } from '@/composables/useProductos'
 import { useRecipes } from '@/composables/useRecipes'
@@ -85,9 +90,11 @@ const {
   cargando: cargandoVentas,
   error: errorVentas,
   totalCarrito,
+  paymentMethod,
   eventoEnCurso,
   agregarAlCarrito,
   vaciarCarrito,
+  setPaymentMethod,
   registrarVenta,
   corregirVenta,
   cargarPorEvento,
@@ -103,6 +110,23 @@ const {
   totalPorEvento: totalImprevistosPorEvento,
 } = useGastosImprevistos()
 const { online } = useOnlineStatus()
+
+// mobile-ux-redesign Phase 3: POS mode flag for simplified vs full.
+const { isSimplifiedMode } = usePosMode()
+
+// Simplified mode: "Cobrar" is enabled only when cart has items AND
+// a payment method has been selected.
+const cobrarHabilitado = computed(
+  () => carrito.value.length > 0 && paymentMethod.value !== null,
+)
+
+// Simplified-mode checkout: select payment and call registrarVenta.
+async function manejarCheckoutSimplificado() {
+  if (!cobrarHabilitado.value) return
+  const metodo = paymentMethod.value as MetodoPago | null
+  if (!metodo) return
+  await registrarVenta(metodo)
+}
 
 // REQ-FIN-28, REQ-FIN-29: the POS grid source. Reactive on the
 // active evento id — switching eventos re-evaluates without a manual
@@ -128,6 +152,18 @@ const contribucionesPorProducto = computed<Record<string, number>>(() => {
   }
   return mapa
 })
+
+// mobile-ux-redesign Phase 3: simplified POS grid uses ProductGrid
+// which expects { id, nombre, precio, imagen } shape.
+const productosSimplificados = computed(() =>
+  productosParaGrid.value.map((ep) => ({
+    id: ep.producto_id,
+    nombre: ep.producto_nombre,
+    precio: ep.precio_final,
+    imagen: null,
+  })),
+)
+
 // ProductoCardGrid is a presentational component that takes
 // Producto[] + RecetaConIngredientes[]; map the joined shape into
 // the legacy types so we keep the existing card surface without a
@@ -372,6 +408,9 @@ async function reintentarHistorial() {
 
 <template>
   <v-container>
+    <!-- mobile-ux-redesign Phase 3: mode banner shows simplified/full -->
+    <PosModeBanner />
+
     <div class="d-flex align-center justify-space-between mb-4">
       <h1 data-testid="pos-titulo">POS</h1>
       <div class="d-flex align-center ga-2">
@@ -543,7 +582,47 @@ async function reintentarHistorial() {
         </v-btn>
       </v-alert>
 
-      <v-row v-else-if="!cargandoProductos && !errorProductos">
+      <!-- mobile-ux-redesign Phase 3: Simplified POS mode (active event) -->
+      <template v-if="isSimplifiedMode && !cargandoProductos && !errorProductos">
+        <v-row>
+          <v-col cols="12" md="8">
+            <ProductGrid
+              :productos="productosSimplificados"
+              @add-to-cart="manejarAgregar"
+            />
+          </v-col>
+          <v-col cols="12" md="4">
+            <CarritoPanel
+              :carrito="carrito"
+              :total="totalCarrito"
+              @registrar-venta="abrirDialogoRegistrar"
+              @vaciar="vaciarCarrito"
+              @update-cantidad="actualizarCantidad"
+              @eliminar="quitarDelCarrito"
+            />
+          </v-col>
+        </v-row>
+        <v-row class="mt-4">
+          <v-col cols="12" md="8">
+            <PaymentSelector
+              :model-value="paymentMethod"
+              @update:model-value="setPaymentMethod"
+            />
+          </v-col>
+        </v-row>
+        <v-row class="mt-4">
+          <v-col cols="12">
+            <CheckoutButton
+              :disabled="!cobrarHabilitado"
+              :total="totalCarrito"
+              @checkout="manejarCheckoutSimplificado"
+            />
+          </v-col>
+        </v-row>
+      </template>
+
+      <!-- Full mode: existing ProductoCardGrid + CarritoPanel -->
+      <v-row v-else-if="!isSimplifiedMode && !cargandoProductos && !errorProductos">
         <v-col cols="12" md="8" data-testid="pos-grid-col">
           <ProductoCardGrid
             :productos="productosMapeados"

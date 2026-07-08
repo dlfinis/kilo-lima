@@ -1575,3 +1575,70 @@ describe('useVentasStore — corregirVenta (REQ-POS-CORRECCION-1..3, v2 atomic R
     debugSpy.mockRestore()
   })
 })
+
+// mobile-ux-redesign Phase 3 (REQ-POS-1): payment method state on the
+// ventas store. The store exposes paymentMethod (string|null),
+// setPaymentMethod(method), and clearPaymentMethod(). The payment
+// method resets when the cart is cleared.
+describe('useVentasStore — paymentMethod (Phase 3: POS Ultra-Rapid)', () => {
+  it('starts with paymentMethod = null', () => {
+    conContexto(() => {
+      const store = useVentasStore()
+      expect(store.paymentMethod).toBeNull()
+    })
+  })
+
+  it('setPaymentMethod updates paymentMethod', () => {
+    conContexto(() => {
+      const store = useVentasStore()
+      store.setPaymentMethod('efectivo')
+      expect(store.paymentMethod).toBe('efectivo')
+    })
+  })
+
+  it('setPaymentMethod accepts all valid methods', () => {
+    const metodos = ['efectivo', 'transferencia', 'tarjeta'] as const
+    for (const metodo of metodos) {
+      conContexto(() => {
+        const store = useVentasStore()
+        store.setPaymentMethod(metodo)
+        expect(store.paymentMethod).toBe(metodo)
+      })
+    }
+  })
+
+  it('clearPaymentMethod resets paymentMethod to null', () => {
+    conContexto(() => {
+      const store = useVentasStore()
+      store.setPaymentMethod('efectivo')
+      expect(store.paymentMethod).toBe('efectivo')
+      store.clearPaymentMethod()
+      expect(store.paymentMethod).toBeNull()
+    })
+  })
+
+  it('clearPaymentMethod on already-null is a no-op', () => {
+    conContexto(() => {
+      const store = useVentasStore()
+      expect(store.paymentMethod).toBeNull()
+      store.clearPaymentMethod()
+      expect(store.paymentMethod).toBeNull()
+    })
+  })
+
+  it('paymentMethod resets when cart is cleared (vaciarCarrito)', () => {
+    sembrarEventoEnCurso()
+    sembrarProducto('p-1')
+    sembrarProducto('p-2')
+    conContexto(() => {
+      const store = useVentasStore()
+      store.agregarAlCarrito('p-1', 1)
+      store.agregarAlCarrito('p-2', 1)
+      store.setPaymentMethod('efectivo')
+      expect(store.paymentMethod).toBe('efectivo')
+      store.vaciarCarrito()
+      expect(store.paymentMethod).toBeNull()
+      expect(store.carrito).toEqual([])
+    })
+  })
+})

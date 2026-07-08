@@ -18,6 +18,7 @@ export function useVentas() {
   return {
     carrito: refs.carrito,
     ventas: refs.ventas,
+    paymentMethod: refs.paymentMethod,
     cargando: refs.cargando,
     error: refs.error,
     toast: refs.toast,
@@ -28,6 +29,8 @@ export function useVentas() {
     actualizarCantidad: store.actualizarCantidad,
     quitarDelCarrito: store.quitarDelCarrito,
     vaciarCarrito: store.vaciarCarrito,
+    setPaymentMethod: store.setPaymentMethod,
+    clearPaymentMethod: store.clearPaymentMethod,
     cargarPorEvento: store.cargarPorEvento,
     registrarVenta: store.registrarVenta,
     corregirVenta: store.corregirVenta,
