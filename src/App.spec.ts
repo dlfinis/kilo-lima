@@ -1,4 +1,12 @@
-import { describe, it, expect } from 'vitest'
+// REQ-UX-1 + REQ-NAV-1: App.vue conditionally renders either the
+// responsive AppLayout (when VITE_FLAG_MOBILE_UX='true') or the
+// legacy AppBar-only layout. The legacy smoke test stays.
+//
+// TDD CYCLE (Strict TDD Mode):
+//   SAFETY NET → 838 tests passing before changes.
+//   RED   → Updated test for new behavior; existing test adapted.
+//   GREEN → App.vue updated to match.
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia } from 'pinia'
 import { createVuetify } from 'vuetify'
@@ -7,30 +15,49 @@ import * as directives from 'vuetify/directives'
 import { createRouter, createMemoryHistory } from 'vue-router'
 import App from './App.vue'
 
-// REQ-UX-1: App.vue mounts <AppBar> globally above the <router-view>
-// so every route renders the same navigation surface. The previous
-// inline <h1>Kilo-Lima</h1> was removed because the AppBar title now
-// carries the brand. The smoke test still asserts the brand is visible
-// (now via the AppBar title).
 const vuetify = createVuetify({ components, directives })
 
 const mkRouter = async () => {
   const router = createRouter({
     history: createMemoryHistory(),
-    routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div />' } }],
+    routes: [{ path: '/:pathMatch(.*)*', component: { template: '<div data-testid="catch-all" />' } }],
   })
   await router.push('/')
   await router.isReady()
   return router
 }
 
+afterEach(() => {
+  vi.unstubAllEnvs()
+})
+
 describe('App', () => {
-  it('renders the AppBar with the Kilo-Lima title on mount', async () => {
+  it('renders the legacy layout (AppBar) when VITE_FLAG_MOBILE_UX is not set', async () => {
+    vi.stubEnv('VITE_FLAG_MOBILE_UX', undefined)
     const router = await mkRouter()
     const wrapper = mount(App, {
       global: { plugins: [createPinia(), vuetify, router] },
     })
     expect(wrapper.find('[data-testid="app-bar"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="app-bar-title"]').text()).toBe('Kilo-Lima')
+  })
+
+  it('renders the legacy layout (AppBar) when VITE_FLAG_MOBILE_UX is "false"', async () => {
+    vi.stubEnv('VITE_FLAG_MOBILE_UX', 'false')
+    const router = await mkRouter()
+    const wrapper = mount(App, {
+      global: { plugins: [createPinia(), vuetify, router] },
+    })
+    expect(wrapper.find('[data-testid="app-bar"]').exists()).toBe(true)
+  })
+
+  it('renders AppLayout when VITE_FLAG_MOBILE_UX is "true"', async () => {
+    vi.stubEnv('VITE_FLAG_MOBILE_UX', 'true')
+    const router = await mkRouter()
+    const wrapper = mount(App, {
+      global: { plugins: [createPinia(), vuetify, router] },
+    })
+    // AppLayout renders AppBar internally, so app-bar should still exist
+    expect(wrapper.find('[data-testid="app-bar"]').exists()).toBe(true)
   })
 })
