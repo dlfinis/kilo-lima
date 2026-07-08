@@ -1,55 +1,71 @@
 <script setup lang="ts">
-// REQ-UX-9..19 + REQ-UX-25: HomeView rewrite. PR2 of ux-improvements
-// adds three new presentational components that turn the home from a
-// passive landing page into an action-oriented context surface:
-//
-//   - ContadoresHome: live snapshot of the 6 domain counters (links
-//     to each route).
-//   - BannerEventoActivo: warning banner when an evento is en_curso
-//     (drives the user to /pos).
-//   - SiguientePasoCta: the recommended next step computed by
-//     `obtenerSiguientePaso(contadores)`. Hidden when no step is
-//     recommended (user is in motion).
-//
-// The 3 phase cards from foundation PR2 are kept as a SECONDARY
-// navigation surface (smaller, below the new components) so the
-// brief §3.1 Progressive Disclosure model still works.
-//
-// PR-2c (finanzas-evento): Post-evento card is now dynamic — when
-// at least one evento is cerrado, the card links to its reporte;
-// otherwise shows an empty-state hint.
+// mobile-ux-redesign Phase 2: HomeView operational dashboard.
+// Composes ActiveEventCard / EmptyStateEvent, KpiGrid, QuickActionsRow,
+// and keeps the 3 business-phase cards as a secondary surface (de-emphasized).
+// Data loading still uses useResumen() for store hydration.
 import { computed, onMounted } from 'vue'
 import { useAppStore } from '@/stores/app.store'
 import { useEventsStore } from '@/stores/events.store'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { useResumen } from '@/composables/useResumen'
-import ContadoresHome from '@/components/business/ContadoresHome.vue'
-import BannerEventoActivo from '@/components/business/BannerEventoActivo.vue'
-import SiguientePasoCta from '@/components/business/SiguientePasoCta.vue'
+import { useEventoActivo } from '@/composables/useEventoActivo'
+import { useKpis } from '@/composables/useKpis'
+import { formatearUSD } from '@/utils/format'
+import ActiveEventCard from '@/components/business/ActiveEventCard.vue'
+import EmptyStateEvent from '@/components/business/EmptyStateEvent.vue'
+import KpiGrid from '@/components/business/KpiGrid.vue'
+import QuickActionsRow from '@/components/business/QuickActionsRow.vue'
 
 const app = useAppStore()
 const eventsStore = useEventsStore()
 const { online } = useOnlineStatus()
-const { contadores, cargar } = useResumen()
+const { cargar } = useResumen()
+const { activeEvent } = useEventoActivo()
+const kpisData = useKpis()
 
-// REQ-FIN-34 / REQ-REPORTE-6: the most recently finished evento
-// (sort by fecha_fin desc, fall back to fecha). Null when no cerrado
-// evento exists → card shows empty state.
+// KPI data for the grid — derived from store-backed composable
+const kpis = computed(() => [
+  {
+    title: 'Ventas Hoy',
+    value: formatearUSD(kpisData.ventasHoy.value),
+    icon: 'mdi-cash-register',
+    color: 'primary',
+  },
+  {
+    title: 'Gastos Hoy',
+    value: formatearUSD(kpisData.gastosHoy.value),
+    icon: 'mdi-file-document-edit',
+    color: 'warning',
+  },
+  {
+    title: 'Utilidad Est.',
+    value: formatearUSD(kpisData.utilidadEstimada.value),
+    icon: 'mdi-chart-line',
+    color: kpisData.utilidadEstimada.value >= 0 ? 'success' : 'error',
+  },
+  {
+    title: 'Stock Crítico',
+    value: kpisData.stockCritico.value,
+    icon: 'mdi-alert-circle',
+    color: kpisData.stockCritico.value > 0 ? 'error' : 'grey',
+  },
+])
+
+// Most-recently-finished event for the post-evento card
 const ultimoCerrado = computed(() => {
   const cerrados = eventsStore.eventos
     .filter((e) => e.estado === 'cerrado')
     .sort((a, b) => {
       const fa = a.fecha_fin ?? a.fecha
       const fb = b.fecha_fin ?? b.fecha
-      return fb.localeCompare(fa) // descending — most recent first
+      return fb.localeCompare(fa)
     })
   return cerrados[0] ?? null
 })
 
+const hasActiveEvent = computed(() => activeEvent.value !== null)
+
 onMounted(() => {
-  // Fire-and-forget — the home shows the skeleton state until
-  // `cargado` flips true. The Promise.allSettled design ensures
-  // partial failures don't blank the home.
   void cargar()
 })
 </script>
@@ -61,19 +77,20 @@ onMounted(() => {
       Costos y ventas de postres en ferias
     </p>
 
-    <!-- Top: live counters (REQs UX-9..12) -->
-    <ContadoresHome :contadores="contadores" />
+    <!-- Active event or empty state -->
+    <ActiveEventCard v-if="hasActiveEvent" />
+    <EmptyStateEvent v-else />
 
-    <!-- Active business state (REQs UX-13..16) -->
-    <BannerEventoActivo />
+    <!-- KPI Dashboard -->
+    <KpiGrid :kpis="kpis" />
 
-    <!-- Recommended next step (REQs UX-17..19). Hidden on null. -->
-    <SiguientePasoCta :contadores="contadores" />
+    <!-- Quick Action Buttons -->
+    <QuickActionsRow />
 
     <v-divider class="my-6" />
 
-    <!-- Secondary: 3 phase cards from foundation PR2 — kept smaller -->
-    <h2 class="text-h6 mb-3">Fases del negocio</h2>
+    <!-- Secondary: 3 business phase cards (de-emphasized) -->
+    <h3 class="text-subtitle-2 text-medium-emphasis mb-3">Fases del negocio</h3>
     <v-row dense>
       <v-col cols="12" md="4">
         <v-card
@@ -118,8 +135,7 @@ onMounted(() => {
           <v-card-text>
             <p class="text-body-2 mb-2">
               Con el evento activo, registrá ventas en el POS. Agregá productos
-              al carrito, elegí método de pago y registrá gastos imprevistos
-              que surjan durante la feria.
+              al carrito, elegí método de pago y registrá gastos imprevistos.
             </p>
             <p class="text-caption text-medium-emphasis">
               Ir a Caja →
@@ -158,56 +174,6 @@ onMounted(() => {
             </p>
           </v-card-text>
         </v-card>
-      </v-col>
-    </v-row>
-
-    <v-divider class="my-6" />
-
-    <h2 class="text-h6 mb-3">Accesos rápidos</h2>
-    <v-row dense>
-      <v-col cols="6" sm="3">
-        <v-btn
-          variant="outlined"
-          prepend-icon="mdi-package-variant"
-          to="/materias-primas"
-          block
-          data-testid="home-btn-materias-primas"
-        >
-          Materias Primas
-        </v-btn>
-      </v-col>
-      <v-col cols="6" sm="3">
-        <v-btn
-          variant="outlined"
-          prepend-icon="mdi-book-open-variant"
-          to="/recetas"
-          block
-          data-testid="home-btn-recetas"
-        >
-          Recetas
-        </v-btn>
-      </v-col>
-      <v-col cols="6" sm="3">
-        <v-btn
-          variant="outlined"
-          prepend-icon="mdi-store-outline"
-          to="/productos"
-          block
-          data-testid="home-btn-productos"
-        >
-          Productos
-        </v-btn>
-      </v-col>
-      <v-col cols="6" sm="3">
-        <v-btn
-          variant="outlined"
-          prepend-icon="mdi-calendar-check"
-          to="/eventos"
-          block
-          data-testid="home-btn-eventos"
-        >
-          Eventos
-        </v-btn>
       </v-col>
     </v-row>
 
