@@ -16,21 +16,39 @@ const routes: RouteRecordRaw[] = [
   },
   {
     path: '/materias-primas',
-    name: 'materias-primas',
-    component: () => import('@/views/MateriasPrimasView.vue'),
-    meta: { breadcrumb: ['Inicio', 'materias-primas'] },
+    redirect: '/inventario',
+  },
+  {
+    path: '/inventario',
+    name: 'inventario',
+    component: () => import('@/views/InventarioView.vue'),
+    meta: { breadcrumb: ['Inicio', 'Inventario'] },
   },
   {
     path: '/recetas',
-    name: 'recetas',
-    component: () => import('@/views/RecetasView.vue'),
-    meta: { breadcrumb: ['Inicio', 'recetas'] },
+    redirect: '/productos/recetas',
   },
   {
     path: '/recetas/:id',
+    redirect: (to) => `/productos/recetas/${to.params.id as string}`,
+  },
+  {
+    path: '/productos',
+    name: 'productos',
+    component: () => import('@/views/ProductosView.vue'),
+    meta: { breadcrumb: ['Inicio', 'productos'] },
+  },
+  {
+    path: '/productos/recetas',
+    name: 'recetas',
+    component: () => import('@/views/RecetasView.vue'),
+    meta: { breadcrumb: ['Inicio', 'Productos', 'Recetas'] },
+  },
+  {
+    path: '/productos/recetas/:id',
     name: 'receta-detalle',
     component: () => import('@/views/RecetaDetalleView.vue'),
-    meta: { breadcrumb: ['Inicio', 'recetas', 'Detalle'] },
+    meta: { breadcrumb: ['Inicio', 'Productos', 'Recetas', 'Detalle'] },
   },
   {
     path: '/eventos',
@@ -68,26 +86,50 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/ContabilidadEventoView.vue'),
     meta: { breadcrumb: ['Inicio', 'eventos', 'Contabilidad'] },
   },
+  // ---- Redirects: legacy → new routes ----
   {
-    path: '/productos',
-    name: 'productos',
-    component: () => import('@/views/ProductosView.vue'),
-    meta: { breadcrumb: ['Inicio', 'productos'] },
+    path: '/contabilidad',
+    redirect: '/reportes/contabilidad',
   },
+  {
+    path: '/rentabilidad',
+    redirect: '/reportes/rentabilidad',
+  },
+  // ---- Reportes (Phase 5) ----
+  {
+    path: '/reportes',
+    component: () => import('@/components/layout/ReportesLayout.vue'),
+    children: [
+      {
+        path: '',
+        name: 'reportes-resumen',
+        component: () => import('@/views/ReportesView.vue'),
+        meta: { breadcrumb: ['Inicio', 'Reportes', 'Resumen'] },
+      },
+      {
+        path: 'contabilidad',
+        name: 'reportes-contabilidad',
+        component: () => import('@/views/ContabilidadView.vue'),
+        meta: { breadcrumb: ['Inicio', 'Reportes', 'Contabilidad'] },
+      },
+      {
+        path: 'rentabilidad',
+        name: 'reportes-rentabilidad',
+        component: () => import('@/views/RentabilidadView.vue'),
+        meta: { breadcrumb: ['Inicio', 'Reportes', 'Rentabilidad'] },
+      },
+    ],
+  },
+  // ---- POS ----
   {
     path: '/pos',
     name: 'pos',
-    // PosView ships in PR3 — the box-office surface (grid + cart +
-    // registrar venta flow). Lazy-loaded so the chunk stays small.
     component: () => import('@/views/PosView.vue'),
     meta: { breadcrumb: ['Inicio', 'pos'] },
   },
   {
     path: '/pos/cierre',
     name: 'pos-cierre',
-    // CierresCajaView ships in PR4 — close review screen with
-    // CierreResumenCard + breakdown + imprevistos list + "Registrar
-    // cierre" action.
     component: () => import('@/views/CierresCajaView.vue'),
     meta: { breadcrumb: ['Inicio', 'pos', 'Cierre'] },
   },

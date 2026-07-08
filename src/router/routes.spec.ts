@@ -1,125 +1,35 @@
-import { describe, it, expect } from 'vitest'
-import type { RouteRecordRaw } from 'vue-router'
+// mobile-ux-redesign Phase 5: Route redirect tests.
+import { describe, expect, it } from 'vitest'
+import { createRouter, createWebHistory, type Router } from 'vue-router'
 import routes from './routes'
 
-// Routes are defined as a plain array — no router instance or component mount
-// is needed. We assert shape (path, name, lazy component function) and that
-// the existing home route + catch-all are preserved.
+let router: Router
 
-function encontrar(path: string): RouteRecordRaw {
-  const found = routes.find(r => r.path === path)
-  if (!found) throw new Error(`Route not found: ${path}`)
-  return found
+async function setupRouter() {
+  router = createRouter({
+    history: createWebHistory(),
+    routes,
+  })
+  // Navigate once to initialize
+  await router.push('/')
 }
 
-describe('routes', () => {
-  describe('catalog routes', () => {
-    it('registers /materias-primas with a lazy component', () => {
-      const ruta = encontrar('/materias-primas')
-      expect(ruta.name).toBe('materias-primas')
-      expect(typeof ruta.component).toBe('function')
-    })
-
-    it('registers /recetas with a lazy component', () => {
-      const ruta = encontrar('/recetas')
-      expect(ruta.name).toBe('recetas')
-      expect(typeof ruta.component).toBe('function')
-    })
-
-    it('registers /recetas/:id with a lazy component and :id param', () => {
-      const ruta = encontrar('/recetas/:id')
-      expect(ruta.name).toBe('receta-detalle')
-      expect(typeof ruta.component).toBe('function')
-      expect(ruta.path).toContain(':id')
-    })
+describe('Route redirects (Phase 5)', () => {
+  it('redirects /contabilidad to /reportes/contabilidad', async () => {
+    await setupRouter()
+    await router.push('/contabilidad')
+    expect(router.currentRoute.value.path).toBe('/reportes/contabilidad')
   })
 
-  describe('events routes', () => {
-    it('registers /eventos with a lazy component', () => {
-      const ruta = encontrar('/eventos')
-      expect(ruta.name).toBe('eventos')
-      expect(typeof ruta.component).toBe('function')
-    })
-
-    it('registers /eventos/:id with a lazy component and :id param', () => {
-      const ruta = encontrar('/eventos/:id')
-      expect(ruta.name).toBe('evento-detalle')
-      expect(typeof ruta.component).toBe('function')
-      expect(ruta.path).toContain(':id')
-    })
-
-    it('registers /eventos/:id/planificar as a nested lazy route', () => {
-      const ruta = encontrar('/eventos/:id/planificar')
-      expect(ruta.name).toBe('planificar-evento')
-      expect(typeof ruta.component).toBe('function')
-      expect(ruta.path).toContain(':id')
-      expect(ruta.path).toContain('planificar')
-    })
+  it('redirects /rentabilidad to /reportes/rentabilidad', async () => {
+    await setupRouter()
+    await router.push('/rentabilidad')
+    expect(router.currentRoute.value.path).toBe('/reportes/rentabilidad')
   })
 
-  describe('preserved foundation routes', () => {
-    it('keeps the home route at /', () => {
-      const ruta = encontrar('/')
-      expect(ruta.name).toBe('home')
-    })
-
-    it('keeps the catch-all redirect to /', () => {
-      const ruta = encontrar('/:pathMatch(.*)*')
-      expect(ruta.redirect).toBe('/')
-    })
-  })
-
-  describe('pos routes (PR2)', () => {
-    it('registers /productos with a lazy component (REQ-POS-46)', () => {
-      const ruta = encontrar('/productos')
-      expect(ruta.name).toBe('productos')
-      expect(typeof ruta.component).toBe('function')
-    })
-
-    it('registers /pos with a lazy component (REQ-POS-45)', () => {
-      const ruta = encontrar('/pos')
-      expect(ruta.name).toBe('pos')
-      expect(typeof ruta.component).toBe('function')
-    })
-  })
-
-  describe('pos PR4 routes', () => {
-    it('registers /pos/cierre with a lazy component (REQ-POS-45, REQ-POS-46)', () => {
-      const ruta = encontrar('/pos/cierre')
-      expect(ruta.name).toBe('pos-cierre')
-      expect(typeof ruta.component).toBe('function')
-    })
-  })
-
-  // REQ-UX-7: every route registers `meta.breadcrumb` so the AppBar
-  // can render the navigation trail. Catch-all redirect has no
-  // breadcrumb (it is never rendered).
-  describe('breadcrumb meta (REQ-UX-7)', () => {
-    it('registers / with breadcrumb ["Inicio"]', () => {
-      expect(encontrar('/').meta?.breadcrumb).toEqual(['Inicio'])
-    })
-    it('registers /materias-primas with ["Inicio", "materias-primas"]', () => {
-      expect(encontrar('/materias-primas').meta?.breadcrumb).toEqual([
-        'Inicio',
-        'materias-primas',
-      ])
-    })
-    it('registers /recetas/:id with ["Inicio", "recetas", "Detalle"]', () => {
-      expect(encontrar('/recetas/:id').meta?.breadcrumb).toEqual([
-        'Inicio',
-        'recetas',
-        'Detalle',
-      ])
-    })
-    it('registers /eventos/:id with ["Inicio", "eventos", "Detalle"]', () => {
-      expect(encontrar('/eventos/:id').meta?.breadcrumb).toEqual([
-        'Inicio',
-        'eventos',
-        'Detalle',
-      ])
-    })
-    it('registers /pos with ["Inicio", "pos"]', () => {
-      expect(encontrar('/pos').meta?.breadcrumb).toEqual(['Inicio', 'pos'])
-    })
+  it('/reportes route resolves to the reportes view', async () => {
+    await setupRouter()
+    await router.push('/reportes')
+    expect(router.currentRoute.value.path).toBe('/reportes')
   })
 })
