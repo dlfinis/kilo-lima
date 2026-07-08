@@ -25,8 +25,6 @@ function toggleDrawer() {
     <v-main>
       <router-view />
     </v-main>
-      <router-view />
-    </v-main>
 
     <BottomNav />
     <SideNavCompact />
