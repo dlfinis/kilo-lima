@@ -9,6 +9,10 @@ export interface MateriaPrima {
   unidad: UnidadMedida
   costo_por_unidad: number
   categoria: CategoriaMateriaPrima
+  // mobile-ux-redesign Phase 4: on-hand stock for production capacity.
+  // DB migration adds DEFAULT 0; optional here for backward compat
+  // with existing test factories that don't include it.
+  cantidad_disponible?: number
   notas: string | null
   created_at: string
   updated_at: string
