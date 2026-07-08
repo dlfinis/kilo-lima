@@ -59,7 +59,7 @@ describe('AppBar', () => {
     setActivePinia(createPinia())
     const router = await mkRouter('/')
     const wrapper = mountAppBar(router)
-    expect(wrapper.find('[data-testid="app-bar-title"]').text()).toBe('Kilo-Lima')
+    expect(wrapper.find('[data-testid="app-bar-title"]').text()).toBe('KiloLima')
   })
 
   it('hides the back button on the root route (REQ-UX-2)', async () => {

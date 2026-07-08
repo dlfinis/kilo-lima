@@ -117,15 +117,16 @@ describe('AppLayout', () => {
     expect(wrapper.find('.v-navigation-drawer').exists()).toBe(false)
   })
 
-  it('renders existing layout (AppBar + main) on web breakpoint', async () => {
+  it('renders SideNavFull on web breakpoint', async () => {
     setBreakpoint('web')
     const router = await mkRouter()
     const wrapper = mountAppLayout(router)
 
     // AppBar should still be present
     expect(wrapper.find('[data-testid="app-bar"]').exists()).toBe(true)
-    // Neither bottom nav nor side nav should render on web
+    // SideNavFull should render on web (navigation-drawer without rail)
+    expect(wrapper.find('.v-navigation-drawer').exists()).toBe(true)
+    // Bottom nav should not render on web
     expect(wrapper.find('.v-bottom-navigation').exists()).toBe(false)
-    expect(wrapper.find('.v-navigation-drawer').exists()).toBe(false)
   })
 })

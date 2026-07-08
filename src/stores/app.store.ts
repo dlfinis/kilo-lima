@@ -5,7 +5,7 @@ import { defineStore } from 'pinia'
 // reactive state via `ref`, actions as plain functions, return the public
 // surface so Pinia can wire the reactivity to the consumer.
 export const useAppStore = defineStore('app', () => {
-  const appName = ref('Kilo-Lima')
+  const appName = ref('KiloLima')
 
   function setAppName(nuevo: string) {
     appName.value = nuevo

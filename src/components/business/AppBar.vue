@@ -21,7 +21,7 @@ function irAInicio(): void {
 </script>
 
 <template>
-  <v-app-bar app color="surface" data-testid="app-bar" density="comfortable">
+  <v-app-bar app color="surface" data-testid="app-bar" density="comfortable" elevation="1">
     <v-btn
       v-if="puedeVolver"
       icon="mdi-arrow-left"
@@ -41,8 +41,16 @@ function irAInicio(): void {
       <v-icon icon="mdi-home" />
     </v-btn>
 
-    <v-app-bar-title data-testid="app-bar-title">
-      {{ appStore.appName }}
+    <v-app-bar-title data-testid="app-bar-title" class="d-flex align-center gap-2">
+      <v-icon
+        icon="mdi-scale-balanced"
+        color="primary"
+        size="28"
+        class="me-2"
+      />
+      <span class="text-h6 font-weight-bold text-primary">
+        {{ appStore.appName }}
+      </span>
     </v-app-bar-title>
 
     <BreadcrumbNav :items="breadcrumbs" class="ms-4 d-none d-md-flex" />
