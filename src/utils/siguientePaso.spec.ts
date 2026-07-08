@@ -27,7 +27,7 @@ describe('obtenerSiguientePaso', () => {
     })
     expect(paso).not.toBeNull()
     expect(paso!.textoBoton).toBe('CREAR MATERIA PRIMA')
-    expect(paso!.ruta).toBe('/materias-primas')
+    expect(paso!.ruta).toBe('/inventario')
     expect(paso!.colorBoton).toBe('primary')
     expect(paso!.testid).toBe('siguiente-paso-crear-materia-prima')
   })
@@ -43,7 +43,7 @@ describe('obtenerSiguientePaso', () => {
     })
     expect(paso).not.toBeNull()
     expect(paso!.textoBoton).toBe('CREAR RECETA')
-    expect(paso!.ruta).toBe('/recetas')
+    expect(paso!.ruta).toBe('/productos/recetas')
     expect(paso!.colorBoton).toBe('primary')
   })
 

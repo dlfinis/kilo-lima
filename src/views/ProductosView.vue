@@ -153,7 +153,7 @@ function cerrarDialogo() {
         }}
       </p>
       <p class="mb-4">Creá productos desde el Catálogo para empezar a vender.</p>
-      <v-btn color="primary" :href="'/recetas'" data-testid="productos-ir-recetas">
+      <v-btn color="primary" :href="'/productos/recetas'" data-testid="productos-ir-recetas">
         Ir a Recetas
       </v-btn>
     </v-alert>

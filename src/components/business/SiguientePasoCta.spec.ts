@@ -44,8 +44,8 @@ beforeEach(async () => {
     history: createMemoryHistory(),
     routes: [
       { path: '/', component: { template: '<div />' } },
-      { path: '/materias-primas', component: { template: '<div />' } },
-      { path: '/recetas', component: { template: '<div />' } },
+      { path: '/inventario', component: { template: '<div />' } },
+      { path: '/productos/recetas', component: { template: '<div />' } },
       { path: '/eventos', component: { template: '<div />' } },
       { path: '/pos', component: { template: '<div />' } },
     ],
@@ -66,8 +66,8 @@ describe('SiguientePasoCta', () => {
     const cta = wrapper.find('[data-testid="siguiente-paso-crear-materia-prima"]')
     expect(cta.exists()).toBe(true)
     expect(cta.text()).toContain('CREAR MATERIA PRIMA')
-    // Routed to /materias-primas
-    expect(wrapper.html()).toContain('href="/materias-primas"')
+    // Routed to /inventario
+    expect(wrapper.html()).toContain('href="/inventario"')
   })
 
   it('renders IR A CAJA (success) when ventasHoy===0 with active evento (REQ-UX-17 branch 5)', () => {

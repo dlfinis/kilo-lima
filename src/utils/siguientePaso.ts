@@ -32,7 +32,7 @@ export function obtenerSiguientePaso(
   if (mp === 0) {
     return {
       texto: 'Empezá cargando tus materias primas',
-      ruta: '/materias-primas',
+      ruta: '/inventario',
       textoBoton: 'CREAR MATERIA PRIMA',
       colorBoton: 'primary',
       testid: 'siguiente-paso-crear-materia-prima',
@@ -41,7 +41,7 @@ export function obtenerSiguientePaso(
   if (rc === 0) {
     return {
       texto: 'Ahora creá tu primera receta',
-      ruta: '/recetas',
+      ruta: '/productos/recetas',
       textoBoton: 'CREAR RECETA',
       colorBoton: 'primary',
       testid: 'siguiente-paso-crear-receta',

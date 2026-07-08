@@ -92,8 +92,8 @@ describe('ContadoresHome', () => {
         history: m.createMemoryHistory(),
         routes: [
           { path: '/', component: { template: '<div />' } },
-          { path: '/materias-primas', component: { template: '<div />' } },
-          { path: '/recetas', component: { template: '<div />' } },
+          { path: '/inventario', component: { template: '<div />' } },
+          { path: '/productos/recetas', component: { template: '<div />' } },
           { path: '/eventos', component: { template: '<div />' } },
           { path: '/productos', component: { template: '<div />' } },
           { path: '/pos', component: { template: '<div />' } },
@@ -118,8 +118,8 @@ describe('ContadoresHome', () => {
     // Each counter renders as a v-card with `to` — assert the resolved
     // href on each card so the test stays behavior-focused.
     const html = wrapper.html()
-    expect(html).toContain('href="/materias-primas"')
-    expect(html).toContain('href="/recetas"')
+    expect(html).toContain('href="/inventario"')
+    expect(html).toContain('href="/productos/recetas"')
     expect(html).toContain('href="/eventos"')
     expect(html).toContain('href="/productos"')
     expect(html).toContain('href="/pos"')

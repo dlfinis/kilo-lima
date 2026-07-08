@@ -32,23 +32,30 @@ const routes: RouteRecordRaw[] = [
     path: '/recetas/:id',
     redirect: (to) => `/productos/recetas/${to.params.id as string}`,
   },
+  // ---- Productos (Phase 6) ----
   {
     path: '/productos',
-    name: 'productos',
-    component: () => import('@/views/ProductosView.vue'),
-    meta: { breadcrumb: ['Inicio', 'productos'] },
-  },
-  {
-    path: '/productos/recetas',
-    name: 'recetas',
-    component: () => import('@/views/RecetasView.vue'),
-    meta: { breadcrumb: ['Inicio', 'Productos', 'Recetas'] },
-  },
-  {
-    path: '/productos/recetas/:id',
-    name: 'receta-detalle',
-    component: () => import('@/views/RecetaDetalleView.vue'),
-    meta: { breadcrumb: ['Inicio', 'Productos', 'Recetas', 'Detalle'] },
+    component: () => import('@/components/layout/ProductosLayout.vue'),
+    children: [
+      {
+        path: '',
+        name: 'productos',
+        component: () => import('@/views/ProductosView.vue'),
+        meta: { breadcrumb: ['Inicio', 'Productos'] },
+      },
+      {
+        path: 'recetas',
+        name: 'recetas',
+        component: () => import('@/views/RecetasView.vue'),
+        meta: { breadcrumb: ['Inicio', 'Productos', 'Recetas'] },
+      },
+      {
+        path: 'recetas/:id',
+        name: 'receta-detalle',
+        component: () => import('@/views/RecetaDetalleView.vue'),
+        meta: { breadcrumb: ['Inicio', 'Productos', 'Recetas', 'Detalle'] },
+      },
+    ],
   },
   {
     path: '/eventos',

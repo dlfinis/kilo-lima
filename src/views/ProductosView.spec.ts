@@ -67,6 +67,18 @@ async function mountView() {
 }
 
 describe('ProductosView', () => {
+  it('empty state links to /productos/recetas (Phase 6 consolidated route)', async () => {
+    __pushSupabaseResponse<Producto[]>({ data: [], error: null })
+    __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
+
+    const wrapper = await mountView()
+    await flushPromises()
+
+    const irRecetasBtn = wrapper.find('[data-testid="productos-ir-recetas"]')
+    expect(irRecetasBtn.exists()).toBe(true)
+    expect(irRecetasBtn.attributes('href')).toBe('/productos/recetas')
+  })
+
   it('shows the Productos title (REQ-POS-46)', async () => {
     __pushSupabaseResponse<Producto[]>({ data: [], error: null })
     __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
