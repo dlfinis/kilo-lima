@@ -1,12 +1,12 @@
-<!-- REQ-NAV-1: Web sidebar (>1024px). Full navigation-drawer with icons + labels.
-     Active item tracks the current route. Hidden on mobile/tablet via useBreakpoint. -->
+<!-- REQ-NAV-1: Web sidebar (>1024px). Temporary navigation-drawer toggled
+     via hamburger menu in AppBar. Hidden by default, opens on demand. -->
 <script setup lang="ts">
 import { useRouter, useRoute } from 'vue-router'
-import { useBreakpoint } from '@/composables/useBreakpoint'
 
 const router = useRouter()
 const route = useRoute()
-const bp = useBreakpoint()
+
+const modelValue = defineModel<boolean>({ default: false })
 
 const items = [
   { icon: 'mdi-home', label: 'Inicio', route: '/' },
@@ -23,15 +23,12 @@ function isActive(itemRoute: string): boolean {
 
 function navigate(to: string): void {
   void router.push(to)
+  modelValue.value = false
 }
 </script>
 
 <template>
-  <v-navigation-drawer
-    v-if="bp === 'web'"
-    permanent
-    width="240"
-  >
+  <v-navigation-drawer :model-value="modelValue" temporary width="280" @update:model-value="modelValue = $event">
     <v-list density="comfortable" nav>
       <v-list-item
         v-for="item in items"

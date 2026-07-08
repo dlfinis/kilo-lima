@@ -3,8 +3,9 @@
 //   2. back button is hidden on / (single-crumb root)
 //   3. back button is visible on a nested route (multi-crumb trail)
 //   4. breadcrumb items render via the BreadcrumbNav child
+//   5. hamburger menu appears on web breakpoint
 // Behaviour-only assertions — no CSS class coupling.
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createRouter, createMemoryHistory, type Router } from 'vue-router'
@@ -16,6 +17,18 @@ import AppBar from './AppBar.vue'
 import BreadcrumbNav from './BreadcrumbNav.vue'
 
 const vuetify = createVuetify({ components, directives })
+
+// Mock useBreakpoint to control which breakpoint the AppBar sees
+let _bp: 'mobile' | 'tablet' | 'web' = 'mobile'
+vi.mock('@/composables/useBreakpoint', async () => {
+  const { computed: _computed } = await import('vue')
+  return {
+    useBreakpoint: () => _computed(() => _bp),
+  }
+})
+function setBreakpoint(bp: 'mobile' | 'tablet' | 'web') {
+  _bp = bp
+}
 
 const mkRouter = async (inicial: string): Promise<Router> => {
   const router = createRouter({
@@ -91,5 +104,25 @@ describe('AppBar', () => {
       { title: 'Inicio', to: '/' },
       { title: 'Materias primas', disabled: true },
     ])
+  })
+
+  it('shows hamburger menu on web breakpoint', async () => {
+    setBreakpoint('web')
+    setActivePinia(createPinia())
+    const router = await mkRouter('/')
+    const wrapper = mountAppBar(router)
+    expect(wrapper.find('[data-testid="app-bar-menu"]').exists()).toBe(true)
+  })
+
+  it('hides hamburger menu on mobile/tablet breakpoints', async () => {
+    setBreakpoint('mobile')
+    setActivePinia(createPinia())
+    const router = await mkRouter('/')
+    const wrapper = mountAppBar(router)
+    expect(wrapper.find('[data-testid="app-bar-menu"]').exists()).toBe(false)
+
+    setBreakpoint('tablet')
+    const wrapper2 = mountAppBar(router)
+    expect(wrapper2.find('[data-testid="app-bar-menu"]').exists()).toBe(false)
   })
 })

@@ -35,6 +35,9 @@ function mountSideNavFull(router: Awaited<ReturnType<typeof mkRouter>>) {
     global: {
       plugins: [vuetify, router],
     },
+    props: {
+      modelValue: true,
+    },
   })
 }
 
