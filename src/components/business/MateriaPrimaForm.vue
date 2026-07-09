@@ -38,9 +38,12 @@ const notas = ref<string | null>(null)
 // that destroyed in-progress values like "1.200" or ".".
 const costoTexto = ref<string>('0.00')
 
-// REQ-UX-MONEY-2: track whether the user has actually interacted with the
-// cost field.  When untouched, onSubmit emits the original numeric
-// costo_por_unidad exactly — no rounding from display formatting.
+// REQ-UX-MONEY-2: track whether the user has interacted with the cost
+// field.  Used by onCostoBlur to skip reformatting on untouched fields
+// (avoiding mutation of the displayed over-precision value).  onSubmit
+// does NOT use this flag — it always emits costo_por_unidad, which is
+// only updated on valid parses and therefore always holds the last
+// accepted numeric value.
 const costoTocado = ref(false)
 
 const errores = ref<{ nombre?: string; costo?: string }>({})
@@ -53,7 +56,14 @@ const errores = ref<{ nombre?: string; costo?: string }>({})
 function onCostoInput(valor: string): void {
   costoTexto.value = valor
   costoTocado.value = true
-  errores.value = { ...errores.value, costo: undefined }
+  // Actually delete the costo key — setting it to undefined is NOT
+  // enough because formularioValido uses Object.keys(errores).length.
+  // Without this, errores.costo stays sticky after an invalid submit
+  // and formularioValido stays false even with a valid cost typed.
+  if (errores.value.costo) {
+    const { costo: _costo, ...rest } = errores.value
+    errores.value = rest
+  }
   const parsed = parsearUSDInput(valor)
   if (!Number.isNaN(parsed)) {
     costo_por_unidad.value = parsed
@@ -79,6 +89,18 @@ function onCostoBlur(): void {
   }
 }
 
+// Clear the name error reactively when the user types a non-empty
+// name.  Must actually delete the key — setting it to undefined is NOT
+// enough because formularioValido uses Object.keys(errores).length.
+// Without this, errores.nombre remains sticky after an invalid submit
+// and formularioValido stays false even with a valid name typed.
+watch(nombre, (newVal: string) => {
+  if (newVal.trim().length > 0 && errores.value.nombre) {
+    const { nombre: _nombre, ...rest } = errores.value
+    errores.value = rest
+  }
+})
+
 watch(
   () => props.valoresIniciales,
   (v) => {
@@ -90,6 +112,7 @@ watch(
       costoTexto.value = '0.00'
       notas.value = null
       errores.value = {}
+      costoTocado.value = false
       return
     }
     nombre.value = v.nombre
@@ -99,6 +122,7 @@ watch(
     costoTexto.value = formatearUSDInput(v.costo_por_unidad)
     notas.value = v.notas
     errores.value = {}
+    costoTocado.value = false
   },
   { immediate: true },
 )
@@ -121,13 +145,17 @@ function validar(): boolean {
 
 function onSubmit() {
   if (!validar()) return
-  // Parse fresh from costoTexto to avoid a stale costo_por_unidad
-  // when the last keystroke didn't produce a valid number.
+  // REQ-UX-MONEY-2: costo_por_unidad acts as the "last accepted numeric
+  // value." It is only updated on valid parses in onCostoInput; when the
+  // user types garbage and blurs, costo_por_unidad is untouched — so
+  // submit will preserve the original exact numeric value.  If the user
+  // made a valid edit, costo_por_unidad already holds that edit, making
+  // the costoTocado binary unnecessary for the submit decision.
   emit('submit', {
     nombre: nombre.value.trim(),
     unidad: unidad.value,
     categoria: categoria.value,
-    costo_por_unidad: parsearUSDInput(costoTexto.value),
+    costo_por_unidad: costo_por_unidad.value,
     notas: notas.value?.trim() ? notas.value.trim() : null,
   })
 }
