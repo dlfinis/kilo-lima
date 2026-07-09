@@ -9,6 +9,7 @@
 // in parallel with productos per REQ-POS-HOY-1).
 import { computed } from 'vue'
 
+import { formatearUSD } from '@/utils/format'
 import type { MetodoPago, VentaConItems } from '@/types'
 
 const props = defineProps<{
@@ -22,8 +23,6 @@ const METODOS_ETIQUETA: Record<MetodoPago, string> = {
   tarjeta: 'Tarjeta',
   mixto: 'Mixto',
 }
-
-const usd = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'USD' })
 
 // Group ventas by metodo_pago → { count, total }. We don't sort by
 // amount — operators want to see efectivo first, the rest follows
@@ -84,7 +83,7 @@ const resumenPorMetodo = computed<MetodoResumen[]>(() => {
         :data-testid="`resumen-hoy-chip-${r.metodo}`"
       >
         {{ METODOS_ETIQUETA[r.metodo] }}: {{ r.cantidad }} venta(s) ·
-        {{ usd.format(r.total) }}
+        {{ formatearUSD(r.total) }}
       </v-chip>
     </div>
   </v-card>

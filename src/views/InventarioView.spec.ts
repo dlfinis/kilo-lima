@@ -3,10 +3,7 @@
 // Tests cover the four UX states (loading/empty/error/data) and the CRUD
 // flows including the delete confirmation dialog. The store is mocked via
 // Pinia so we control `cargando`/`error`/`materiasPrimas` directly.
-//
-// mobile-ux-redesign Phase 4: adds StockAlertsList and ProductionCapacityCard
-// sections powered by useInventario composable (mocked below).
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
 import { createVuetify } from 'vuetify'
@@ -18,48 +15,7 @@ import { __pushSupabaseResponse, __resetSupabaseMock } from '../../tests/setup'
 
 import InventarioView from './InventarioView.vue'
 import MateriaPrimaForm from '@/components/business/MateriaPrimaForm.vue'
-import { useRecipesStore } from '@/stores/recipes.store'
 import type { MateriaPrima } from '@/types'
-
-// Mock useInventario for Phase 4: provide controlled alert/capacity data
-// while keeping the real useIngredients store for CRUD tests.
-vi.mock('@/composables/useInventario', () => {
-  const { ref, computed } = require('vue')
-  return {
-    useInventario: () => ({
-      items: ref([
-        { id: 'mp-1', nombre: 'Harina', cantidad_disponible: 30, unidad: 'g', categoria: 'ingrediente', costo_por_unidad: 2.5, notas: null, created_at: '', updated_at: '' },
-        { id: 'mp-2', nombre: 'Azúcar', cantidad_disponible: 200, unidad: 'g', categoria: 'ingrediente', costo_por_unidad: 3.0, notas: null, created_at: '', updated_at: '' },
-        { id: 'mp-3', nombre: 'Huevos', cantidad_disponible: 5, unidad: 'unidad', categoria: 'ingrediente', costo_por_unidad: 1.0, notas: null, created_at: '', updated_at: '' },
-      ]),
-      necesidadTotal: computed(() => new Map<string, number>([
-        ['mp-1', 100],
-        ['mp-2', 100],
-        ['mp-3', 100],
-      ])),
-      stockCritico: computed(() => 2),
-      unidadesPosiblesPorProducto: computed(() => new Map()),
-      alertLevel: (stock: number, need: number): 'crítico' | 'bajo' | 'normal' => {
-        if (need <= 0) return 'normal'
-        if (stock <= 0) return 'crítico'
-        const r = (stock / need) * 100
-        if (r < 20) return 'crítico'
-        if (r < 50) return 'bajo'
-        return 'normal'
-      },
-      unidadesPosibles: () => 0,
-    }),
-    alertLevel: (stock: number, need: number): 'crítico' | 'bajo' | 'normal' => {
-      if (need <= 0) return 'normal'
-      if (stock <= 0) return 'crítico'
-      const r = (stock / need) * 100
-      if (r < 20) return 'crítico'
-      if (r < 50) return 'bajo'
-      return 'normal'
-    },
-    unidadesPosibles: () => 0,
-  }
-})
 
 const vuetify = createVuetify({ components, directives })
 
@@ -68,6 +24,7 @@ const mkMateria = (id: string, overrides: Partial<MateriaPrima> = {}): MateriaPr
   nombre: 'Harina',
   unidad: 'kg',
   costo_por_unidad: 2.5,
+  categoria: 'ingrediente',
   notas: null,
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
@@ -107,7 +64,7 @@ describe('MateriasPrimasView', () => {
     // The view calls useIngredients().cargarTodas in onMounted; with the
     // chainable mock returning [] by default, the list is empty and the
     // empty-state CTA is rendered.
-    expect(wrapper.text()).toContain('No hay materias primas')
+    expect(wrapper.find('[data-testid="mp-empty-global"]').exists()).toBe(true)
   })
 
   it('renders the empty-state CTA when the list is empty (REQ-CATALOG-6)', async () => {
@@ -228,6 +185,47 @@ describe('MateriasPrimasView', () => {
     expect(texto).toContain('Eliminar')
   })
 
+  it('edit dialog prefills categoria so the value is preserved on save', async () => {
+    const wrapper = montarVista()
+    await esperarCargaInicial()
+    const { useIngredientsStore } = await import('@/stores/ingredients.store')
+    const store = useIngredientsStore()
+    store.materiasPrimas.push(mkMateria('mp-1', { nombre: 'Harina Integral', categoria: 'ingrediente' }))
+    await flushPromises()
+
+    // Open the edit dialog
+    const editBtn = wrapper.find('[data-testid="mp-edit-mp-1"]')
+    expect(editBtn.exists()).toBe(true)
+    await editBtn.trigger('click')
+    await flushPromises()
+
+    // The form's categoria select should show the preserved value.
+    // The MateriaPrimaForm renders a v-select with data-testid="mp-categoria".
+    const form = wrapper.findComponent(MateriaPrimaForm)
+    expect(form.exists()).toBe(true)
+
+    // actualizar only does one supabase call: .update().eq().select().single()
+    __pushSupabaseResponse<MateriaPrima>({
+      data: mkMateria('mp-1', { nombre: 'Harina Integral', categoria: 'ingrediente' }),
+      error: null,
+    })
+
+    // Emit submit — even if the form itself doesn't change categoria,
+    // the view MUST include it in the payload.
+    await form.vm.$emit('submit', {
+      nombre: 'Harina Integral',
+      unidad: 'kg',
+      categoria: 'ingrediente',
+      costo_por_unidad: 2.5,
+      notas: null,
+    })
+    await flushPromises()
+
+    // After update, the item in the store should still have categoria: 'ingrediente'
+    const updated = store.materiasPrimas.find((m) => m.id === 'mp-1')
+    expect(updated?.categoria).toBe('ingrediente')
+  })
+
   it('does not import supabase directly — uses inject via composable (REQ-CATALOG-46)', () => {
     // Source-level check: the view delegates to useIngredients().
     // We assert by reading the rendered output via the composable (proves
@@ -237,43 +235,10 @@ describe('MateriasPrimasView', () => {
   })
 
   // -----------------------------------------------------------------------
-  // Phase 4: Inventory Intelligence — StockAlertsList & ProductionCapacityCard
+  // Existing CRUD rendering
   // -----------------------------------------------------------------------
 
-  it('renders StockAlertsList component at the top of the view', () => {
-    const wrapper = montarVista()
-    expect(wrapper.find('[data-testid="stock-alerts-list"]').exists()).toBe(true)
-  })
-
-  it('renders the "Alertas de Stock" section title', () => {
-    const wrapper = montarVista()
-    expect(wrapper.text()).toContain('Alertas de Stock')
-  })
-
-  it('renders ProductionCapacityCard section', async () => {
-    const wrapper = montarVista()
-    await esperarCargaInicial()
-    // Seed the recipes store so the ProductionCapacityCard section renders
-    const recStore = useRecipesStore()
-    recStore.recetas.push({
-      id: 'rec-1',
-      nombre: 'Brownies',
-      descripcion: null,
-      rendimiento_unidades: 12,
-      notas: null,
-      created_at: '2026-01-01T00:00:00Z',
-      updated_at: '2026-01-01T00:00:00Z',
-      ingredientes: [
-        { id: 'ri-1', receta_id: 'rec-1', materia_prima_id: 'mp-1', cantidad: 200, created_at: '' },
-        { id: 'ri-2', receta_id: 'rec-1', materia_prima_id: 'mp-2', cantidad: 100, created_at: '' },
-      ],
-    })
-    await flushPromises()
-    // The production capacity section should be present
-    expect(wrapper.find('[data-testid="production-capacity-card"]').exists()).toBe(true)
-  })
-
-  it('still renders the existing materias primas table below the alerts', async () => {
+  it('still renders the existing materias primas table', async () => {
     const wrapper = montarVista()
     await esperarCargaInicial()
 
@@ -285,16 +250,169 @@ describe('MateriasPrimasView', () => {
     )
     await flushPromises()
 
-    // Both the new alert section AND the old table should be present
-    expect(wrapper.find('[data-testid="stock-alerts-list"]').exists()).toBe(true)
     expect(wrapper.find('[data-testid="mp-list"]').exists()).toBe(true)
     expect(wrapper.text()).toContain('Harina')
   })
 
-  it('renders alert items for ingredients with critical stock', () => {
-    const wrapper = montarVista()
-    // At least one ingredient in the mock has crítico level (Huevos at 5%)
-    expect(wrapper.text()).toContain('Crítico')
-    expect(wrapper.text()).toContain('Bajo')
+  // -----------------------------------------------------------------------
+  // Category filter + alphabetical sort
+  // -----------------------------------------------------------------------
+
+  describe('category filter and sort controls', () => {
+    beforeEach(async () => {
+      setActivePinia(createPinia())
+      __resetSupabaseMock()
+      document.body.innerHTML = ''
+    })
+
+    it('renders category filter buttons with correct testids', async () => {
+      const wrapper = montarVista()
+      await esperarCargaInicial()
+
+      expect(wrapper.find('[data-testid="mp-filter-todos"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="mp-filter-ingrediente"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="mp-filter-empaque"]').exists()).toBe(true)
+    })
+
+    it('renders alphabetical sort buttons with correct testids', async () => {
+      const wrapper = montarVista()
+      await esperarCargaInicial()
+
+      expect(wrapper.find('[data-testid="mp-sort-asc"]').exists()).toBe(true)
+      expect(wrapper.find('[data-testid="mp-sort-desc"]').exists()).toBe(true)
+    })
+
+    it('filters items by "ingrediente" category', async () => {
+      const wrapper = montarVista()
+      await esperarCargaInicial()
+
+      const { useIngredientsStore } = await import('@/stores/ingredients.store')
+      const store = useIngredientsStore()
+      store.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Harina', categoria: 'ingrediente' }),
+        mkMateria('mp-2', { nombre: 'Caja', categoria: 'empaque' }),
+      )
+      await flushPromises()
+
+      // Default: "Todos" shows both
+      expect(wrapper.text()).toContain('Harina')
+      expect(wrapper.text()).toContain('Caja')
+
+      // Click "Ingredientes" filter
+      await wrapper.find('[data-testid="mp-filter-ingrediente"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Harina')
+      expect(wrapper.text()).not.toContain('Caja')
+    })
+
+    it('filters items by "empaque" category', async () => {
+      const wrapper = montarVista()
+      await esperarCargaInicial()
+
+      const { useIngredientsStore } = await import('@/stores/ingredients.store')
+      const store = useIngredientsStore()
+      store.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Harina', categoria: 'ingrediente' }),
+        mkMateria('mp-2', { nombre: 'Caja', categoria: 'empaque' }),
+      )
+      await flushPromises()
+
+      await wrapper.find('[data-testid="mp-filter-empaque"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).not.toContain('Harina')
+      expect(wrapper.text()).toContain('Caja')
+    })
+
+    it('"Todos" filter shows all items regardless of category', async () => {
+      const wrapper = montarVista()
+      await esperarCargaInicial()
+
+      const { useIngredientsStore } = await import('@/stores/ingredients.store')
+      const store = useIngredientsStore()
+      store.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Harina', categoria: 'ingrediente' }),
+        mkMateria('mp-2', { nombre: 'Caja', categoria: 'empaque' }),
+      )
+      await flushPromises()
+
+      // First filter to something else, then back to Todos
+      await wrapper.find('[data-testid="mp-filter-empaque"]').trigger('click')
+      await flushPromises()
+      await wrapper.find('[data-testid="mp-filter-todos"]').trigger('click')
+      await flushPromises()
+
+      expect(wrapper.text()).toContain('Harina')
+      expect(wrapper.text()).toContain('Caja')
+    })
+
+    it('sorts items A-Z by default', async () => {
+      const wrapper = montarVista()
+      await esperarCargaInicial()
+
+      const { useIngredientsStore } = await import('@/stores/ingredients.store')
+      const store = useIngredientsStore()
+      store.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Cacao' }),
+        mkMateria('mp-2', { nombre: 'Azúcar' }),
+        mkMateria('mp-3', { nombre: 'Harina' }),
+      )
+      await flushPromises()
+
+      const items = wrapper.findAll('[data-testid^="mp-row-"]')
+      const nombres = items.map((el) => el.text())
+      // A-Z order: Azúcar, Cacao, Harina
+      expect(nombres[0]).toContain('Azúcar')
+      expect(nombres[1]).toContain('Cacao')
+      expect(nombres[2]).toContain('Harina')
+    })
+
+    it('sorts items Z-A when descending order is selected', async () => {
+      const wrapper = montarVista()
+      await esperarCargaInicial()
+
+      const { useIngredientsStore } = await import('@/stores/ingredients.store')
+      const store = useIngredientsStore()
+      store.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Azúcar' }),
+        mkMateria('mp-2', { nombre: 'Harina' }),
+        mkMateria('mp-3', { nombre: 'Cacao' }),
+      )
+      await flushPromises()
+
+      await wrapper.find('[data-testid="mp-sort-desc"]').trigger('click')
+      await flushPromises()
+
+      const items = wrapper.findAll('[data-testid^="mp-row-"]')
+      const nombres = items.map((el) => el.text())
+      // Z-A order: Harina, Cacao, Azúcar
+      expect(nombres[0]).toContain('Harina')
+      expect(nombres[1]).toContain('Cacao')
+      expect(nombres[2]).toContain('Azúcar')
+    })
+
+    it('shows filtered-empty card when filter produces zero results and offers Limpiar filtro', async () => {
+      const wrapper = montarVista()
+      await esperarCargaInicial()
+
+      const { useIngredientsStore } = await import('@/stores/ingredients.store')
+      const store = useIngredientsStore()
+      store.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Harina', categoria: 'ingrediente' }),
+      )
+      await flushPromises()
+
+      // Filter to empaque — there are none
+      await wrapper.find('[data-testid="mp-filter-empaque"]').trigger('click')
+      await flushPromises()
+
+      const emptyFilter = wrapper.find('[data-testid="mp-empty-filter"]')
+      expect(emptyFilter.exists()).toBe(true)
+      expect(emptyFilter.text()).toContain('No hay materias primas que coincidan con el filtro actual')
+
+      // Should NOT show the global empty message
+      expect(wrapper.find('[data-testid="mp-empty-global"]').exists()).toBe(false)
+    })
   })
 })

@@ -189,4 +189,37 @@ describe('Navigation Integration (Phase 6)', () => {
       expect(route.path).toBe('/inventario')
     })
   })
+
+  describe('WebSidebar routes (Wave 1)', () => {
+    it('navigates to /ventas via WebSidebar click-through', async () => {
+      await router.push('/ventas')
+      expect(router.currentRoute.value.path).toBe('/ventas')
+      expect(router.currentRoute.value.name).toBe('ventas')
+      expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Operación', 'Ventas'])
+    })
+
+    it('navigates to /gastos via WebSidebar click-through', async () => {
+      await router.push('/gastos')
+      expect(router.currentRoute.value.path).toBe('/gastos')
+      expect(router.currentRoute.value.name).toBe('gastos')
+    })
+
+    it('navigates to /costos via WebSidebar click-through', async () => {
+      await router.push('/costos')
+      expect(router.currentRoute.value.path).toBe('/costos')
+      expect(router.currentRoute.value.name).toBe('costos')
+    })
+
+    it('navigates to /ajustes via WebSidebar click-through', async () => {
+      await router.push('/ajustes')
+      expect(router.currentRoute.value.path).toBe('/ajustes')
+      expect(router.currentRoute.value.name).toBe('ajustes')
+    })
+
+    it('navigates to /equipo via WebSidebar click-through', async () => {
+      await router.push('/equipo')
+      expect(router.currentRoute.value.path).toBe('/equipo')
+      expect(router.currentRoute.value.name).toBe('equipo')
+    })
+  })
 })

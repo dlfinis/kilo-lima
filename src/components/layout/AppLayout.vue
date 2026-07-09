@@ -1,7 +1,3 @@
-<!-- REQ-NAV-1: Responsive shell. Wraps router-view and conditionally
-     renders BottomNav (mobile ≤768), SideNavCompact (tablet 769–1024),
-     or SideNavFull (web >1024, temporary drawer). AppBar is present
-     at the top for all breakpoints. -->
 <script setup lang="ts">
 import { ref } from 'vue'
 import AppBar from '@/components/business/AppBar.vue'

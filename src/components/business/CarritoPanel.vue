@@ -8,6 +8,7 @@
 // owns the store calls (registrarVenta, vaciarCarrito).
 import { computed, ref } from 'vue'
 
+import { formatearUSD } from '@/utils/format'
 import VentaItem from './VentaItem.vue'
 import type { LineaCarrito } from '@/types'
 
@@ -23,11 +24,7 @@ const emit = defineEmits<{
   eliminar: [productoId: string]
 }>()
 
-const totalTexto = computed(() =>
-  new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'USD' }).format(
-    props.total,
-  ),
-)
+const totalTexto = computed(() => formatearUSD(props.total))
 
 const dialogoVaciarAbierto = ref(false)
 function abrirDialogoVaciar() {

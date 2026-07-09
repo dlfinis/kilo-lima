@@ -15,6 +15,7 @@
 // response).
 import { computed } from 'vue'
 
+import { formatearUSD } from '@/utils/format'
 import type { Evento, VentaConItems } from '@/types'
 
 const props = defineProps<{
@@ -34,14 +35,12 @@ const METODOS_ETIQUETA: Record<VentaConItems['metodo_pago'], string> = {
   mixto: 'Mixto',
 }
 
-const usd = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'USD' })
-
-const totalTexto = computed(() => usd.format(props.venta.total))
+const totalTexto = computed(() => formatearUSD(props.venta.total))
 const montoRecibidoTexto = computed(() =>
-  props.venta.monto_recibido !== null ? usd.format(props.venta.monto_recibido) : null,
+  props.venta.monto_recibido !== null ? formatearUSD(props.venta.monto_recibido) : null,
 )
 const cambioTexto = computed(() =>
-  props.venta.cambio !== null ? usd.format(props.venta.cambio) : null,
+  props.venta.cambio !== null ? formatearUSD(props.venta.cambio) : null,
 )
 const comprobanteTexto = computed(() => props.venta.comprobante_numero ?? '—')
 
@@ -105,13 +104,13 @@ defineExpose({ cerrar, imprimir })
             <tr v-for="item in venta.items" :key="item.id">
               <td class="text-right" style="width: 40px">{{ item.cantidad }}</td>
               <td>
-                <div>{{ usd.format(item.precio_unitario) }}</div>
+                <div>{{ formatearUSD(item.precio_unitario) }}</div>
                 <div class="text-caption text-medium-emphasis">
                   c/u
                 </div>
               </td>
               <td class="text-right font-weight-medium">
-                {{ usd.format(item.subtotal) }}
+                {{ formatearUSD(item.subtotal) }}
               </td>
             </tr>
           </tbody>

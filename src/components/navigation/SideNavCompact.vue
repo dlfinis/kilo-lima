@@ -30,6 +30,7 @@ function navigate(to: string): void {
 <template>
   <v-navigation-drawer
     v-if="bp === 'tablet'"
+    data-testid="side-nav-compact"
     rail
     width="72"
   >

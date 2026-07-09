@@ -12,6 +12,7 @@
 // are hidden and the emit omits montoRecibido.
 import { computed, ref, watch } from 'vue'
 
+import { formatearUSD } from '@/utils/format'
 import { METODOS_PAGO, type Evento, type MetodoPago } from '@/types'
 
 const props = defineProps<{
@@ -86,17 +87,11 @@ watch(
   },
 )
 
-const totalTexto = new Intl.NumberFormat('es-MX', {
-  style: 'currency',
-  currency: 'USD',
-}).format(props.total)
+const totalTexto = computed(() => formatearUSD(props.total))
 
 const cambioTexto = computed<string>(() => {
   if (cambio.value === null) return ''
-  return new Intl.NumberFormat('es-MX', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(cambio.value)
+  return formatearUSD(cambio.value)
 })
 
 function alConfirmar(): void {

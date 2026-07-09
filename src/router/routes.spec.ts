@@ -118,3 +118,51 @@ describe('Route consolidation (Phase 6)', () => {
     expect(meta.breadcrumb).toEqual(['Inicio', 'Reportes', 'Rentabilidad'])
   })
 })
+
+describe('New feature routes (Wave 1)', () => {
+  it('/ventas resolves with correct name and breadcrumb', async () => {
+    await setupRouter()
+    await router.push('/ventas')
+    expect(router.currentRoute.value.path).toBe('/ventas')
+    expect(router.currentRoute.value.name).toBe('ventas')
+    expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Operación', 'Ventas'])
+  })
+
+  it('/gastos resolves with correct name and breadcrumb', async () => {
+    await setupRouter()
+    await router.push('/gastos')
+    expect(router.currentRoute.value.path).toBe('/gastos')
+    expect(router.currentRoute.value.name).toBe('gastos')
+    expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Operación', 'Gastos'])
+  })
+
+  it('/costos resolves with correct name and breadcrumb', async () => {
+    await setupRouter()
+    await router.push('/costos')
+    expect(router.currentRoute.value.path).toBe('/costos')
+    expect(router.currentRoute.value.name).toBe('costos')
+    expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Planificación', 'Costos'])
+  })
+
+  it('/ajustes resolves with correct name and breadcrumb', async () => {
+    await setupRouter()
+    await router.push('/ajustes')
+    expect(router.currentRoute.value.path).toBe('/ajustes')
+    expect(router.currentRoute.value.name).toBe('ajustes')
+    expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Configuración', 'Ajustes'])
+  })
+
+  it('/equipo resolves with correct name and breadcrumb', async () => {
+    await setupRouter()
+    await router.push('/equipo')
+    expect(router.currentRoute.value.path).toBe('/equipo')
+    expect(router.currentRoute.value.name).toBe('equipo')
+    expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Configuración', 'Equipo'])
+  })
+
+  it('catch-all still redirects to /', async () => {
+    await setupRouter()
+    await router.push('/nonexistent-page-xyz')
+    expect(router.currentRoute.value.path).toBe('/')
+  })
+})

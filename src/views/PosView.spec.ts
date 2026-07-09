@@ -766,7 +766,7 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
     vi.unstubAllEnvs()
   })
 
-  it('renders PosModeBanner in simplified mode when isSimplifiedMode is true', async () => {
+  it('does NOT render PosModeBanner in simplified mode (banner removed)', async () => {
     posModeRef.value = true
     sembrarEventoEnCurso()
     sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
@@ -774,12 +774,11 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
       const { wrapper } = await mountView()
       await flushPromises()
       const banner = wrapper.find('[data-testid="pos-mode-banner"]')
-      expect(banner.exists()).toBe(true)
-      expect(banner.text()).toContain('Modo rápido')
+      expect(banner.exists()).toBe(false)
     })
   })
 
-  it('renders full mode PosModeBanner when isSimplifiedMode is false', async () => {
+  it('does NOT render PosModeBanner in full mode (banner removed)', async () => {
     posModeRef.value = false
     sembrarEventoEnCurso()
     sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
@@ -787,8 +786,7 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
       const { wrapper } = await mountView()
       await flushPromises()
       const banner = wrapper.find('[data-testid="pos-mode-banner"]')
-      expect(banner.exists()).toBe(true)
-      expect(banner.text()).toContain('Modo completo')
+      expect(banner.exists()).toBe(false)
     })
   })
 
@@ -933,6 +931,29 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
       // (the simplified ProductGrid replaces it)
       const searchInput = wrapper.find('[data-testid="product-grid-search"]')
       expect(searchInput.exists()).toBe(true)
+    })
+  })
+
+  it('keeps the product grid and cart side-by-side on all breakpoints (not stacked)', async () => {
+    // The cart must be visually pinned to the right, not stacked below
+    // products. At the DOM level, both columns must NOT use cols="12"
+    // (full-width) which would cause vertical stacking.
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const productsCol = wrapper.find('[data-testid="pos-products-col"]')
+      const cartCol = wrapper.find('[data-testid="pos-cart-col"]')
+      expect(productsCol.exists()).toBe(true)
+      expect(cartCol.exists()).toBe(true)
+      // Neither column should have cols="12" — that would force stacking
+      // on screens smaller than the md breakpoint (960px).
+      expect(productsCol.classes()).not.toContain('v-col-12')
+      expect(cartCol.classes()).not.toContain('v-col-12')
+      // The cart column should include the CarritoPanel
+      expect(cartCol.find('[data-testid="carrito-panel"]').exists()).toBe(true)
     })
   })
 })

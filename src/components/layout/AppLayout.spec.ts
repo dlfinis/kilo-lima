@@ -1,7 +1,8 @@
 // REQ-NAV-1: AppLayout is the responsive shell. It wraps <router-view>
 // and conditionally renders BottomNav (mobile), SideNavCompact (tablet),
-// or SideNavFull (web) based on useBreakpoint(). The AppBar renders at
-// the top for all breakpoints.
+// or SideNavFull (always mounted: permanent on web, temporary on mobile/tablet).
+// The AppBar renders at the top for all breakpoints. Hamburger on mobile/tablet
+// opens SideNavFull as a temporary drawer.
 //
 // TDD CYCLE (Strict TDD Mode):
 //   RED   → This file was written before AppLayout.vue existed.
@@ -74,7 +75,6 @@ describe('AppLayout', () => {
     const router = await mkRouter()
     const wrapper = mountAppLayout(router)
 
-    // The router-view renders the matched component (Home at /)
     expect(wrapper.html()).toContain('Home Page')
   })
 
@@ -106,7 +106,7 @@ describe('AppLayout', () => {
     const router = await mkRouter()
     const wrapper = mountAppLayout(router)
 
-    expect(wrapper.find('.v-navigation-drawer').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="side-nav-compact"]').exists()).toBe(true)
   })
 
   it('does not render SideNavCompact on mobile breakpoint', async () => {
@@ -114,19 +114,55 @@ describe('AppLayout', () => {
     const router = await mkRouter()
     const wrapper = mountAppLayout(router)
 
-    expect(wrapper.find('.v-navigation-drawer').exists()).toBe(false)
+    expect(wrapper.find('[data-testid="side-nav-compact"]').exists()).toBe(false)
   })
 
-  it('renders SideNavFull on web breakpoint', async () => {
+  it('renders SideNavFull on all breakpoints (permanent on web)', async () => {
     setBreakpoint('web')
     const router = await mkRouter()
     const wrapper = mountAppLayout(router)
 
-    // AppBar should still be present
-    expect(wrapper.find('[data-testid="app-bar"]').exists()).toBe(true)
-    // SideNavFull should render on web (navigation-drawer without rail)
-    expect(wrapper.find('.v-navigation-drawer').exists()).toBe(true)
-    // Bottom nav should not render on web
-    expect(wrapper.find('.v-bottom-navigation').exists()).toBe(false)
+    const full = wrapper.find('[data-testid="side-nav-full"]')
+    expect(full.exists()).toBe(true)
+  })
+
+  it('renders SideNavFull on mobile breakpoint (temporary mode)', async () => {
+    setBreakpoint('mobile')
+    const router = await mkRouter()
+    const wrapper = mountAppLayout(router)
+
+    const full = wrapper.find('[data-testid="side-nav-full"]')
+    expect(full.exists()).toBe(true)
+  })
+
+  it('renders SideNavFull on tablet breakpoint (temporary mode)', async () => {
+    setBreakpoint('tablet')
+    const router = await mkRouter()
+    const wrapper = mountAppLayout(router)
+
+    const full = wrapper.find('[data-testid="side-nav-full"]')
+    expect(full.exists()).toBe(true)
+  })
+
+  it('clicking menu on AppBar opens SideNavFull on mobile', async () => {
+    setBreakpoint('mobile')
+    const router = await mkRouter()
+    const wrapper = mountAppLayout(router)
+
+    const menu = wrapper.find('[data-testid="app-bar-menu"]')
+    expect(menu.exists()).toBe(true)
+
+    await menu.trigger('click')
+
+    const full = wrapper.find('[data-testid="side-nav-full"]')
+    expect(full.exists()).toBe(true)
+  })
+
+  it('does not show hamburger menu on web', async () => {
+    setBreakpoint('web')
+    const router = await mkRouter()
+    const wrapper = mountAppLayout(router)
+
+    expect(wrapper.find('[data-testid="app-bar-menu"]').exists()).toBe(false)
   })
 })

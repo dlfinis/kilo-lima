@@ -29,19 +29,53 @@
 --   2. Manual desde Supabase SQL editor: pegar este archivo entero.
 -- =====================================================================
 
-begin;
+-- begin; -- no-op (la RPC exec_sql del proyecto no soporta BEGIN/COMMIT)
 
 -- =====================================================================
 -- 1. MATERIAS PRIMAS (catálogo)
--- 6 filas · 5 ingredientes + 1 empaque · costos en USD
+-- Base inicial + catálogo ampliado de pastelería ecuatoriana.
+-- Costos en USD/mercado-local (Referencial Quito, 2026).
+-- Categoría: 'ingrediente' o 'empaque'.
 -- =====================================================================
 insert into public.materias_primas (nombre, unidad, costo_por_unidad, categoria, notas) values
-  ('Azúcar',          'g',      0.05,  'ingrediente', null),
-  ('Harina',          'kg',     2.50,  'ingrediente', 'Harina de trigo todo uso'),
-  ('Mantequilla',     'g',      0.12,  'ingrediente', null),
-  ('Huevo',           'unidad', 0.30,  'ingrediente', 'Huevo de gallina grande'),
-  ('Chocolate',       'kg',    15.00,  'ingrediente', 'Chocolate semiamargo'),
-  ('Caja para pan',   'unidad', 1.50,  'empaque',     'Caja de cartón kraft para 2 piezas')
+  -- Base (Panadería tradicional)
+  ('Azúcar',          'g',      0.05,   'ingrediente', null),
+  ('Harina',          'kg',     2.50,   'ingrediente', 'Harina de trigo todo uso'),
+  ('Mantequilla',     'g',      0.12,   'ingrediente', null),
+  ('Huevo',           'unidad', 0.30,   'ingrediente', 'Huevo de gallina grande'),
+  ('Chocolate',       'kg',    15.00,   'ingrediente', 'Chocolate semiamargo'),
+  ('Caja para pan',   'unidad', 1.50,   'empaque',     'Caja de cartón kraft para 2 piezas'),
+  -- Endulzantes / saborizantes andinos
+  ('Panela',          'kg',     3.20,   'ingrediente', 'Panela en bloque, rallada o molida fina'),
+  ('Miel de abeja',   'ml',     0.06,   'ingrediente', 'Miel pura de abeja (Cosecha nacional)'),
+  ('Canela molida',   'g',      0.40,   'ingrediente', 'Canela molida fina'),
+  ('Vainilla',        'ml',     0.50,   'ingrediente', 'Esencia de vainilla'),
+  -- Harinas y almidones típicos
+  ('Harina de maíz',  'kg',     2.80,   'ingrediente', 'Harina de maíz blanco, para tortillas y humitas'),
+  ('Almidón de yuca', 'kg',     4.50,   'ingrediente', 'Almidón dulce de yuca, base del pan de yuca'),
+  ('Harina de banano','kg',     3.00,   'ingrediente', 'Harina verde de banano, sin azúcar añadida'),
+  -- Lácteos y rellenos
+  ('Queso fresco',    'kg',     8.00,   'ingrediente', 'Queso fresco de vaca (cuajada)'),
+  ('Leche entera',    'l',      1.20,   'ingrediente', 'Leche entera UHT, sin azúcar'),
+  ('Crema de leche',  'l',      5.50,   'ingrediente', 'Crema de leche para heladería/pastelería'),
+  ('Mantequilla de maní','kg', 12.00,   'ingrediente', 'Mantequilla de maní natural sin azúcar'),
+  -- Rellenos salados
+  ('Mortadela',       'kg',     9.00,   'ingrediente', 'Mortadela en pieza, para empanadas'),
+  -- Frutas y aromáticos
+  ('Banano maduro',   'kg',     1.00,   'ingrediente', 'Banano maduro (plátano de seda)'),
+  ('Piña natural',    'kg',     1.50,   'ingrediente', 'Piña picada en trozos pequeños'),
+  ('Coco rallado',    'kg',     6.00,   'ingrediente', 'Coco rallado fresco/endulado, sin azúcar'),
+  -- Endulzantes modernos para coladas y bizcochos
+  ('Leche condensada','g',      0.06,   'ingrediente', 'Leche condensada azucarada'),
+  -- Combustibles / consumibles
+  ('Aceite vegetal',  'l',      3.50,   'ingrediente', 'Aceite vegetal neutro para freír'),
+  ('Gas refrigerante','g',      0.10,   'ingrediente', 'Gas refrigerante para la máquina de helado'),
+  -- Empaques adicionales
+  ('Bolsa celofán',   'unidad', 0.05,   'empaque',     'Bolsa de celofán transparente 15×20 cm'),
+  ('Funda papel kraft','unidad', 0.15,  'empaque',     'Funda kraft con ventana, para panes y bizcochos'),
+  -- Bebidas calientes (insumos)
+  ('Café molido',     'g',      0.45,   'ingrediente', 'Café arábigo molido medio'),
+  ('Canelazo premezcla','g',    0.30,   'ingrediente', 'Premezcla para canelazo (canela+clavo de olor)')
 on conflict (nombre) do nothing;
 
 -- =====================================================================
@@ -117,12 +151,360 @@ where r.nombre = 'Pan básico' and m.nombre = 'Caja para pan'
 on conflict do nothing;
 
 -- =====================================================================
+-- 2b. RECETAS DE PASTELERÍA ECUATORIANA
+-- 10 recetas típicas con rendimiento realista para ferias/eventos.
+-- Cada una reutiliza la base existente o las MP nuevas del paso 1.
+-- =====================================================================
+insert into public.recetas (nombre, descripcion, rendimiento_unidades, notas) values
+  ('Empanada de viento',          'Masa de harina rellena de queso, frita y aireada', 20, '20 empanadas'),
+  ('Humita',                       'Tamales de maíz dulce envueltos en hoja',          12, '12 humitas'),
+  ('Quimbolito',                   'Tamal dulce al vapor con harina de maíz',          12, '12 quimbolitos'),
+  ('Pan de yuca',                  'Bolitas crocantes con almidón de yuca y queso',   24, '24 unidades'),
+  ('Tortilla de tiesto',           'Tortilla grande de maíz, asada en tiesto',         8, '8 tortillas grandes'),
+  ('Rosquilla quiteña',            'Rosca dulce con panela, derretida al horno',      24, '24 rosquillas'),
+  ('Pan de banano con maní',       'Bizcocho húmedo con banano maduro y maní',        12, '12 porciones'),
+  ('Helado de paila (mora)',       'Helado artesanal hecho en paila metálica',         1, 'Por tanda de 3 L'),
+  ('Bizcocho de colada morada',    'Bizcocho con harina de maíz y especias',          12, '12 porciones'),
+  ('Canelazo',                     'Bebida caliente con canela y aguardiente',         1, 'Por jarra de 2 L')
+on conflict (nombre) do nothing;
+
+-- 2b.1 Empanada de viento (20 unidades): harina 500g, agua 250ml, huevo 1,
+-- manteca vegetal 60g, sal 8g, queso fresco 300g, aceite 1 L para freír.
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.5
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Empanada de viento' and m.nombre = 'Harina'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.3
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Empanada de viento' and m.nombre = 'Queso fresco'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 1
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Empanada de viento' and m.nombre = 'Huevo'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.06
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Empanada de viento' and m.nombre = 'Mantequilla'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 1
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Empanada de viento' and m.nombre = 'Aceite vegetal'
+on conflict do nothing;
+
+-- 2b.2 Humita (12 unidades): maíz tierno molido 1 kg, manteca 100g,
+-- panela 150g, anís 5g, huevo 2, leche 250ml.
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 1
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Humita' and m.nombre = 'Harina de maíz'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.15
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Humita' and m.nombre = 'Panela'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.1
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Humita' and m.nombre = 'Mantequilla'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.25
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Humita' and m.nombre = 'Leche entera'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 2
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Humita' and m.nombre = 'Huevo'
+on conflict do nothing;
+
+-- 2b.3 Quimbolito (12 unidades): harina de maíz 500g, panela 200g,
+-- huevos 3, manteca 80g, leche 300ml, vainilla 5ml.
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.5
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Quimbolito' and m.nombre = 'Harina de maíz'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.2
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Quimbolito' and m.nombre = 'Panela'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.08
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Quimbolito' and m.nombre = 'Mantequilla'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.3
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Quimbolito' and m.nombre = 'Leche entera'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 3
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Quimbolito' and m.nombre = 'Huevo'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 5
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Quimbolito' and m.nombre = 'Vainilla'
+on conflict do nothing;
+
+-- 2b.4 Pan de yuca (24 unidades): almidón de yuca 500g, queso fresco
+-- 250g, huevos 2, mantequilla 60g, leche 200ml.
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.5
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de yuca' and m.nombre = 'Almidón de yuca'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.25
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de yuca' and m.nombre = 'Queso fresco'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 2
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de yuca' and m.nombre = 'Huevo'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.06
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de yuca' and m.nombre = 'Mantequilla'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.2
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de yuca' and m.nombre = 'Leche entera'
+on conflict do nothing;
+
+-- 2b.5 Tortilla de tiesto (8 unidades): harina de maíz 500g, manteca
+-- 60g, sal 8g, agua 250ml.
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.5
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Tortilla de tiesto' and m.nombre = 'Harina de maíz'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.06
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Tortilla de tiesto' and m.nombre = 'Mantequilla'
+on conflict do nothing;
+
+-- 2b.6 Rosquilla quiteña (24 unidades): harina 500g, panela 200g,
+-- mantequilla 80g, huevo 2, anís 5g, aceite 0.5 L.
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.5
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Rosquilla quiteña' and m.nombre = 'Harina'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.2
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Rosquilla quiteña' and m.nombre = 'Panela'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.08
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Rosquilla quiteña' and m.nombre = 'Mantequilla'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 2
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Rosquilla quiteña' and m.nombre = 'Huevo'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.5
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Rosquilla quiteña' and m.nombre = 'Aceite vegetal'
+on conflict do nothing;
+
+-- 2b.7 Pan de banano con maní (12 porciones): banano maduro 600g,
+-- harina de banano 200g, mantequilla 100g, panela 150g, huevos 2,
+-- mantequilla de maní 100g, leche condensada 100g.
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.6
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de banano con maní' and m.nombre = 'Banano maduro'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.2
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de banano con maní' and m.nombre = 'Harina de banano'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.1
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de banano con maní' and m.nombre = 'Mantequilla'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.1
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de banano con maní' and m.nombre = 'Mantequilla de maní'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.1
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de banano con maní' and m.nombre = 'Leche condensada'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 2
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de banano con maní' and m.nombre = 'Huevo'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 1
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Pan de banano con maní' and m.nombre = 'Funda papel kraft'
+on conflict do nothing;
+
+-- 2b.8 Helado de paila (mora) - 1 tanda de 3 L: leche entera 2.5 L,
+-- panela 250g, piña madura 200g (para dulzor ácido), mora fresca
+-- 500g, crema de leche 0.5 L, gas refrigerante 50g.
+-- (La piña se modela con "Piña natural" como acidulante natural.)
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 2.5
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Helado de paila (mora)' and m.nombre = 'Leche entera'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.25
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Helado de paila (mora)' and m.nombre = 'Panela'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.2
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Helado de paila (mora)' and m.nombre = 'Piña natural'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.5
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Helado de paila (mora)' and m.nombre = 'Crema de leche'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 50
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Helado de paila (mora)' and m.nombre = 'Gas refrigerante'
+on conflict do nothing;
+
+-- 2b.9 Bizcocho de colada morada (12 porciones): harina de maíz 250g,
+-- harina de trigo 250g, panela 300g, mantequilla 120g, huevos 3,
+-- leche 250ml, canela 10g, piña 100g (pulpa).
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.25
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Bizcocho de colada morada' and m.nombre = 'Harina de maíz'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.25
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Bizcocho de colada morada' and m.nombre = 'Harina'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.3
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Bizcocho de colada morada' and m.nombre = 'Panela'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.12
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Bizcocho de colada morada' and m.nombre = 'Mantequilla'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 3
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Bizcocho de colada morada' and m.nombre = 'Huevo'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.25
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Bizcocho de colada morada' and m.nombre = 'Leche entera'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 10
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Bizcocho de colada morada' and m.nombre = 'Canela molida'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.1
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Bizcocho de colada morada' and m.nombre = 'Piña natural'
+on conflict do nothing;
+
+-- 2b.10 Canelazo por jarra (2 L): agua 1.8 L, panela 250g,
+-- canela 20g (extra para infusión), clavo de olor (no agregado,
+-- ya incluido en premezcla), aguardiente 200ml (no está en catálogo,
+-- se modela con "Canelazo premezcla" como concentrado),
+-- limones (no en catálogo).
+-- Para no inflar materias primas: usamos solo "Canelazo premezcla"
+-- y agua (no-modelada) para reflejar la bebida.
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 100
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Canelazo' and m.nombre = 'Canelazo premezcla'
+on conflict do nothing;
+
+insert into public.receta_ingredientes (receta_id, materia_prima_id, cantidad)
+select r.id, m.id, 0.25
+from public.recetas r, public.materias_primas m
+where r.nombre = 'Canelazo' and m.nombre = 'Panela'
+on conflict do nothing;
+
+
+-- =====================================================================
 -- 3. SOCIOS (contabilidad)
 -- 2 socios · porcentajes de ganancia para el evento "Festival 2026"
 -- =====================================================================
 insert into public.socios (nombre, email, telefono, notas) values
-  ('Diego León',    'diego@example.com',   '+52 55 0000 0001', 'Encargado de producción'),
-  ('Lucía Reyes',   'lucia@example.com',   '+52 55 0000 0002', 'Encargada de ventas')
+  ('Diego',    'diego@example.com',   '+52 55 0000 0001', 'Encargado de producción'),
+  ('Ana',   'lucia@example.com',   '+52 55 0000 0002', 'Encargada de ventas')
 on conflict (nombre) do nothing;
 
 -- =====================================================================
@@ -149,6 +531,70 @@ insert into public.productos (receta_id, precio_venta, disponible, orden, descri
 select r.id, 35.00, true, 2, 'Pan de caja artesanal',      'mdi-bread-slice', '#D2691E'
 from public.recetas r
 where r.nombre = 'Pan básico'
+on conflict (receta_id) do nothing;
+
+-- 5b. PRODUCTOS DE PASTELERÍA ECUATORIANA
+-- Precios en USD, sugeridos para ferias urbanas (Quito / Guayaquil).
+-- No se asignan a evento_productos: existen en el catálogo y se
+-- activan por evento vía "Inicializar desde catálogo".
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 0.80, true,  3, 'Empanada de viento quiteña — masa rellena de queso, frita',           'mdi-food-croissant', '#E9967A'
+from public.recetas r
+where r.nombre = 'Empanada de viento'
+on conflict (receta_id) do nothing;
+
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 1.50, true,  4, 'Humita quiteña — tamal de maíz dulce envuelto en hoja',            'mdi-corn',           '#F4D03F'
+from public.recetas r
+where r.nombre = 'Humita'
+on conflict (receta_id) do nothing;
+
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 1.50, true,  5, 'Quimbolito — tamal dulce al vapor con harina de maíz',            'mdi-bowl',           '#D4AC0D'
+from public.recetas r
+where r.nombre = 'Quimbolito'
+on conflict (receta_id) do nothing;
+
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 0.60, true,  6, 'Pan de yuca — bolitas crocantes de almidón de yuca y queso',     'mdi-baguette',       '#F5DEB3'
+from public.recetas r
+where r.nombre = 'Pan de yuca'
+on conflict (receta_id) do nothing;
+
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 2.00, true,  7, 'Tortilla de tiesto grande — asada en tiesto de barro',          'mdi-flatbread',      '#DAA520'
+from public.recetas r
+where r.nombre = 'Tortilla de tiesto'
+on conflict (receta_id) do nothing;
+
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 0.75, true,  8, 'Rosquilla quiteña — rosca dulce con panela, horneada',           'mdi-cookie-outline', '#CD853F'
+from public.recetas r
+where r.nombre = 'Rosquilla quiteña'
+on conflict (receta_id) do nothing;
+
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 2.50, true,  9, 'Porción de pan de banano con mantequilla de maní',              'mdi-cake-variant',   '#FFE4B5'
+from public.recetas r
+where r.nombre = 'Pan de banano con maní'
+on conflict (receta_id) do nothing;
+
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 25.00, true, 10, 'Tanda de helado de paila de mora — artesanal por 3 L',          'mdi-ice-cream',      '#8B4789'
+from public.recetas r
+where r.nombre = 'Helado de paila (mora)'
+on conflict (receta_id) do nothing;
+
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 2.25, true, 11, 'Porción de bizcocho de colada morada — para Todos los Santos',  'mdi-cupcake',        '#8B4513'
+from public.recetas r
+where r.nombre = 'Bizcocho de colada morada'
+on conflict (receta_id) do nothing;
+
+insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, 6.00, true, 12, 'Jarra de canelazo 2 L — bebida caliente con canela',            'mdi-cup',            '#A0522D'
+from public.recetas r
+where r.nombre = 'Canelazo'
 on conflict (receta_id) do nothing;
 
 -- =====================================================================
@@ -379,6 +825,9 @@ where e.nombre = 'Mercado Navideño 2025' and v.comprobante_numero = 'MNA-002';
 -- 13. CORRECCIÓN DE VENTA (auditoría)
 -- El operador corrigió FPR-003 después de registrarlo: ajustó
 -- precio_unitario y dejó el motivo registrado.
+-- Se usa json_build_object en lugar de concatenar strings para
+-- evitar parseos manuales de JSON que rompan al pasar SQL por
+-- ciertas RPC multi-cliente.
 -- =====================================================================
 insert into public.venta_correcciones (
   venta_id, evento_id,
@@ -394,8 +843,18 @@ select
   'efectivo', 'efectivo',
   100.00, 60.00,
   'Cliente frecuente: descuento de cortesía autorizado por Diego',
-  '[{"producto_id":"' || p.id::text || '","cantidad":2,"precio_unitario":42.00,"subtotal":84.00}]'::jsonb,
-  '[{"producto_id":"' || p.id::text || '","cantidad":2,"precio_unitario":30.00,"subtotal":60.00}]'::jsonb
+  jsonb_build_array(jsonb_build_object(
+    'producto_id', p.id::text,
+    'cantidad', 2,
+    'precio_unitario', 42.00,
+    'subtotal', 84.00
+  )),
+  jsonb_build_array(jsonb_build_object(
+    'producto_id', p.id::text,
+    'cantidad', 2,
+    'precio_unitario', 30.00,
+    'subtotal', 60.00
+  ))
 from public.ventas v
 join public.eventos e on e.id = v.evento_id
 join public.productos p on p.precio_venta = 35.00
@@ -426,12 +885,11 @@ from public.eventos e
 where e.nombre = 'Mercado Navideño 2025'
 on conflict (evento_id) do nothing;
 
-commit;
+-- (sin COMMIT explícito — la RPC exec_sql no permite transaction commands)
 
 -- =====================================================================
 -- RESUMEN (corre al final del seed — útil para inspección manual)
 -- =====================================================================
-\echo '--- RESUMEN DEL SEED ---'
 select 'materias_primas'    as tabla, count(*)::text as filas from public.materias_primas
 union all select 'recetas',        count(*)::text from public.recetas
 union all select 'productos',      count(*)::text from public.productos

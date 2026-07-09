@@ -48,7 +48,6 @@ import { useRouter } from 'vue-router'
 
 import CheckoutButton from '@/components/pos/CheckoutButton.vue'
 import PaymentSelector from '@/components/pos/PaymentSelector.vue'
-import PosModeBanner from '@/components/pos/PosModeBanner.vue'
 import ProductGrid from '@/components/pos/ProductGrid.vue'
 import ComprobanteVentaDialog from '@/components/business/ComprobanteVentaDialog.vue'
 import CarritoPanel from '@/components/business/CarritoPanel.vue'
@@ -408,9 +407,6 @@ async function reintentarHistorial() {
 
 <template>
   <v-container>
-    <!-- mobile-ux-redesign Phase 3: mode banner shows simplified/full -->
-    <PosModeBanner />
-
     <div class="d-flex align-center justify-space-between mb-4">
       <h1 data-testid="pos-titulo">POS</h1>
       <div class="d-flex align-center ga-2">
@@ -582,16 +578,21 @@ async function reintentarHistorial() {
         </v-btn>
       </v-alert>
 
-      <!-- mobile-ux-redesign Phase 3: Simplified POS mode (active event) -->
+      <!-- mobile-ux-redesign Phase 3: Simplified POS mode (active event).
+           Layout is a single row with products on the left and the cart
+           pinned to the right at ALL breakpoints — xs through lg. The
+           split is 8/4 on mobile/tablet so the product grid can render
+           2 items per row at cols="4", and 9/3 on lg for more breathing
+           room. -->
       <template v-if="isSimplifiedMode && !cargandoProductos && !errorProductos">
         <v-row>
-          <v-col cols="12" md="8">
+          <v-col cols="8" sm="8" md="8" lg="9" data-testid="pos-products-col">
             <ProductGrid
               :productos="productosSimplificados"
               @add-to-cart="manejarAgregar"
             />
           </v-col>
-          <v-col cols="12" md="4">
+          <v-col cols="4" sm="4" md="4" lg="3" data-testid="pos-cart-col">
             <CarritoPanel
               :carrito="carrito"
               :total="totalCarrito"

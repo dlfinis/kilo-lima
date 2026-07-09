@@ -1,25 +1,30 @@
 #!/usr/bin/env node
 // scripts/db-reset.mjs
 // ---------------------------------------------------------------------
-// Reset + seed del entorno local de Supabase.
+// Reset + seed del entorno local de Supabase usando `psql` (cliente
+// nativo de Postgres) contra la connection string de la base.
 //
-//   1. Lee VITE_SUPABASE_URL y VITE_SUPABASE_ANON_KEY del .env.local.
-//      (Si no hay sesión, usa la service_role de SUPABASE_SERVICE_ROLE_KEY.)
+// Pipeline:
+//   1. Lee .env.local (SUPABASE_PSQL_CONNECTION requerido).
 //   2. Pide confirmación interactiva antes de truncar.
 //   3. Trunca TODAS las tablas en orden correcto (respeta FKs).
-//   4. Re-corre supabase/seed.sql contra la base.
-//   5. Imprime un resumen con conteos por tabla para que el dev vea
-//      de un vistazo qué quedó cargado.
+//   4. Re-corre supabase/seed.sql usando psql (multi-statement nativo).
+//   5. Lee los conteos por tabla via REST y los imprime.
 //
 // Uso:
-//   node scripts/db-reset.mjs            # interactivo (pide confirmación)
-//   node scripts/db-reset.mjs --yes      # salta la confirmación
-//   node scripts/db-reset.mjs --print     # solo imprime resumen, no toca
+//   node scripts/db-reset.mjs           # interactivo (pide confirmación)
+//   node scripts/db-reset.mjs --yes     # salta la confirmación
+//   node scripts/db-reset.mjs --print    # solo imprime resumen
+//   node scripts/db-reset.mjs --sql <archivo.sql>  # corre cualquier SQL
 //
 // Requisitos:
 //   * node >= 22
-//   * .env.local con VITE_SUPABASE_URL + VITE_SUPABASE_ANON_KEY (o service key)
+//   * .env.local con SUPABASE_PSQL_CONNECTION
+//     (formato: postgres://USER:PASS@HOST:5432/postgres o
+//      postgresql://USER:PASS@HOST:PORT/postgres)
+//   * cliente `psql` en PATH (Postgres 14+)
 // ---------------------------------------------------------------------
+import { spawn } from 'node:child_process'
 import fs from 'node:fs/promises'
 import path from 'node:path'
 import readline from 'node:readline/promises'
@@ -33,10 +38,13 @@ const REPO_ROOT = path.resolve(__dirname, '..')
 const ARGS = process.argv.slice(2)
 const YES = ARGS.includes('--yes')
 const PRINT_ONLY = ARGS.includes('--print')
+const DEBUG = ARGS.includes('--debug')
+const HEALTH = ARGS.includes('--health')
+const FLAG_SQL = ARGS.indexOf('--sql')
+const SQL_PATH_OVERRIDE = FLAG_SQL >= 0 ? ARGS[FLAG_SQL + 1] : null
 
 // ---------------------------------------------------------------------
-// 1. Cargar .env.local sin librerías externas (reglas tipo dotenv, sin
-//    expansión de variables — solo `KEY=value` simple).
+// .env.local parser (sin dependencias externas)
 // ---------------------------------------------------------------------
 async function loadDotenv() {
   const envPath = path.join(REPO_ROOT, '.env.local')
@@ -62,27 +70,110 @@ async function loadDotenv() {
   }
 }
 
-function getSupabaseConfig() {
+function getConfig() {
+  const psql = process.env.SUPABASE_PSQL_CONNECTION
+  // Las variables de REST son opcionales: solo se usan para el
+  // resumen via PostgREST. Si no están, devolvemos el resumen desde
+  // psql (un SELECT count(*) por tabla es ~3 ms en cualquier base).
   const url = process.env.VITE_SUPABASE_URL ?? process.env.SUPABASE_URL
-  // Preferimos la service role key si está — bypassa RLS y puede truncar.
-  // Si no, caemos a la anon (útil para entornos que solo exponen anon).
-  const key =
-    process.env.SUPABASE_SERVICE_ROLE_KEY ??
+  const viewer =
     process.env.VITE_SUPABASE_ANON_KEY ??
-    process.env.SUPABASE_ANON_KEY
-  if (!url || !key) {
+    process.env.SUPABASE_ANON_KEY ??
+    process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!psql) {
     throw new Error(
-      'Faltan VITE_SUPABASE_URL y/o VITE_SUPABASE_ANON_KEY en .env.local.',
+      'Falta SUPABASE_PSQL_CONNECTION en .env.local.\n' +
+        'Formato: postgres://USER:PASSWORD@HOST:PORT/postgres\n' +
+        'Lo sacás de Supabase Dashboard → Settings → Database → Connection string (Transaction).',
     )
   }
-  return { url: url.replace(/\/$/, ''), key }
+  return {
+    psql,
+    url: url ? url.replace(/\/$/, '') : '',
+    viewer: viewer ?? '',
+    host: (() => {
+      try {
+        return new URL(psql).host
+      } catch {
+        return ''
+      }
+    })(),
+    port: (() => {
+      try {
+        return Number(new URL(psql).port || 5432)
+      } catch {
+        return null
+      }
+    })(),
+  }
+}
+
+// Diagnóstico básico de DNS/red antes de tirar psql. Si no resuelve
+// el host, abortamos con una guía específica.
+async function diagnosticarHost(host) {
+  return new Promise((resolve) => {
+    const child = spawn('nslookup', [host], { stdio: ['ignore', 'pipe', 'pipe'] })
+    let out = ''
+    let err = ''
+    child.stdout.on('data', (d) => (out += d.toString()))
+    child.stderr.on('data', (d) => (err += d.toString()))
+    child.on('error', () => resolve({ ok: false, motivo: 'nslookup no disponible en PATH' }))
+    child.on('close', (code) => {
+      if (code === 0 && /Address:/.test(out)) {
+        resolve({ ok: true, out })
+      } else {
+        resolve({ ok: false, motivo: out || err || `nslookup salió con código ${code}` })
+      }
+    })
+  })
 }
 
 // ---------------------------------------------------------------------
-// 2. Truncar todas las tablas. Se hace via RPC `exec_sql` cuando está
-//    disponible (típicamente `pg_execute_server` / función definida por
-//    el dev). Si no existe, lo pedimos como fallback via REST no es
-//    posible — emitimos instrucciones al usuario.
+function ejecutarPsql(connectionString, archivoSql, variables = {}) {
+  return new Promise((resolve, reject) => {
+    const args = ['-v', 'ON_ERROR_STOP=1', '-X']
+    for (const [k, v] of Object.entries(variables)) {
+      args.push('-v', `${k}=${v}`)
+    }
+    args.push('-f', archivoSql, connectionString)
+
+    const child = spawn('psql', args, { stdio: ['ignore', 'pipe', 'pipe'] })
+    let stdout = ''
+    let stderr = ''
+    child.stdout.on('data', (chunk) => (stdout += chunk.toString()))
+    child.stderr.on('data', (chunk) => (stderr += chunk.toString()))
+    child.on('error', (err) => {
+      if (err.code === 'ENOENT') {
+        reject(
+          new Error(
+            'No se encontró el binario `psql` en PATH.\n' +
+              'macOS:   brew install postgresql@16 && export PATH="$(brew --prefix postgresql@16)/bin:$PATH"\n' +
+              'Linux:   sudo apt install postgresql-client\n' +
+              'Windows: usa el instalador de Postgres o psql desde WSL.',
+          ),
+        )
+        return
+      }
+      reject(err)
+    })
+    child.on('close', (code) => {
+      if (code === 0) {
+        resolve({ stdout, stderr })
+      } else {
+        const err = new Error(
+          `psql salió con código ${code}\n\nSTDERR:\n${stderr}\n\nSTDOUT (tail):\n${stdout.slice(-400)}`,
+        )
+        err.stdout = stdout
+        err.stderr = stderr
+        err.code = code
+        reject(err)
+      }
+    })
+  })
+}
+
+// ---------------------------------------------------------------------
+// Conteo por tabla via REST (PostgREST Content-Range)
 // ---------------------------------------------------------------------
 const TABLAS_ORDEN = [
   'venta_correcciones',
@@ -124,78 +215,136 @@ const TABLAS_RESUMEN = [
   'cierres_caja',
 ]
 
-async function rpcExec({ url, key }, sql, params = {}) {
-  const res = await fetch(`${url}/rest/v1/rpc/exec_sql`, {
-    method: 'POST',
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ sql_text: sql, params }),
-  })
-  if (!res.ok) {
-    const body = await res.text()
-    throw new Error(`RPC exec_sql ${res.status}: ${body}`)
-  }
-  return res.json().catch(() => null)
-}
+// Health check: corre 4 pruebas en orden y reporta ✓/✗ en cada una.
+//   1) URL parsea OK y apunta a puerto 5432 o 6543.
+//   2) psql responde "SELECT 1" (única conexión al pooler → barato).
+//   3) Usuario y password autentican (la prueba "real" más útil).
+//   4) Puede leer del schema `public` (permisos + existencia de schema).
+// Si las 4 andan, `pnpm db:reset:yes` va a funcionar.
+async function healthCheck(config) {
+  console.log('\nHealth check:')
 
-async function rpcExiste({ url, key }) {
-  const res = await fetch(`${url}/rest/v1/rpc/exec_sql`, {
-    method: 'POST',
-    headers: {
-      apikey: key,
-      Authorization: `Bearer ${key}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({ sql_text: 'select 1' }),
-  })
-  return res.status !== 404
-}
-
-async function truncateAll(config) {
-  const truncates = TABLAS_ORDEN.map((t) => `truncate table public.${t} restart identity cascade`).join(';')
-  await rpcExec(config, truncates)
-}
-
-async function ejecutarSeed(config) {
-  const sqlPath = path.join(REPO_ROOT, 'supabase', 'seed.sql')
-  const sql = await fs.readFile(sqlPath, 'utf8')
-  // Enviamos el archivo entero. exec_sql acepta multi-statement.
-  await rpcExec(config, sql)
-}
-
-async function resumen(config) {
-  const out = {}
-  for (const tabla of TABLAS_RESUMEN) {
-    const url = `${config.url}/rest/v1/${tabla}?select=id&limit=1000`
-    const res = await fetch(url, {
-      method: 'GET',
-      headers: {
-        apikey: config.key,
-        Authorization: `Bearer ${config.key}`,
-        Prefer: 'count=exact',
-      },
-    })
-    if (!res.ok) {
-      out[tabla] = '?'
-      continue
-    }
-    const range = res.headers.get('content-range')
-    if (range && range.includes('/')) {
-      const total = range.split('/')[1]
-      out[tabla] = total === '*' ? '?' : total
+  // 1. URL parsing
+  const urlPsql = (() => {
+    try { return new URL(config.psql) } catch { return null }
+  })()
+  const portOk = urlPsql && (urlPsql.port === '5432' || urlPsql.port === '6543')
+  const userSpecCorrect = urlPsql && /postgres\.[a-z0-9]+/.test(urlPsql.username)
+  if (portOk && userSpecCorrect) {
+    console.log('  ✓ URL válida (host=' + urlPsql.hostname + ', puerto=' + urlPsql.port + ', usuario=' + urlPsql.username + ')')
+  } else {
+    console.log('  ✗ URL con formato inusual:')
+    if (urlPsql) {
+      console.log('      host=' + urlPsql.hostname + ', puerto=' + urlPsql.port + ', usuario=' + urlPsql.username)
     } else {
-      out[tabla] = '?'
+      console.log('      no se pudo parsear como URL')
+    }
+    if (!portOk) console.log('        → el puerto debe ser 5432 (directo) o 6543 (pooler)')
+    if (userSpecCorrect === false) console.log('        → el usuario debe ser postgres.PROJECT_REF (no solo "postgres")')
+  }
+
+  // 2 + 3 + 4. Un solo psql -c que autentica y prueba SELECT dual.
+  // Si falla por "authentication failed" → problema de password.
+  // Si falla por "permission denied" → problema de RLS / role.
+  // Si falla por "relation does not exist" → schema no es `public`.
+  try {
+    const stdout = await new Promise((resolve, reject) => {
+      const child = spawn(
+        'psql',
+        [
+          '-X', '-tA', '-v', 'ON_ERROR_STOP=1',
+          '-c', "SELECT current_database() || '|' || current_user || '|' || (SELECT count(*)::text FROM information_schema.tables WHERE table_schema='public');",
+          config.psql,
+        ],
+        { stdio: ['ignore', 'pipe', 'pipe'] },
+      )
+      let out = ''
+      let err = ''
+      child.stdout.on('data', (c) => (out += c.toString()))
+      child.stderr.on('data', (c) => (err += c.toString()))
+      child.on('error', reject)
+      child.on('close', (code) => {
+        if (code === 0) resolve(out.trim())
+        else reject(new Error('código ' + code + '\n' + err))
+      })
+    })
+
+    const [db, user, nTables] = stdout.split('|')
+    console.log('  ✓ Autenticación OK: db=' + db + ', user=' + user + ', tablas en public=' + nTables)
+
+    if (Number(nTables) === 0) {
+      console.log('  ⚠ El schema `public` existe pero está vacío — ¿se aplicaron las migraciones?')
+    } else {
+      const esperado = TABLAS_RESUMEN.length
+      if (Number(nTables) < esperado) {
+        console.log('  ⚠ Hay ' + nTables + ' tablas en `public`, esperábamos >= ' + esperado + '. Probablemente faltan migraciones.')
+      } else {
+        console.log('  ✓ Schema `public` tiene ' + nTables + ' tablas (>= esperadas ' + esperado + ')')
+      }
+    }
+  } catch (err) {
+    console.log('  ✗ Conexión / auth / permisos fallaron:')
+    // Siempre mostrar el stderr crudo de psql para saber qué falló REALMENTE.
+    const lineas = err.message.split('\n').filter(Boolean)
+    const relevante = lineas.find((l) => /FATAL|ERROR|fatal/i.test(l)) || lineas[0]
+    console.log('      psql dice: ' + relevante)
+    const m = err.message
+    if (/authentication failed/i.test(m)) {
+      console.log('      → Password incorrecta. Resetear desde Dashboard → Settings → Database → Database password.')
+    } else if (/password authentication failed/i.test(m)) {
+      console.log('      → Usuario o password incorrectos. Esperado: postgres.PROJECT_REF')
+    } else if (/nodename|nor servname|getaddrinfo/i.test(m)) {
+      console.log('      → DNS no resuelve. ¿Estás online? ¿tienes IPv6 accesible?')
+    } else if (/ECONNREFUSED|Connection refused|timeout/i.test(m)) {
+      console.log('      → TCP rechaza la conexión. Puerto o host incorrecto, o firewall.')
+    } else if (/too many authentication failures|ECIRCUITBREAKER/i.test(m)) {
+      console.log('      → El pooler bloqueó nuevas conexiones por demasiados auth failures. Esperá 5–15 min.')
+    } else if (/permission denied/i.test(m)) {
+      console.log('      → Permisos insuficientes sobre el schema `public`. Revisar rol del usuario.')
+    } else if (/relation .* does not exist/i.test(m)) {
+      console.log('      → El schema `public` no tiene las tablas esperadas. ¿Se aplicaron las migraciones?')
+    } else {
+      console.log('      → ' + m.split('\n')[0])
+    }
+  }
+}
+
+// Resumen: UNA sola sentencia, UNA sola conexión psql. Hace un UNION ALL
+async function resumen(config) {
+  const selects = TABLAS_RESUMEN.map(
+    (t) => `SELECT '${t}' AS tabla, count(*)::bigint AS n FROM public.${t}`,
+  ).join('\nUNION ALL\n')
+  const sql = `SELECT tabla || '=' || n AS fila FROM (${selects}) s ORDER BY tabla;`
+
+  const stdout = await new Promise((resolve, reject) => {
+    const child = spawn(
+      'psql',
+      ['-X', '-tA', '-v', 'ON_ERROR_STOP=1', '-c', sql, config.psql],
+      { stdio: ['ignore', 'pipe', 'pipe'] },
+    )
+    let out = ''
+    let err = ''
+    child.stdout.on('data', (c) => (out += c.toString()))
+    child.stderr.on('data', (c) => (err += c.toString()))
+    child.on('error', reject)
+    child.on('close', (code) => {
+      if (code === 0) resolve(out)
+      else reject(new Error(`psql -c (resumen) salió con código ${code}\nSTDERR:\n${err}`))
+    })
+  })
+
+  const out = {}
+  // Inicializo con "?" para tablas que no vinieron en la respuesta.
+  for (const t of TABLAS_RESUMEN) out[t] = '?'
+  for (const linea of stdout.split('\n')) {
+    const [tabla, valor] = linea.split('=')
+    if (tabla && valor !== undefined && TABLAS_RESUMEN.includes(tabla)) {
+      out[tabla] = valor || '0'
     }
   }
   return out
 }
 
-// ---------------------------------------------------------------------
-// 3. Loop principal
-// ---------------------------------------------------------------------
 function formatearResumen(rows) {
   const ancho = Math.max(...Object.keys(rows).map((k) => k.length))
   return Object.entries(rows)
@@ -203,11 +352,33 @@ function formatearResumen(rows) {
     .join('\n')
 }
 
+// ---------------------------------------------------------------------
+// Loop principal
+// ---------------------------------------------------------------------
 async function main() {
   await loadDotenv()
-  const config = getSupabaseConfig()
+  const config = getConfig()
 
-  console.log(`\nConectado a ${config.url}`)
+  const host = (() => {
+    try {
+      return new URL(config.psql).host
+    } catch {
+      return '(oculto)'
+    }
+  })()
+  console.log(`\nConectado a ${host}`)
+
+  // Diagnóstico DNS si --debug. Sirve para identificar problemas
+  // de firewall o de URL incorrecta sin esperar a que psql se caiga.
+  if (DEBUG && config.host) {
+    console.log(`\nDiagnosticando DNS de ${config.host}...`)
+    const diag = await diagnosticarHost(config.host)
+    if (diag.ok) {
+      console.log('  ✓ DNS resuelve correctamente.')
+    } else {
+      console.log(`  ✗ DNS no resuelve: ${diag.motivo}`)
+    }
+  }
 
   if (PRINT_ONLY) {
     console.log('\nResumen actual:')
@@ -215,24 +386,23 @@ async function main() {
     return
   }
 
-  const rpcOk = await rpcExiste(config)
-  if (!rpcOk) {
+  if (HEALTH) {
+    await healthCheck(config)
+    return
+  }
+
+  // Verificar psql
+  const psqlCheck = spawn('psql', ['--version'])
+  psqlCheck.on('error', () => {
     console.error(
-      [
-        'La base no expone la función RPC `exec_sql(sql_text)`.',
-        'Crea esta función en Supabase (SQL editor) para que el script',
-        'pueda truncar y aplicar el seed:',
-        '',
-        '  create or replace function public.exec_sql(sql_text text)',
-        '  returns void language plpgsql security definer as $$',
-        '  begin execute sql_text; end; $$;',
-        '',
-        'Si prefieres, ejecuta manualmente supabase/clean_db.sql y',
-        'supabase/seed.sql desde el Dashboard.',
-      ].join('\n'),
+      '\nNo se encontró `psql` en PATH. Instalalo antes de correr este script:\n' +
+        '  macOS:   brew install postgresql@16\n' +
+        '  Linux:   sudo apt install postgresql-client\n',
     )
     process.exit(1)
-  }
+  })
+  psqlCheck.stdout.on('data', (d) => process.stdout.write(`$ ${d.toString().trim()}\n`))
+  await new Promise((res) => psqlCheck.on('close', res))
 
   if (!YES) {
     const rl = readline.createInterface({ input, output })
@@ -247,10 +417,20 @@ async function main() {
   }
 
   console.log('\n→ Truncando tablas…')
-  await truncateAll(config)
+  const truncateSql = `truncate table ${TABLAS_ORDEN.map((t) => `public.${t}`).join(', ')} restart identity cascade;`
+  const truncateFile = path.join(REPO_ROOT, 'supabase', '.tmp-truncate.sql')
+  await fs.writeFile(truncateFile, truncateSql, 'utf8')
+  try {
+    await ejecutarPsql(config.psql, truncateFile)
+  } finally {
+    await fs.unlink(truncateFile).catch(() => null)
+  }
 
   console.log('→ Aplicando seed.sql…')
-  await ejecutarSeed(config)
+  const archivoSql = SQL_PATH_OVERRIDE
+    ? path.resolve(SQL_PATH_OVERRIDE)
+    : path.join(REPO_ROOT, 'supabase', 'seed.sql')
+  await ejecutarPsql(config.psql, archivoSql)
 
   console.log('\nResumen post-seed:')
   console.log(formatearResumen(await resumen(config)))
@@ -259,5 +439,23 @@ async function main() {
 
 main().catch((err) => {
   console.error(`\nERROR: ${err.message}`)
+  // Si es un fallo de red / DNS, agregar guía específica para Supabase.
+  if (/nodename|nor servname|network|timeout|ECONNREFUSED|getaddrinfo/i.test(err.message)) {
+    console.error(
+      [
+        '',
+        'Parece un fallo de DNS o red. Posibles causas:',
+        '  • Estás detrás de un proxy/cortafuegos corporativo que filtra *.supabase.co.',
+        '  • Tu URL directa NO resuelve desde tu red. Probá con el pooler:',
+        '        postgres://postgres:PASS@aws-0-us-east-1.pooler.supabase.com:6543/postgres',
+        '    (reemplazá aws-0-us-east-1 por la región de tu proyecto).',
+        '  • Plan gratuito: el host directo db.*.supabase.co solo responde desde',
+        '    redes con IPv6. El pooler siempre funciona.',
+        '',
+        'Solución rápida: usar el Session Pooler de Supabase desde',
+        'Settings → Database → Connection pooling → Transaction.',
+      ].join('\n'),
+    )
+  }
   process.exit(1)
 })

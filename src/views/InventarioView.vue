@@ -4,21 +4,35 @@
 // MateriaPrimaListItem. The four UX states (loading / empty / error /
 // data) follow the brief's lockup. Delete confirmation lives here so
 // the list-item stays presentational (REQ-CATALOG-41).
-//
-// mobile-ux-redesign Phase 4: adds StockAlertsList for inventory alerts
-// and ProductionCapacityCard for each producible product.
 import { computed, onMounted, ref } from 'vue'
 
 import FabNuevo from '@/components/business/FabNuevo.vue'
 import MateriaPrimaForm from '@/components/business/MateriaPrimaForm.vue'
 import MateriaPrimaListItem from '@/components/business/MateriaPrimaListItem.vue'
-import StockAlertsList from '@/components/inventario/StockAlertsList.vue'
-import ProductionCapacityCard from '@/components/inventario/ProductionCapacityCard.vue'
 import { useIngredients } from '@/composables/useIngredients'
-import { useRecipesStore } from '@/stores/recipes.store'
-import type { MateriaPrima, MateriaPrimaInput, RecetaConIngredientes } from '@/types'
+import type { MateriaPrima, MateriaPrimaInput, CategoriaMateriaPrima } from '@/types'
 
 const { materiasPrimas, cargando, error, cargarTodas, crear, actualizar, eliminar } = useIngredients()
+
+const filtroCategoria = ref<CategoriaMateriaPrima | 'todos'>('todos')
+const ordenAlfabetico = ref<'asc' | 'desc'>('asc')
+
+const materiasPrimasFiltradas = computed<MateriaPrima[]>(() => {
+  const lista = filtroCategoria.value === 'todos'
+    ? [...materiasPrimas.value]
+    : materiasPrimas.value.filter((m) => m.categoria === filtroCategoria.value)
+
+  lista.sort((a, b) => {
+    const cmp = a.nombre.localeCompare(b.nombre, 'es', { sensitivity: 'base' })
+    return ordenAlfabetico.value === 'asc' ? cmp : -cmp
+  })
+
+  return lista
+})
+
+const sinCoincidenciasFiltro = computed<boolean>(
+  () => materiasPrimas.value.length > 0 && materiasPrimasFiltradas.value.length === 0,
+)
 
 type Dialogo =
   | { tipo: 'cerrado' }
@@ -33,6 +47,7 @@ const materiaEnEdicion = computed<MateriaPrimaInput | null>(() =>
         nombre: dialogo.value.materia.nombre,
         unidad: dialogo.value.materia.unidad,
         costo_por_unidad: dialogo.value.materia.costo_por_unidad,
+        categoria: dialogo.value.materia.categoria,
         notas: dialogo.value.materia.notas,
       }
     : null,
@@ -41,21 +56,6 @@ const materiaEnEdicion = computed<MateriaPrimaInput | null>(() =>
 onMounted(() => {
   cargarTodas()
 })
-
-// Phase 4: Products with recipes for ProductionCapacityCard.
-// Each recipe becomes a "product" shape the card can consume.
-const recipesStore = useRecipesStore()
-
-const productosConReceta = computed(() =>
-  recipesStore.recetas.map((r: RecetaConIngredientes) => ({
-    id: r.id,
-    nombre: r.nombre,
-    receta: r.ingredientes.map((i) => ({
-      materia_prima_id: i.materia_prima_id,
-      cantidad: i.cantidad,
-    })),
-  })),
-)
 
 async function manejarSubmit(input: MateriaPrimaInput) {
   if (dialogo.value.tipo === 'editar') {
@@ -98,21 +98,59 @@ function cerrarDialogo() {
       <h1>Inventario</h1>
     </div>
 
-    <!-- Phase 4: Stock alerts section (prominent, at top) -->
-    <StockAlertsList />
-
-    <!-- Phase 4: Production capacity per product recipe -->
-    <v-row v-if="productosConReceta.length > 0" class="mb-4">
-      <v-col
-        v-for="p in productosConReceta"
-        :key="p.id"
-        cols="12"
-        sm="6"
-        md="4"
-      >
-        <ProductionCapacityCard :producto="p" />
-      </v-col>
-    </v-row>
+    <!-- Category filter + alphabetical sort controls -->
+    <div class="d-flex align-center flex-wrap ga-3 mb-4">
+      <div class="d-flex align-center ga-2">
+        <v-btn
+          :color="filtroCategoria === 'todos' ? 'grey' : undefined"
+          :variant="filtroCategoria === 'todos' ? 'tonal' : 'text'"
+          size="small"
+          data-testid="mp-filter-todos"
+          @click="filtroCategoria = 'todos'"
+        >
+          Todos
+        </v-btn>
+        <v-btn
+          :color="filtroCategoria === 'ingrediente' ? 'primary' : undefined"
+          :variant="filtroCategoria === 'ingrediente' ? 'tonal' : 'text'"
+          size="small"
+          data-testid="mp-filter-ingrediente"
+          @click="filtroCategoria = 'ingrediente'"
+        >
+          Ingredientes
+        </v-btn>
+        <v-btn
+          :color="filtroCategoria === 'empaque' ? 'secondary' : undefined"
+          :variant="filtroCategoria === 'empaque' ? 'tonal' : 'text'"
+          size="small"
+          data-testid="mp-filter-empaque"
+          @click="filtroCategoria = 'empaque'"
+        >
+          Empaques
+        </v-btn>
+      </div>
+      <v-divider vertical class="mx-2" />
+      <div class="d-flex align-center ga-1">
+        <v-btn
+          :color="ordenAlfabetico === 'asc' ? 'primary' : undefined"
+          :variant="ordenAlfabetico === 'asc' ? 'tonal' : 'text'"
+          size="small"
+          icon="mdi-sort-alphabetical-ascending"
+          aria-label="Ordenar A-Z"
+          data-testid="mp-sort-asc"
+          @click="ordenAlfabetico = 'asc'"
+        />
+        <v-btn
+          :color="ordenAlfabetico === 'desc' ? 'primary' : undefined"
+          :variant="ordenAlfabetico === 'desc' ? 'tonal' : 'text'"
+          size="small"
+          icon="mdi-sort-alphabetical-descending"
+          aria-label="Ordenar Z-A"
+          data-testid="mp-sort-desc"
+          @click="ordenAlfabetico = 'desc'"
+        />
+      </div>
+    </div>
 
     <!-- Existing materias primas CRUD section -->
     <FabNuevo
@@ -135,16 +173,23 @@ function cerrarDialogo() {
       </template>
     </v-alert>
 
-    <v-card v-if="!cargando && materiasPrimas.length === 0 && !error" class="pa-6 text-center" data-testid="mp-empty">
+    <v-card v-if="!cargando && sinCoincidenciasFiltro && !error" class="pa-6 text-center" data-testid="mp-empty-filter">
+      <p class="text-h6 mb-4">No hay materias primas que coincidan con el filtro actual</p>
+      <v-btn variant="outlined" @click="filtroCategoria = 'todos'">
+        Limpiar filtro
+      </v-btn>
+    </v-card>
+
+    <v-card v-if="!cargando && materiasPrimas.length === 0 && !error" class="pa-6 text-center" data-testid="mp-empty-global">
       <p class="text-h6 mb-4">No hay materias primas todavía</p>
       <v-btn color="primary" @click="abrirCrear">
         Agregar primera materia prima
       </v-btn>
     </v-card>
 
-    <v-list v-if="materiasPrimas.length > 0" data-testid="mp-list">
+    <v-list v-if="materiasPrimasFiltradas.length > 0" data-testid="mp-list">
       <MateriaPrimaListItem
-        v-for="m in materiasPrimas"
+        v-for="m in materiasPrimasFiltradas"
         :key="m.id"
         :materia="m"
         @edit="abrirEditar"

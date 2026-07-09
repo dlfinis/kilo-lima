@@ -17,6 +17,7 @@
 // venta_correcciones row) is the store/service's responsibility.
 import { computed, ref, watch } from 'vue'
 
+import { formatearUSD } from '@/utils/format'
 import { METODOS_PAGO, type MetodoPago, type VentaConItems, type VentaItemInput } from '@/types'
 
 interface ProductoDisponible {
@@ -51,8 +52,6 @@ const emit = defineEmits<{
 // `METODOS_ETIQUETA` map. Now sourced from the same constant the
 // registrar dialog and history dialog use.
 const METODOS = METODOS_PAGO
-
-const usd = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'USD' })
 
 // Mutable local state — initialized from props.venta every time the
 // dialog opens so a previous edit doesn't leak into a new sale.
@@ -120,7 +119,7 @@ const puedeAplicar = computed<boolean>(
 )
 
 function formatearMoneda(n: number): string {
-  return usd.format(n)
+  return formatearUSD(n)
 }
 
 function nombreProducto(productoId: string): string {

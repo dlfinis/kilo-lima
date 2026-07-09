@@ -5,6 +5,7 @@
 // mutation.
 import { computed } from 'vue'
 
+import { formatearUSD } from '@/utils/format'
 import type { LineaCarrito } from '@/types'
 
 const props = withDefaults(
@@ -20,10 +21,7 @@ const emit = defineEmits<{
   eliminar: [productoId: string]
 }>()
 
-const subtotalTexto = computed(() => {
-  const n = props.linea.subtotal
-  return new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'USD' }).format(n)
-})
+const subtotalTexto = computed(() => formatearUSD(props.linea.subtotal))
 
 function incrementar() {
   emit('update-cantidad', props.linea.producto_id, props.linea.cantidad + 1)

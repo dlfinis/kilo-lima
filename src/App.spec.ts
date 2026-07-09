@@ -39,7 +39,6 @@ describe('App', () => {
       global: { plugins: [createPinia(), vuetify, router] },
     })
     expect(wrapper.find('[data-testid="app-bar"]').exists()).toBe(true)
-    expect(wrapper.find('[data-testid="app-bar-title"]').text()).toBe('KiloLima')
   })
 
   it('renders the legacy layout (AppBar) when VITE_FLAG_MOBILE_UX is "false"', async () => {

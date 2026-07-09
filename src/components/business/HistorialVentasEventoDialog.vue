@@ -22,6 +22,7 @@
 // the component can be unit-tested without mocking Pinia.
 import { computed } from 'vue'
 
+import { formatearUSD } from '@/utils/format'
 import { METODOS_PAGO, type Evento, type MetodoPago, type VentaConItems } from '@/types'
 
 const props = withDefaults(
@@ -54,8 +55,6 @@ const METODOS_ETIQUETA: Record<MetodoPago, string> = Object.fromEntries(
   METODOS_PAGO.map((m) => [m.value, m.label]),
 ) as Record<MetodoPago, string>
 
-const usd = new Intl.NumberFormat('es-MX', { style: 'currency', currency: 'USD' })
-
 // Sort the sales newest-first so the operator sees the latest
 // transaction at the top of the list (read-only UX invariant — the
 // store keeps insertion order but the display layer is responsible
@@ -84,12 +83,12 @@ function formatearFechaHora(iso: string | null | undefined): string {
 // printable detail.
 function resumenItems(venta: VentaConItems): string {
   return venta.items
-    .map((it) => `${it.cantidad} × ${usd.format(it.precio_unitario)}`)
+    .map((it) => `${it.cantidad} × ${formatearUSD(it.precio_unitario)}`)
     .join(' · ')
 }
 
 function formatearTotal(venta: VentaConItems): string {
-  return usd.format(venta.total)
+  return formatearUSD(venta.total)
 }
 
 function comprobante(venta: VentaConItems): string {

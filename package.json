@@ -34,7 +34,8 @@
     "verify:all": "node scripts/verify-all.mjs",
     "db:reset": "node scripts/db-reset.mjs",
     "db:reset:yes": "node scripts/db-reset.mjs --yes",
-    "db:summary": "node scripts/db-reset.mjs --print"
+    "db:summary": "node scripts/db-reset.mjs --print",
+    "db:health": "node scripts/db-reset.mjs --health"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",

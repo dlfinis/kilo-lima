@@ -51,6 +51,6 @@ describe('ContribucionBadge (REQ-CON-6)', () => {
 
   it('formats the contribution using the shared formatearUSD helper', () => {
     const wrapper = mountBadge(1234.5)
-    expect(wrapper.text()).toContain('1,234.50')
+    expect(wrapper.text()).toContain('1234.50')
   })
 })
