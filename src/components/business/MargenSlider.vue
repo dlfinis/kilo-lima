@@ -55,7 +55,7 @@ function onSliderInput(event: Event) {
   const target = event.target as HTMLInputElement | null
   if (!target) return
   const ui = Number(target.value)
-  const decimal = Math.max(0, Math.min(90, ui)) / 100
+  const decimal = Math.max(0, Math.min(200, ui)) / 100
   emit('update:modelValue', decimal)
 }
 
@@ -70,9 +70,9 @@ function onPrecioClick() {
   <div class="d-flex align-center ga-2" data-testid="margen-slider">
     <input
       type="range"
-      :value="porcentaje"
+      :value="Math.min(200, porcentaje)"
       min="0"
-      max="90"
+      max="200"
       step="1"
       :disabled="disabled"
       class="margen-slider-input"

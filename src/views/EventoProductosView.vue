@@ -198,38 +198,79 @@ async function alToggleIncluido(ep: EventoProducto) {
 // the operator sees which lever they're pulling.
 async function alCambiarGanancia(ep: EventoProductoConDetalle, pct: number) {
   if (!eventoId.value) return
+  const prevGanancia = gananciaPct.value[ep.producto_id] ?? 0
+  const prevContrib = contribucionPct.value[ep.producto_id] ?? 0
+  const prevPrecioTexto = precioTexto.value[ep.producto_id]
+  // Optimistic update: show the change immediately.
   gananciaPct.value = { ...gananciaPct.value, [ep.producto_id]: pct }
-  const nuevoPrecio = ep.costo_unitario * (1 + pct + (contribucionPct.value[ep.producto_id] ?? 0))
-  // Sync the text input so the operator sees the price react to the
-  // slider. Without this, precioTexto stays at the old value and the
-  // input appears static even though the store updated.
+  const nuevoPrecio = ep.costo_unitario * (1 + pct + prevContrib)
   precioTexto.value = { ...precioTexto.value, [ep.producto_id]: formatearUSDInput(nuevoPrecio) }
-  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, pct + (contribucionPct.value[ep.producto_id] ?? 0))
+  const res = await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, pct + prevContrib)
+  if (res.error) {
+    // Save failed — revert to previous state so the UI stays coherent
+    // with the DB. The store's error ref is already set by the store.
+    gananciaPct.value = { ...gananciaPct.value, [ep.producto_id]: prevGanancia }
+    if (prevPrecioTexto !== undefined) {
+      precioTexto.value = { ...precioTexto.value, [ep.producto_id]: prevPrecioTexto }
+    }
+  }
 }
 
 async function alCambiarContribucion(ep: EventoProductoConDetalle, pct: number) {
   if (!eventoId.value) return
+  const prevGanancia = gananciaPct.value[ep.producto_id] ?? 0
+  const prevContrib = contribucionPct.value[ep.producto_id] ?? 0
+  const prevPrecioTexto = precioTexto.value[ep.producto_id]
   contribucionPct.value = { ...contribucionPct.value, [ep.producto_id]: pct }
-  const nuevoPrecio = ep.costo_unitario * (1 + (gananciaPct.value[ep.producto_id] ?? 0) + pct)
+  const nuevoPrecio = ep.costo_unitario * (1 + prevGanancia + pct)
   precioTexto.value = { ...precioTexto.value, [ep.producto_id]: formatearUSDInput(nuevoPrecio) }
-  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, (gananciaPct.value[ep.producto_id] ?? 0) + pct)
+  const res = await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, prevGanancia + pct)
+  if (res.error) {
+    contribucionPct.value = { ...contribucionPct.value, [ep.producto_id]: prevContrib }
+    if (prevPrecioTexto !== undefined) {
+      precioTexto.value = { ...precioTexto.value, [ep.producto_id]: prevPrecioTexto }
+    }
+  }
 }
 
 // Initialize slider percentages from loaded data. Ganancia defaults to
 // the event's margen_ganancia (floor); contribución defaults to 10%.
-// When the DB already has a precio override, we reverse-engineer the
-// split: total_markup = (precio/costo) − 1, contribución keeps its
-// default (10%), ganancia absorbs the remainder.
+// Initialize slider percentages from loaded data.
+//
+// NEW product (precio_venta === null in DB): defaults — ganancia =
+// event's margen_ganancia (floor), contribución = 10%. The 10%
+// contribución only makes sense as a starting point for a product
+// the operator hasn't priced yet.
+//
+// EXISTING product (already has precio_venta): balanced 60/40 split
+// of total markup, capped at 90% each. This keeps both sliders within
+// their visual range and gives a meaningful view of where the markup
+// goes instead of dumping everything into ganancia.
 function initSliderPct(ep: EventoProductoConDetalle): { ganancia: number; contribucion: number } {
   const eventoMargen = eventoActual.value?.margen_ganancia ?? 0.30
   const costo = ep.costo_unitario
   const precio = ep.precio_final
   if (costo <= 0) return { ganancia: eventoMargen, contribucion: 0.10 }
+
+  // Detect new product: no precio_venta override in the raw DB row.
+  const rawEp = epStore.productosPorEvento
+    .get(eventoId.value ?? '')
+    ?.find((p) => p.producto_id === ep.producto_id)
+  const isNew = !rawEp || rawEp.precio_venta === null || rawEp.precio_venta === undefined
+
   const totalMarkup = (precio / costo) - 1
-  const contribDefault = 0.10
-  // Prioritize contribution: keep it at default, ganancia gets the rest.
-  const contribucion = Math.max(0, Math.min(contribDefault, totalMarkup))
-  const ganancia = Math.max(0, totalMarkup - contribucion)
+  const SLIDER_MAX = 2.00
+
+  if (isNew) {
+    const contribDefault = 0.10
+    const contribucion = Math.max(0, Math.min(contribDefault, totalMarkup))
+    const ganancia = Math.max(0, Math.min(SLIDER_MAX, totalMarkup - contribucion))
+    return { ganancia, contribucion }
+  }
+
+  // Existing product: 60/40 split, each capped at 200%.
+  const ganancia = Math.min(SLIDER_MAX, Math.max(0, totalMarkup * 0.60))
+  const contribucion = Math.min(SLIDER_MAX, Math.max(0, totalMarkup * 0.40))
   return { ganancia, contribucion }
 }
 
