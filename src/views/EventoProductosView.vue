@@ -22,7 +22,7 @@
 //   - Bulk action "APLICAR PRECIO MÍNIMO BREAK-EVEN" — applies the
 //     computed `precioMinimoParaProducto(productoId)` to each row's
 //     `precio_venta` via the existing store path.
-import { computed, nextTick, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import MargenSlider from '@/components/business/MargenSlider.vue'
@@ -174,6 +174,7 @@ async function cargar() {
     // cross-store loads complete.
     await nextTick()
     initSliderPcts()
+    initPrecioTexto()
   } finally {
     cargandoCompleto.value = false
   }
@@ -199,6 +200,10 @@ async function alCambiarGanancia(ep: EventoProductoConDetalle, pct: number) {
   if (!eventoId.value) return
   gananciaPct.value = { ...gananciaPct.value, [ep.producto_id]: pct }
   const nuevoPrecio = ep.costo_unitario * (1 + pct + (contribucionPct.value[ep.producto_id] ?? 0))
+  // Sync the text input so the operator sees the price react to the
+  // slider. Without this, precioTexto stays at the old value and the
+  // input appears static even though the store updated.
+  precioTexto.value = { ...precioTexto.value, [ep.producto_id]: formatearUSDInput(nuevoPrecio) }
   await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, pct + (contribucionPct.value[ep.producto_id] ?? 0))
 }
 
@@ -206,6 +211,7 @@ async function alCambiarContribucion(ep: EventoProductoConDetalle, pct: number) 
   if (!eventoId.value) return
   contribucionPct.value = { ...contribucionPct.value, [ep.producto_id]: pct }
   const nuevoPrecio = ep.costo_unitario * (1 + (gananciaPct.value[ep.producto_id] ?? 0) + pct)
+  precioTexto.value = { ...precioTexto.value, [ep.producto_id]: formatearUSDInput(nuevoPrecio) }
   await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, (gananciaPct.value[ep.producto_id] ?? 0) + pct)
 }
 
@@ -358,25 +364,19 @@ function onPrecioBlur(productoId: string): void {
   }
 }
 
-// Keep the text input in sync when the store price changes (e.g. from
-// the slider auto-update, the bulk break-even action, or a sibling
-// row edit). A watcher on productosDelEvento is too heavy; instead we
-// re-initialize the text map when the table data changes.
-watch(
-  productosDelEvento,
-  (rows: EventoProductoConDetalle[]) => {
-    const next: Record<string, string> = {}
-    for (const ep of rows) {
-      if (precioTexto.value[ep.producto_id] === undefined) {
-        next[ep.producto_id] = formatearUSDInput(ep.precio_final ?? 0)
-      } else {
-        next[ep.producto_id] = precioTexto.value[ep.producto_id] ?? formatearUSDInput(ep.precio_final ?? 0)
-      }
-    }
-    precioTexto.value = next
-  },
-  { immediate: true },
-)
+// Initialize precioTexto from loaded data. We do NOT watch
+// productosDelEvento for changes — slider movements update precioTexto
+// directly in alCambiarGanancia/alCambiarContribucion, and manual
+// edits update it in onPrecioInput/onPrecioBlur. A reactive watch
+// would fight the user's in-progress typing (e.g. typing "1" would
+// snap to "1.00" before they can type "18").
+const initPrecioTexto = () => {
+  const next: Record<string, string> = {}
+  for (const ep of productosDelEvento.value) {
+    next[ep.producto_id] = formatearUSDInput(ep.precio_final ?? 0)
+  }
+  precioTexto.value = next
+}
 
 // REQ-UX-27: state for the formulas popover. Toggled by the compact
 // "¿Cómo se calcula?" button so the operator can peek at the math
@@ -654,7 +654,7 @@ const calculoPorProducto = computed(() => {
              markup over cost). Each shows % + unit value. Moving either
              recomputes the price; the other slider keeps its position. -->
         <template #[`item.margenes`]="{ item }">
-          <div class="d-flex flex-column ga-1">
+          <div class="d-flex align-center ga-3">
             <MargenSlider
               :model-value="gananciaPct[item.producto_id] ?? 0"
               :costo="item.costo_unitario"
@@ -699,21 +699,24 @@ const calculoPorProducto = computed(() => {
             <span>Venta total: {{ formatearUSD((item.precio_final ?? 0) * (unidadesPlanificadasPorProducto.get(item.producto_id) ?? 0)) }}</span>
           </v-tooltip>
         </template>
+        <!-- REQ-UX-27: Contrib. plan computed from local slider state
+             (not item.precio_final) so it updates instantly when the
+             operator moves a slider — no waiting for the Supabase
+             round-trip that actualizarPrecio triggers. -->
         <template #[`item.contribucion_plan`]="{ item }">
           <span class="font-weight-medium text-orange-darken-2">
-            ${{ (((item.precio_final ?? 0) - (item.costo_unitario ?? 0)) * (unidadesPlanificadasPorProducto.get(item.producto_id) ?? 0)).toFixed(2) }}
+            ${{ ((item.costo_unitario ?? 0) * (contribucionPct[item.producto_id] ?? 0) * (unidadesPlanificadasPorProducto.get(item.producto_id) ?? 0)).toFixed(2) }}
           </span>
         </template>
-        <!-- REQ-CON-8: break-even units for THIS producto to cover ALL
-             event fixed + imprevistos costs. Infinite (—) when
-             contribución unitaria ≤ 0. -->
+        <!-- REQ-CON-8: P.E from local contribución unitaria so it
+             reacts to slider movement without store latency. -->
         <template #[`item.p_equilibrio`]="{ item }">
           <span
-            :class="((item.precio_final ?? 0) - (item.costo_unitario ?? 0)) > 0 ? 'text-primary' : 'text-error'"
+            :class="(contribucionPct[item.producto_id] ?? 0) > 0 ? 'text-primary' : 'text-error'"
           >
             {{
-              ((item.precio_final ?? 0) - (item.costo_unitario ?? 0)) > 0
-                ? Math.ceil((gastosFijosEvento ?? 0) / ((item.precio_final ?? 0) - (item.costo_unitario ?? 0)))
+              (contribucionPct[item.producto_id] ?? 0) > 0
+                ? Math.ceil((gastosFijosEvento ?? 0) / ((item.costo_unitario ?? 0) * (contribucionPct[item.producto_id] ?? 0)))
                 : '—'
             }}
           </span>

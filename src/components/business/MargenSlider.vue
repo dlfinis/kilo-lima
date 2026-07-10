@@ -84,10 +84,8 @@ function onPrecioClick() {
     </span>
     <span
       class="text-body-2 font-weight-medium"
-      :class="[accentClass, { 'cursor-pointer': !disabled }]"
-      :style="{ textDecoration: disabled ? 'none' : 'underline' }"
+      :class="accentClass"
       data-testid="margen-slider-precio"
-      @click="onPrecioClick"
     >
       {{ unitValue.toFixed(2) }}
     </span>
