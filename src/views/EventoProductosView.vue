@@ -378,6 +378,17 @@ const initPrecioTexto = () => {
   precioTexto.value = next
 }
 
+// REQ-CON-8: break-even units for THIS producto. Returns 0 when there
+// are no fixed costs to cover (nothing to break even against) or when
+// contribución ≤ 0 (impossible). Caller renders "—" for non-positive.
+function pEquilibrioFor(item: EventoProductoConDetalle): number {
+  const costosFijos = gastosFijosEvento.value ?? 0
+  if (costosFijos <= 0) return 0
+  const contribUnit = (item.costo_unitario ?? 0) * (contribucionPct.value[item.producto_id] ?? 0)
+  if (contribUnit <= 0) return 0
+  return Math.ceil(costosFijos / contribUnit)
+}
+
 // REQ-UX-27: state for the formulas popover. Toggled by the compact
 // "¿Cómo se calcula?" button so the operator can peek at the math
 // without losing context of the table.
@@ -678,23 +689,22 @@ const calculoPorProducto = computed(() => {
         <template #[`item.precio_final`]="{ item }">
           <v-tooltip location="top">
             <template #activator="{ props: tooltipProps }">
-              <div v-bind="tooltipProps">
-                <v-text-field
-                  :model-value="precioTextoFor(item.producto_id, item.precio_final)"
-                  type="text"
-                  inputmode="decimal"
-                  density="compact"
-                  hide-details
-                  :disabled="!editable"
-                  :color="(item.precio_final ?? 0) < (item.costo_unitario ?? 0) ? 'error' : undefined"
-                  :data-testid="`evento-productos-precio-${item.producto_id}`"
-                  class="text-center mx-auto"
-                  style="max-width: 140px"
-                  prefix="$"
-                  @update:model-value="(v) => onPrecioInput(item.producto_id, v)"
-                  @blur="() => onPrecioBlur(item.producto_id)"
-                />
-              </div>
+              <v-text-field
+                v-bind="tooltipProps"
+                :model-value="precioTextoFor(item.producto_id, item.precio_final)"
+                type="text"
+                inputmode="decimal"
+                density="compact"
+                hide-details
+                :disabled="!editable"
+                :color="(item.precio_final ?? 0) < (item.costo_unitario ?? 0) ? 'error' : undefined"
+                :data-testid="`evento-productos-precio-${item.producto_id}`"
+                class="text-center mx-auto"
+                style="max-width: 140px"
+                prefix="$"
+                @update:model-value="(v) => onPrecioInput(item.producto_id, v)"
+                @blur="() => onPrecioBlur(item.producto_id)"
+              />
             </template>
             <span>Venta total: {{ formatearUSD((item.precio_final ?? 0) * (unidadesPlanificadasPorProducto.get(item.producto_id) ?? 0)) }}</span>
           </v-tooltip>
@@ -709,16 +719,14 @@ const calculoPorProducto = computed(() => {
           </span>
         </template>
         <!-- REQ-CON-8: P.E from local contribución unitaria so it
-             reacts to slider movement without store latency. -->
+             reacts to slider movement without store latency. Shows "—"
+             when there are no fixed costs to cover (gastos=0) or when
+             contribución ≤ 0 (impossible to break even). -->
         <template #[`item.p_equilibrio`]="{ item }">
           <span
-            :class="(contribucionPct[item.producto_id] ?? 0) > 0 ? 'text-primary' : 'text-error'"
+            :class="pEquilibrioFor(item) > 0 ? 'text-primary' : 'text-medium-emphasis'"
           >
-            {{
-              (contribucionPct[item.producto_id] ?? 0) > 0
-                ? Math.ceil((gastosFijosEvento ?? 0) / ((item.costo_unitario ?? 0) * (contribucionPct[item.producto_id] ?? 0)))
-                : '—'
-            }}
+            {{ pEquilibrioFor(item) > 0 ? pEquilibrioFor(item) : '—' }}
           </span>
         </template>
         <!-- productos-mejoras / cost breakdown: expandable row showing

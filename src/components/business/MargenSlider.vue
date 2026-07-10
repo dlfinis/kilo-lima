@@ -33,15 +33,16 @@ const emit = defineEmits<{
 }>()
 
 const porcentaje = computed<number>(() => Math.round((props.modelValue ?? 0) * 100))
-const precioPreview = computed<number>(() =>
-  calcularPrecioPorMargen(props.costo ?? 0, props.modelValue ?? 0),
-)
-// REQ-UX-27: show the unit value (ganancia or contribución) next to %.
-// Both are `precioPreview − costo` — the same gap, but the label
-// (ganancia vs contribución) is set by the parent via the `color` prop.
-const unitValue = computed<number>(() =>
-  Math.max(0, precioPreview.value - (props.costo ?? 0)),
-)
+// REQ-UX-27: the sliders represent **markup over cost** (not margin),
+// so values can exceed 100% (e.g. 133% ganancia on Pan básico). The
+// preview price and unit value are computed directly from the markup
+// formula instead of `calcularPrecioPorMargen` which clamps at ≥ 1.
+//   precioPreview = costo × (1 + markup)
+//   unitValue     = costo × markup  (= precioPreview − costo)
+const costoNum = computed<number>(() => props.costo ?? 0)
+const markup = computed<number>(() => props.modelValue ?? 0)
+const precioPreview = computed<number>(() => costoNum.value * (1 + markup.value))
+const unitValue = computed<number>(() => costoNum.value * markup.value)
 const accentClass = computed(() =>
   props.color === 'orange' ? 'text-orange-darken-2' : 'text-success',
 )
