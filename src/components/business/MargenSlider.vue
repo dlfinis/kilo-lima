@@ -16,11 +16,16 @@ import { computed } from 'vue'
 
 import { calcularPrecioPorMargen } from '@/utils/pricing'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   modelValue: number
   costo: number
   disabled?: boolean
-}>()
+  /** Visual theme: 'green' (ganancia) or 'orange' (contribución). Controls
+   *  the slider accent color and the value text color. */
+  color?: 'green' | 'orange'
+}>(), {
+  color: 'green',
+})
 
 const emit = defineEmits<{
   'update:modelValue': [value: number]
@@ -31,11 +36,17 @@ const porcentaje = computed<number>(() => Math.round((props.modelValue ?? 0) * 1
 const precioPreview = computed<number>(() =>
   calcularPrecioPorMargen(props.costo ?? 0, props.modelValue ?? 0),
 )
-// REQ-UX-27: the operator asked for the contribution unit value next
-// to the % instead of the price preview. Contribution at this margen
-// = precioPreview − costo = ganancia unitaria.
-const contribucionUnitaria = computed<number>(() =>
+// REQ-UX-27: show the unit value (ganancia or contribución) next to %.
+// Both are `precioPreview − costo` — the same gap, but the label
+// (ganancia vs contribución) is set by the parent via the `color` prop.
+const unitValue = computed<number>(() =>
   Math.max(0, precioPreview.value - (props.costo ?? 0)),
+)
+const accentClass = computed(() =>
+  props.color === 'orange' ? 'text-orange-darken-2' : 'text-success',
+)
+const sliderTrackColor = computed(() =>
+  props.color === 'orange' ? '#ef6c00' : 'rgb(var(--v-theme-success))',
 )
 
 // UI → DB: 50 → 0.50
@@ -64,6 +75,7 @@ function onPrecioClick() {
       step="1"
       :disabled="disabled"
       class="margen-slider-input"
+      :style="{ accentColor: sliderTrackColor }"
       data-testid="margen-slider-input"
       @input="onSliderInput"
     />
@@ -71,13 +83,13 @@ function onPrecioClick() {
       {{ porcentaje }}%
     </span>
     <span
-      class="text-body-2 font-weight-medium text-primary"
-      :class="{ 'cursor-pointer': !disabled }"
+      class="text-body-2 font-weight-medium"
+      :class="[accentClass, { 'cursor-pointer': !disabled }]"
       :style="{ textDecoration: disabled ? 'none' : 'underline' }"
       data-testid="margen-slider-precio"
       @click="onPrecioClick"
     >
-      +${{ contribucionUnitaria.toFixed(2) }}
+      {{ unitValue.toFixed(2) }}
     </span>
   </div>
 </template>
@@ -86,7 +98,6 @@ function onPrecioClick() {
 .margen-slider-input {
   flex: 1 1 auto;
   max-width: 240px;
-  accent-color: rgb(var(--v-theme-primary));
 }
 .cursor-pointer {
   cursor: pointer;

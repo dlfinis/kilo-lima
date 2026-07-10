@@ -22,15 +22,16 @@
 //   - Bulk action "APLICAR PRECIO MÍNIMO BREAK-EVEN" — applies the
 //     computed `precioMinimoParaProducto(productoId)` to each row's
 //     `precio_venta` via the existing store path.
-import { computed, onMounted, ref, watch } from 'vue'
+import { computed, nextTick, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import MargenSlider from '@/components/business/MargenSlider.vue'
-import PricingAlert from '@/components/business/PricingAlert.vue'
 import RecetaCostoDesglose from '@/components/business/RecetaCostoDesglose.vue'
 import { useEvents } from '@/composables/useEvents'
 import { usePlans } from '@/composables/usePlans'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
+import { useGastosFijos } from '@/composables/useGastosFijos'
+import { useGastosImprevistos } from '@/composables/useGastosImprevistos'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
@@ -38,10 +39,8 @@ import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useVentasStore } from '@/stores/ventas.store'
 import { calcularCostoReceta } from '@/composables/useCalculoReceta'
 import { estadoEsEditable } from '@/utils/estado'
-import { formatearUSD } from '@/utils/format'
-import { calcularContribucionUnitaria, calcularPrecioDesdeContribucion } from '@/utils/contribucion'
-import { calcularMargenReal, calcularPrecioPorMargen } from '@/utils/pricing'
-import { formatearUSDInput, parsearUSDInput } from '@/utils/format'
+import { formatearUSD, formatearUSDInput, parsearUSDInput } from '@/utils/format'
+import { calcularMargenReal } from '@/utils/pricing'
 import type { EventoProducto, EventoProductoConDetalle } from '@/types'
 
 const route = useRoute()
@@ -58,8 +57,29 @@ const productosStore = useProductosStore()
 const recipesStore = useRecipesStore()
 const ingredientsStore = useIngredientsStore()
 const ventasStore = useVentasStore()
+const { gastosPorEvento, cargarPorEvento: cargarGastosFijos } = useGastosFijos()
+const { gastosPorEvento: imprevistosPorEvento, cargarPorEvento: cargarImprevistos } = useGastosImprevistos()
 const { productosDelEvento, precioMinimoParaProducto } = usePreciosEvento(eventoId)
 const { planesPorEvento, cargarPorEvento: cargarPlan } = usePlans()
+
+// REQ-UX-27: two-slider pricing model. Each producto tracks its own
+// ganancia% (green, profit markup over cost) and contribución% (orange,
+// operational-cost markup over cost). The price is derived as:
+//   Precio = Costo × (1 + Ganancia% + Contribución%)
+// Both sliders are independent — moving either recomputes the price.
+// Manual price edits redistribute: contribution keeps its current %,
+// ganancia absorbs the remainder (can go to 0 or negative → warning).
+const gananciaPct = ref<Record<string, number>>({})
+const contribucionPct = ref<Record<string, number>>({})
+
+// Total fixed + imprevistos costs for the active evento — used for
+// the per-product break-even (P.E) column.
+const gastosFijosEvento = computed<number>(() => {
+  if (!eventoId.value) return 0
+  const gf = (gastosPorEvento.value.get(eventoId.value) ?? []).reduce((a, g) => a + (g.monto ?? 0), 0)
+  const gi = (imprevistosPorEvento.value.get(eventoId.value) ?? []).reduce((a, g) => a + (g.monto ?? 0), 0)
+  return gf + gi
+})
 
 const editable = computed(() =>
   eventoActual.value ? estadoEsEditable(eventoActual.value.estado) : false,
@@ -79,22 +99,7 @@ const porcentajeMargen = computed<number>(() =>
   Math.round((eventoActual.value?.margen_ganancia ?? 0) * 100),
 )
 
-// Calcular unidades vendidas por producto (para referencias, no se
-// renderiza en la tabla de configuración).
-const unidadesVendidasPorProducto = computed(() => {
-  const map = new Map<string, number>()
-  const ventas = ventasStore.ventas
-  if (!ventas || !Array.isArray(ventas)) return map
-  for (const venta of ventas) {
-    if (!venta || !venta.items || !Array.isArray(venta.items)) continue
-    for (const item of venta.items) {
-      if (!item || !item.producto_id) continue
-      const current = map.get(item.producto_id) ?? 0
-      map.set(item.producto_id, current + item.cantidad)
-    }
-  }
-  return map
-})
+// (unidadesVendidasPorProducto removed — no longer needed in this view)
 
 // REQ-CON-8: unidades planificadas por producto, derivadas del
 // `plan_produccion` del evento. El plan está por receta; como la
@@ -153,14 +158,25 @@ async function cargar() {
       planesPorEvento.value.has(eventoId.value)
         ? Promise.resolve()
         : cargarPlan(eventoId.value),
+      // REQ-CON-8: P.E column needs gastos fijos + imprevistos.
+      gastosPorEvento.value.has(eventoId.value)
+        ? Promise.resolve()
+        : cargarGastosFijos(eventoId.value),
+      imprevistosPorEvento.value.has(eventoId.value)
+        ? Promise.resolve()
+        : cargarImprevistos(eventoId.value),
     ])
+    // Initialize slider percentages from the loaded data. Each
+    // producto's ganancia% defaults to the event's margen_ganancia
+    // (floor); contribución% defaults to 10%. When the operator has
+    // previously set custom values, they persist in the ref maps.
+    // nextTick ensures productosDelEvento has re-evaluated after the
+    // cross-store loads complete.
+    await nextTick()
+    initSliderPcts()
   } finally {
     cargandoCompleto.value = false
   }
-  // productos-mejoras: catalog list is loaded lazily when the
-  // operator opens the "Agregar producto" dialog (see `abrirDialogoAgregar`).
-  // Avoids blocking the initial render on a Supabase round-trip when the
-  // operator never opens the dialog (the common path).
 }
 
 onMounted(cargar)
@@ -175,40 +191,52 @@ async function alToggleIncluido(ep: EventoProducto) {
   await epStore.toggleIncluido(eventoId.value, ep.producto_id)
 }
 
-async function alCambiarPrecio(ep: EventoProductoConDetalle, valor: number) {
+// REQ-UX-27: two-slider price model. Each slider is a markup over cost;
+// the price is `Costo × (1 + ganancia% + contribución%)`. Moving either
+// slider recomputes the price; the other slider keeps its position so
+// the operator sees which lever they're pulling.
+async function alCambiarGanancia(ep: EventoProductoConDetalle, pct: number) {
   if (!eventoId.value) return
-  // productos-mejoras: calcular el margen equivalente al precio manual
-  const margenEquivalente = valor > ep.costo_unitario
-    ? (valor - ep.costo_unitario) / valor
-    : 0
-  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, valor, margenEquivalente)
+  gananciaPct.value = { ...gananciaPct.value, [ep.producto_id]: pct }
+  const nuevoPrecio = ep.costo_unitario * (1 + pct + (contribucionPct.value[ep.producto_id] ?? 0))
+  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, pct + (contribucionPct.value[ep.producto_id] ?? 0))
 }
 
-// productos-mejoras UX: cuando el usuario hace clic en el precio del
-// slider, establecer ese precio como precio de venta.
-async function alAplicarPrecioSlider(ep: EventoProductoConDetalle, precio: number) {
+async function alCambiarContribucion(ep: EventoProductoConDetalle, pct: number) {
   if (!eventoId.value) return
-  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, precio, ep.margen)
+  contribucionPct.value = { ...contribucionPct.value, [ep.producto_id]: pct }
+  const nuevoPrecio = ep.costo_unitario * (1 + (gananciaPct.value[ep.producto_id] ?? 0) + pct)
+  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, (gananciaPct.value[ep.producto_id] ?? 0) + pct)
 }
 
-// REQ-CON (Type A calculator): when the operator edits the contribution
-// field, the price is derived automatically. precio = costo + contribucion.
-async function alCambiarContribucion(ep: EventoProductoConDetalle, contribucionDeseada: number) {
-  if (!eventoId.value) return
+// Initialize slider percentages from loaded data. Ganancia defaults to
+// the event's margen_ganancia (floor); contribución defaults to 10%.
+// When the DB already has a precio override, we reverse-engineer the
+// split: total_markup = (precio/costo) − 1, contribución keeps its
+// default (10%), ganancia absorbs the remainder.
+function initSliderPct(ep: EventoProductoConDetalle): { ganancia: number; contribucion: number } {
+  const eventoMargen = eventoActual.value?.margen_ganancia ?? 0.30
   const costo = ep.costo_unitario
-  const nuevoPrecio = calcularPrecioDesdeContribucion(costo, contribucionDeseada)
-  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, ep.margen)
+  const precio = ep.precio_final
+  if (costo <= 0) return { ganancia: eventoMargen, contribucion: 0.10 }
+  const totalMarkup = (precio / costo) - 1
+  const contribDefault = 0.10
+  // Prioritize contribution: keep it at default, ganancia gets the rest.
+  const contribucion = Math.max(0, Math.min(contribDefault, totalMarkup))
+  const ganancia = Math.max(0, totalMarkup - contribucion)
+  return { ganancia, contribucion }
 }
 
-// REQ-UX-27: slider auto-updates the precio so the operator sees the
-// price react as they move the margen. `calcularPrecioPorMargen`
-// derives `precio = costo / (1 − margen)` — single rounding at exit
-// per REQ-PRICING-7. The precio text-input watcher syncs the DOM
-// input so the displayed number stays coherent with the slider.
-async function alCambiarMargen(ep: EventoProductoConDetalle, margen: number) {
-  if (!eventoId.value) return
-  const nuevoPrecio = calcularPrecioPorMargen(ep.costo_unitario, margen)
-  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, margen)
+function initSliderPcts() {
+  const nextG: Record<string, number> = {}
+  const nextC: Record<string, number> = {}
+  for (const ep of productosDelEvento.value) {
+    const pcts = initSliderPct(ep)
+    nextG[ep.producto_id] = pcts.ganancia
+    nextC[ep.producto_id] = pcts.contribucion
+  }
+  gananciaPct.value = nextG
+  contribucionPct.value = nextC
 }
 
 // REQ-CON-10 (PR-2) + productos-mejoras: bulk action — apply the
@@ -289,19 +317,33 @@ function precioTextoFor(productoId: string, precio: number): string {
   return precioTexto.value[productoId] ?? formatearUSDInput(precio ?? 0)
 }
 
+// REQ-UX-27: manual price edit with redistribution. The total markup
+// (precio/costo − 1) is split between contribución and ganancia.
+// Contribution keeps its current % (prioritized — it covers operational
+// costs first); ganancia absorbs the remainder. If the total markup
+// is less than the current contribución%, contribución takes it all
+// and ganancia goes to 0. If precio < costo, both go negative → warning.
+function redistributeFromPrecio(productoId: string, nuevoPrecio: number) {
+  const ep = productosDelEvento.value.find((e) => e.producto_id === productoId)
+  if (!ep || !eventoId.value) return
+  const costo = ep.costo_unitario
+  if (costo <= 0) return
+  const totalMarkup = (nuevoPrecio / costo) - 1
+  const currentContrib = contribucionPct.value[productoId] ?? 0.10
+  // Prioritize contribution: keep it, ganancia gets the rest.
+  const nuevaContrib = totalMarkup >= currentContrib ? currentContrib : Math.max(0, totalMarkup)
+  const nuevaGanancia = totalMarkup - nuevaContrib
+  contribucionPct.value = { ...contribucionPct.value, [productoId]: nuevaContrib }
+  gananciaPct.value = { ...gananciaPct.value, [productoId]: nuevaGanancia }
+  const margenEquiv = nuevaGanancia + nuevaContrib
+  epStore.actualizarPrecio(eventoId.value, productoId, nuevoPrecio, margenEquiv)
+}
+
 function onPrecioInput(productoId: string, valor: string): void {
   precioTexto.value = { ...precioTexto.value, [productoId]: valor }
   const parsed = parsearUSDInput(valor)
-  if (!Number.isNaN(parsed)) {
-    const ep = productosDelEvento.value.find((e) => e.producto_id === productoId)
-    if (!ep || !eventoId.value) return
-    // Derive the matching margen so the slider stays coherent with the
-    // typed price (avoids showing a stale slider position after a
-    // manual price edit).
-    const margenEquiv = parsed > ep.costo_unitario
-      ? (parsed - ep.costo_unitario) / parsed
-      : 0
-    epStore.actualizarPrecio(eventoId.value, productoId, parsed, margenEquiv)
+  if (!Number.isNaN(parsed) && parsed >= 0) {
+    redistributeFromPrecio(productoId, parsed)
   }
 }
 
@@ -311,11 +353,8 @@ function onPrecioBlur(productoId: string): void {
   const parsed = parsearUSDInput(precioTexto.value[productoId] ?? '')
   const normalized = !Number.isNaN(parsed) && parsed >= 0 ? parsed : ep.precio_final
   precioTexto.value = { ...precioTexto.value, [productoId]: formatearUSDInput(normalized) }
-  if (!Number.isNaN(parsed) && parsed !== ep.precio_final && eventoId.value) {
-    const margenEquiv = parsed > ep.costo_unitario
-      ? (parsed - ep.costo_unitario) / parsed
-      : 0
-    epStore.actualizarPrecio(eventoId.value, productoId, parsed, margenEquiv)
+  if (!Number.isNaN(parsed) && parsed !== ep.precio_final && parsed >= 0) {
+    redistributeFromPrecio(productoId, parsed)
   }
 }
 
@@ -352,23 +391,27 @@ const formulasMenuAbierto = ref(false)
 const ejemploFormulas = computed(() => {
   const ep = productosDelEvento.value[0]
   if (!ep) return null
-  const precio = ep.precio_final
-  const costo = ep.costo_unitario
-  const ganancia = Number((precio - costo).toFixed(2))
-  const margen = precio > 0 ? Number(((precio - costo) / precio).toFixed(3)) : 0
+  const precio = ep.precio_final ?? 0
+  const costo = ep.costo_unitario ?? 0
+  const gananciaUnit = Number((precio - costo).toFixed(2))
   const unidadesPlan = unidadesPlanificadasPorProducto.value.get(ep.producto_id) ?? 0
-  const contribucionPlan = Number((ganancia * unidadesPlan).toFixed(2))
-  const roi = costo > 0 ? Math.round(((precio - costo) / costo) * 100) : 0
+  const contribPlan = Number((gananciaUnit * unidadesPlan).toFixed(2))
+  const pEquilibrio = gananciaUnit > 0 ? Math.ceil((gastosFijosEvento.value) / gananciaUnit) : null
+  const gananciaPctVal = costo > 0 ? Number(((precio - costo) / costo).toFixed(3)) : 0
+  const contribPctVal = costo > 0 ? Number(((precio - costo) / costo).toFixed(3)) : 0
   return {
     nombre: ep.producto_nombre,
     precio: precio.toFixed(2),
     costo,
     costoFmt: costo.toFixed(2),
-    ganancia: ganancia.toFixed(2),
-    margen,
+    gananciaUnit: gananciaUnit.toFixed(2),
+    gananciaPct: (gananciaPctVal * 100).toFixed(0),
+    contribPct: (contribPctVal * 100).toFixed(0),
     unidadesPlan,
-    contribucionPlan: contribucionPlan.toFixed(2),
-    roi,
+    contribPlan: contribPlan.toFixed(2),
+    pEquilibrio,
+    inversion: (costo * unidadesPlan).toFixed(2),
+    ventaTotal: (precio * unidadesPlan).toFixed(2),
   }
 })
 
@@ -463,74 +506,77 @@ const calculoPorProducto = computed(() => {
           </v-card-title>
           <v-divider />
           <v-card-text class="pa-3">
-            <!-- Ganancia unitaria -->
+            <!-- Estructura del precio (3 capas) -->
+            <div class="mb-2">
+              <div class="d-flex align-center ga-2 mb-1">
+                <v-chip size="x-small" color="primary" variant="flat">Precio</v-chip>
+                <span class="text-caption text-medium-emphasis">3 capas sobre el costo</span>
+              </div>
+              <div class="text-body-2">
+                <code class="text-primary">Costo × (1 + Ganancia% + Contribución%)</code>
+              </div>
+              <div v-if="ejemploFormulas" class="text-caption text-medium-emphasis mt-1">
+                Ej: ${{ ejemploFormulas.costoFmt }} × (1 + {{ ejemploFormulas.gananciaPct }}% + {{ ejemploFormulas.contribPct }}%) =
+                <strong class="text-primary">${{ ejemploFormulas.precio }}</strong>
+              </div>
+            </div>
+            <!-- Ganancia (slider verde) -->
             <div class="mb-2">
               <div class="d-flex align-center ga-2 mb-1">
                 <v-chip size="x-small" color="success" variant="flat">Ganancia</v-chip>
-                <span class="text-caption text-medium-emphasis">por unidad</span>
+                <span class="text-caption text-medium-emphasis">tu profit neto por unidad (markup sobre costo)</span>
               </div>
               <div class="text-body-2">
-                <code class="text-success">Precio − Costo</code>
+                <code class="text-success">Costo × Ganancia%</code>
               </div>
               <div v-if="ejemploFormulas" class="text-caption text-medium-emphasis mt-1">
-                Ej: {{ ejemploFormulas.nombre }} →
-                ${{ ejemploFormulas.precio }} − ${{ ejemploFormulas.costo }} =
-                <strong class="text-success">${{ ejemploFormulas.ganancia }}</strong>
+                Ej: ${{ ejemploFormulas.costoFmt }} × {{ ejemploFormulas.gananciaPct }}% =
+                <strong class="text-success">${{ ejemploFormulas.gananciaUnit }}</strong>
               </div>
             </div>
-            <!-- Margen de contribución -->
+            <!-- Contribución (slider naranja) -->
             <div class="mb-2">
               <div class="d-flex align-center ga-2 mb-1">
-                <v-chip size="x-small" color="info" variant="flat">Margen</v-chip>
-                <span class="text-caption text-medium-emphasis">porcentaje del precio que queda tras cubrir el costo</span>
+                <v-chip size="x-small" color="orange-darken-2" variant="flat">Contribución</v-chip>
+                <span class="text-caption text-medium-emphasis">destinada a costos operativos del evento</span>
               </div>
               <div class="text-body-2">
-                <code>(Precio − Costo) / Precio</code>
+                <code class="text-orange-darken-2">Costo × Contribución%</code>
               </div>
               <div v-if="ejemploFormulas" class="text-caption text-medium-emphasis mt-1">
-                Ej: ${{ ejemploFormulas.ganancia }} / ${{ ejemploFormulas.precio }} =
-                <strong>{{ (ejemploFormulas.margen * 100).toFixed(0) }}%</strong>
-              </div>
-            </div>
-            <!-- Unidades planificadas -->
-            <div class="mb-2">
-              <div class="d-flex align-center ga-2 mb-1">
-                <v-chip size="x-small" color="secondary" variant="flat">Unid. plan</v-chip>
-                <span class="text-caption text-medium-emphasis">unidades a producir (plan de producción del evento)</span>
-              </div>
-              <div class="text-body-2">
-                <code>plan_produccion.unidades_a_producir</code>
-              </div>
-              <div v-if="ejemploFormulas" class="text-caption text-medium-emphasis mt-1">
-                Ej: <strong>{{ ejemploFormulas.unidadesPlan }}</strong> unidades planificadas
+                Ej: ${{ ejemploFormulas.costoFmt }} × {{ ejemploFormulas.contribPct }}% =
+                <strong class="text-orange-darken-2">${{ ejemploFormulas.gananciaUnit }}</strong>
               </div>
             </div>
             <!-- Contribución planificada -->
             <div class="mb-2">
               <div class="d-flex align-center ga-2 mb-1">
                 <v-chip size="x-small" color="orange-darken-2" variant="flat">Contrib. plan</v-chip>
-                <span class="text-caption text-medium-emphasis">monto para cubrir costos operativos del evento</span>
+                <span class="text-caption text-medium-emphasis">aporte total del producto a operativos</span>
               </div>
               <div class="text-body-2">
-                <code class="text-orange-darken-2">(Precio − Costo) × Unid. plan</code>
+                <code class="text-orange-darken-2">Contribución unit. × Und.P</code>
               </div>
               <div v-if="ejemploFormulas" class="text-caption text-medium-emphasis mt-1">
-                Ej: ${{ ejemploFormulas.ganancia }} × {{ ejemploFormulas.unidadesPlan }} =
-                <strong class="text-orange-darken-2">${{ ejemploFormulas.contribucionPlan }}</strong>
+                Ej: ${{ ejemploFormulas.gananciaUnit }} × {{ ejemploFormulas.unidadesPlan }} =
+                <strong class="text-orange-darken-2">${{ ejemploFormulas.contribPlan }}</strong>
               </div>
             </div>
-            <!-- ROI -->
+            <!-- Punto de Equilibrio -->
             <div>
               <div class="d-flex align-center ga-2 mb-1">
-                <v-chip size="x-small" color="primary" variant="flat">ROI</v-chip>
-                <span class="text-caption text-medium-emphasis">retorno sobre el costo</span>
+                <v-chip size="x-small" color="primary" variant="flat">P.E</v-chip>
+                <span class="text-caption text-medium-emphasis">unidades de este producto para cubrir todos los operativos del evento</span>
               </div>
               <div class="text-body-2">
-                <code class="text-primary">((Precio − Costo) / Costo) × 100%</code>
+                <code class="text-primary">Gastos fijos / Contribución unit.</code>
               </div>
-              <div v-if="ejemploFormulas && ejemploFormulas.costo > 0" class="text-caption text-medium-emphasis mt-1">
-                Ej: (${{ ejemploFormulas.ganancia }} / ${{ ejemploFormulas.costoFmt }}) × 100 =
-                <strong class="text-primary">{{ ejemploFormulas.roi }}%</strong>
+              <div v-if="ejemploFormulas && ejemploFormulas.pEquilibrio !== null" class="text-caption text-medium-emphasis mt-1">
+                Ej: ${{ ejemploFormulas.inversion }} operativos / ${{ ejemploFormulas.gananciaUnit }} =
+                <strong class="text-primary">{{ ejemploFormulas.pEquilibrio }} und.</strong>
+              </div>
+              <div v-else-if="ejemploFormulas" class="text-caption text-error mt-1">
+                Contribución ≤ 0 → no hay punto de equilibrio posible
               </div>
             </div>
           </v-card-text>
@@ -569,12 +615,11 @@ const calculoPorProducto = computed(() => {
           { title: '', key: 'incluido', sortable: false, width: 60 },
           { title: 'Producto', key: 'producto_nombre' },
           { title: 'Costo', key: 'costo_unitario' },
-          { title: 'Und.P', key: 'unidades_plan', align: 'end', width: 70 },
-          { title: 'Margen de Contribución', key: 'margen_efectivo' },
+          { title: 'Und.P', key: 'unidades_plan', align: 'end', width: 80 },
+          { title: 'Márgenes', key: 'margenes', minWidth: 340 },
           { title: 'Precio', key: 'precio_final', width: 140, align: 'center' },
-          { title: 'Ganancia', key: 'ganancia_unitaria' },
           { title: 'Contrib. plan', key: 'contribucion_plan', align: 'end' },
-          { title: 'ROI', key: 'roi', align: 'end' },
+          { title: 'P.E', key: 'p_equilibrio', align: 'end', width: 80 },
         ]"
         density="comfortable"
         show-expand
@@ -591,72 +636,87 @@ const calculoPorProducto = computed(() => {
         <template #[`item.costo_unitario`]="{ item }">
           {{ formatearUSD(item.costo_unitario) }}
         </template>
-        <template #[`item.margen_efectivo`]="{ item }">
-          <MargenSlider
-            :model-value="item.margen_efectivo"
-            :costo="item.costo_unitario"
-            :disabled="!editable"
-            @update:model-value="(m) => alCambiarMargen(item, m)"
-            @apply-price="(p) => alAplicarPrecioSlider(item, p)"
-          />
-        </template>
-        <template #[`item.precio_final`]="{ item }">
-          <v-text-field
-            :model-value="item.precio_final"
-            type="number"
-            density="compact"
-            hide-details
-            :disabled="!editable"
-            :data-testid="`evento-productos-precio-${item.producto_id}`"
-            class="text-center mx-auto"
-            style="max-width: 140px"
-            prefix="$"
-            @update:model-value="(v) => alCambiarPrecio(item, Number(v))"
-          />
-        </template>
-        <template #[`item.ganancia_unitaria`]="{ item }">
-          <span
-            class="font-weight-medium"
-            :class="item.precio_final - item.costo_unitario >= 0 ? 'text-success' : 'text-error'"
-          >
-            ${{ (item.precio_final - item.costo_unitario).toFixed(2) }}
-          </span>
-        </template>
+        <!-- REQ-UX-27: Und.P with hover tooltip showing Inversión total
+             (Costo × Und.P) so the operator sees capital required without
+             adding another column. -->
         <template #[`item.unidades_plan`]="{ item }">
-          <span class="font-weight-medium">
-            {{ unidadesPlanificadasPorProducto.get(item.producto_id) ?? 0 }}
-          </span>
+          <v-tooltip location="top">
+            <template #activator="{ props: tooltipProps }">
+              <span v-bind="tooltipProps" class="font-weight-medium">
+                {{ unidadesPlanificadasPorProducto.get(item.producto_id) ?? 0 }}
+              </span>
+            </template>
+            <span>Inversión: {{ formatearUSD((item.costo_unitario ?? 0) * (unidadesPlanificadasPorProducto.get(item.producto_id) ?? 0)) }}</span>
+          </v-tooltip>
+        </template>
+        <!-- REQ-UX-27: two sliders stacked — green (ganancia, profit
+             markup over cost) and orange (contribución, operational-cost
+             markup over cost). Each shows % + unit value. Moving either
+             recomputes the price; the other slider keeps its position. -->
+        <template #[`item.margenes`]="{ item }">
+          <div class="d-flex flex-column ga-1">
+            <MargenSlider
+              :model-value="gananciaPct[item.producto_id] ?? 0"
+              :costo="item.costo_unitario"
+              color="green"
+              :disabled="!editable"
+              @update:model-value="(m) => alCambiarGanancia(item, m)"
+            />
+            <MargenSlider
+              :model-value="contribucionPct[item.producto_id] ?? 0"
+              :costo="item.costo_unitario"
+              color="orange"
+              :disabled="!editable"
+              @update:model-value="(m) => alCambiarContribucion(item, m)"
+            />
+          </div>
+        </template>
+        <!-- REQ-UX-MONEY-1: controlled text input for precio. Manual
+             edits redistribute total markup prioritizing contribución
+             (covers operational costs first); ganancia absorbs the
+             remainder. Warning when precio < costo (selling at loss). -->
+        <template #[`item.precio_final`]="{ item }">
+          <v-tooltip location="top">
+            <template #activator="{ props: tooltipProps }">
+              <div v-bind="tooltipProps">
+                <v-text-field
+                  :model-value="precioTextoFor(item.producto_id, item.precio_final)"
+                  type="text"
+                  inputmode="decimal"
+                  density="compact"
+                  hide-details
+                  :disabled="!editable"
+                  :color="(item.precio_final ?? 0) < (item.costo_unitario ?? 0) ? 'error' : undefined"
+                  :data-testid="`evento-productos-precio-${item.producto_id}`"
+                  class="text-center mx-auto"
+                  style="max-width: 140px"
+                  prefix="$"
+                  @update:model-value="(v) => onPrecioInput(item.producto_id, v)"
+                  @blur="() => onPrecioBlur(item.producto_id)"
+                />
+              </div>
+            </template>
+            <span>Venta total: {{ formatearUSD((item.precio_final ?? 0) * (unidadesPlanificadasPorProducto.get(item.producto_id) ?? 0)) }}</span>
+          </v-tooltip>
         </template>
         <template #[`item.contribucion_plan`]="{ item }">
           <span class="font-weight-medium text-orange-darken-2">
-            ${{ ((item.precio_final - item.costo_unitario) * (unidadesPlanificadasPorProducto.get(item.producto_id) ?? 0)).toFixed(2) }}
+            ${{ (((item.precio_final ?? 0) - (item.costo_unitario ?? 0)) * (unidadesPlanificadasPorProducto.get(item.producto_id) ?? 0)).toFixed(2) }}
           </span>
         </template>
-        <template #[`item.roi`]="{ item }">
-          <span :class="item.costo_unitario > 0 ? 'text-primary' : 'text-medium-emphasis'">
-            {{ item.costo_unitario > 0 ? Math.round(((item.precio_final - item.costo_unitario) / item.costo_unitario) * 100) : 0 }}%
+        <!-- REQ-CON-8: break-even units for THIS producto to cover ALL
+             event fixed + imprevistos costs. Infinite (—) when
+             contribución unitaria ≤ 0. -->
+        <template #[`item.p_equilibrio`]="{ item }">
+          <span
+            :class="((item.precio_final ?? 0) - (item.costo_unitario ?? 0)) > 0 ? 'text-primary' : 'text-error'"
+          >
+            {{
+              ((item.precio_final ?? 0) - (item.costo_unitario ?? 0)) > 0
+                ? Math.ceil((gastosFijosEvento ?? 0) / ((item.precio_final ?? 0) - (item.costo_unitario ?? 0)))
+                : '—'
+            }}
           </span>
-        </template>
-        <!-- REQ-UX-MONEY-1: controlled text input for the precio field
-             mirrors MateriaPrimaForm's cost input. `type="text"` with
-             `inputmode="decimal"` preserves trailing zeros (e.g.
-             "$18.00" stays "$18.00" while editing) and aligns decimals
-             consistently with the rest of the app. -->
-        <template #[`item.precio_final`]="{ item }">
-          <v-text-field
-            :model-value="precioTextoFor(item.producto_id, item.precio_final)"
-            type="text"
-            inputmode="decimal"
-            density="compact"
-            hide-details
-            :disabled="!editable"
-            :data-testid="`evento-productos-precio-${item.producto_id}`"
-            class="text-center mx-auto"
-            style="max-width: 140px"
-            prefix="$"
-            @update:model-value="(v) => onPrecioInput(item.producto_id, v)"
-            @blur="() => onPrecioBlur(item.producto_id)"
-          />
         </template>
         <!-- productos-mejoras / cost breakdown: expandable row showing
              the per-producto ingredient breakdown via RecetaCostoDesglose.
