@@ -31,6 +31,12 @@ const porcentaje = computed<number>(() => Math.round((props.modelValue ?? 0) * 1
 const precioPreview = computed<number>(() =>
   calcularPrecioPorMargen(props.costo ?? 0, props.modelValue ?? 0),
 )
+// REQ-UX-27: the operator asked for the contribution unit value next
+// to the % instead of the price preview. Contribution at this margen
+// = precioPreview − costo = ganancia unitaria.
+const contribucionUnitaria = computed<number>(() =>
+  Math.max(0, precioPreview.value - (props.costo ?? 0)),
+)
 
 // UI → DB: 50 → 0.50
 function onSliderInput(event: Event) {
@@ -71,7 +77,7 @@ function onPrecioClick() {
       data-testid="margen-slider-precio"
       @click="onPrecioClick"
     >
-      ${{ precioPreview.toFixed(2) }}
+      +${{ contribucionUnitaria.toFixed(2) }}
     </span>
   </div>
 </template>

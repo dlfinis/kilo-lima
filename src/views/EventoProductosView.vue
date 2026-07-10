@@ -22,7 +22,7 @@
 //   - Bulk action "APLICAR PRECIO MÍNIMO BREAK-EVEN" — applies the
 //     computed `precioMinimoParaProducto(productoId)` to each row's
 //     `precio_venta` via the existing store path.
-import { computed, onMounted, ref } from 'vue'
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import MargenSlider from '@/components/business/MargenSlider.vue'
@@ -40,7 +40,8 @@ import { calcularCostoReceta } from '@/composables/useCalculoReceta'
 import { estadoEsEditable } from '@/utils/estado'
 import { formatearUSD } from '@/utils/format'
 import { calcularContribucionUnitaria, calcularPrecioDesdeContribucion } from '@/utils/contribucion'
-import { calcularMargenReal } from '@/utils/pricing'
+import { calcularMargenReal, calcularPrecioPorMargen } from '@/utils/pricing'
+import { formatearUSDInput, parsearUSDInput } from '@/utils/format'
 import type { EventoProducto, EventoProductoConDetalle } from '@/types'
 
 const route = useRoute()
@@ -199,13 +200,15 @@ async function alCambiarContribucion(ep: EventoProductoConDetalle, contribucionD
   await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, ep.margen)
 }
 
-// productos-mejoras / evento-producto-pricing: slider fix. Pass
-// `ep.precio_venta` as-is (null OR number) instead of coercing to 0
-// with `?? 0`. The DB row now stays in auto-calc mode unless the
-// operator sets an override via the editable precio field.
-async function alCambiarMargen(ep: EventoProducto, margen: number) {
+// REQ-UX-27: slider auto-updates the precio so the operator sees the
+// price react as they move the margen. `calcularPrecioPorMargen`
+// derives `precio = costo / (1 − margen)` — single rounding at exit
+// per REQ-PRICING-7. The precio text-input watcher syncs the DOM
+// input so the displayed number stays coherent with the slider.
+async function alCambiarMargen(ep: EventoProductoConDetalle, margen: number) {
   if (!eventoId.value) return
-  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, ep.precio_venta, margen)
+  const nuevoPrecio = calcularPrecioPorMargen(ep.costo_unitario, margen)
+  await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, margen)
 }
 
 // REQ-CON-10 (PR-2) + productos-mejoras: bulk action — apply the
@@ -274,6 +277,68 @@ async function alAgregarProducto(productoId: string) {
 // open at once. The data-table writes back via `update:expanded`.
 const expandedRows = ref<string[]>([])
 
+// REQ-UX-MONEY-1: controlled text input for the precio field. The
+// native <input type="number"> strips trailing zeros and the decimal
+// alignment is wrong (no `$` prefix, no forced 2dp). We use a
+// per-product string ref that mirrors the MateriaPrimaForm pattern:
+// on input we parse and update the numeric model only on valid parses,
+// on blur we normalize to the policy representation (2–3 decimals).
+const precioTexto = ref<Record<string, string>>({})
+
+function precioTextoFor(productoId: string, precio: number): string {
+  return precioTexto.value[productoId] ?? formatearUSDInput(precio ?? 0)
+}
+
+function onPrecioInput(productoId: string, valor: string): void {
+  precioTexto.value = { ...precioTexto.value, [productoId]: valor }
+  const parsed = parsearUSDInput(valor)
+  if (!Number.isNaN(parsed)) {
+    const ep = productosDelEvento.value.find((e) => e.producto_id === productoId)
+    if (!ep || !eventoId.value) return
+    // Derive the matching margen so the slider stays coherent with the
+    // typed price (avoids showing a stale slider position after a
+    // manual price edit).
+    const margenEquiv = parsed > ep.costo_unitario
+      ? (parsed - ep.costo_unitario) / parsed
+      : 0
+    epStore.actualizarPrecio(eventoId.value, productoId, parsed, margenEquiv)
+  }
+}
+
+function onPrecioBlur(productoId: string): void {
+  const ep = productosDelEvento.value.find((e) => e.producto_id === productoId)
+  if (!ep) return
+  const parsed = parsearUSDInput(precioTexto.value[productoId] ?? '')
+  const normalized = !Number.isNaN(parsed) && parsed >= 0 ? parsed : ep.precio_final
+  precioTexto.value = { ...precioTexto.value, [productoId]: formatearUSDInput(normalized) }
+  if (!Number.isNaN(parsed) && parsed !== ep.precio_final && eventoId.value) {
+    const margenEquiv = parsed > ep.costo_unitario
+      ? (parsed - ep.costo_unitario) / parsed
+      : 0
+    epStore.actualizarPrecio(eventoId.value, productoId, parsed, margenEquiv)
+  }
+}
+
+// Keep the text input in sync when the store price changes (e.g. from
+// the slider auto-update, the bulk break-even action, or a sibling
+// row edit). A watcher on productosDelEvento is too heavy; instead we
+// re-initialize the text map when the table data changes.
+watch(
+  productosDelEvento,
+  (rows: EventoProductoConDetalle[]) => {
+    const next: Record<string, string> = {}
+    for (const ep of rows) {
+      if (precioTexto.value[ep.producto_id] === undefined) {
+        next[ep.producto_id] = formatearUSDInput(ep.precio_final ?? 0)
+      } else {
+        next[ep.producto_id] = precioTexto.value[ep.producto_id] ?? formatearUSDInput(ep.precio_final ?? 0)
+      }
+    }
+    precioTexto.value = next
+  },
+  { immediate: true },
+)
+
 // REQ-UX-27: state for the formulas popover. Toggled by the compact
 // "¿Cómo se calcula?" button so the operator can peek at the math
 // without losing context of the table.
@@ -297,7 +362,8 @@ const ejemploFormulas = computed(() => {
   return {
     nombre: ep.producto_nombre,
     precio: precio.toFixed(2),
-    costo: costo.toFixed(2),
+    costo,
+    costoFmt: costo.toFixed(2),
     ganancia: ganancia.toFixed(2),
     margen,
     unidadesPlan,
@@ -463,7 +529,7 @@ const calculoPorProducto = computed(() => {
                 <code class="text-primary">((Precio − Costo) / Costo) × 100%</code>
               </div>
               <div v-if="ejemploFormulas && ejemploFormulas.costo > 0" class="text-caption text-medium-emphasis mt-1">
-                Ej: (${{ ejemploFormulas.ganancia }} / ${{ ejemploFormulas.costo }}) × 100 =
+                Ej: (${{ ejemploFormulas.ganancia }} / ${{ ejemploFormulas.costoFmt }}) × 100 =
                 <strong class="text-primary">{{ ejemploFormulas.roi }}%</strong>
               </div>
             </div>
@@ -503,8 +569,8 @@ const calculoPorProducto = computed(() => {
           { title: '', key: 'incluido', sortable: false, width: 60 },
           { title: 'Producto', key: 'producto_nombre' },
           { title: 'Costo', key: 'costo_unitario' },
-          { title: 'Unid. plan', key: 'unidades_plan', align: 'end', width: 90 },
-          { title: 'Margen', key: 'margen_efectivo' },
+          { title: 'Und.P', key: 'unidades_plan', align: 'end', width: 70 },
+          { title: 'Margen de Contribución', key: 'margen_efectivo' },
           { title: 'Precio', key: 'precio_final', width: 140, align: 'center' },
           { title: 'Ganancia', key: 'ganancia_unitaria' },
           { title: 'Contrib. plan', key: 'contribucion_plan', align: 'end' },
@@ -570,6 +636,27 @@ const calculoPorProducto = computed(() => {
           <span :class="item.costo_unitario > 0 ? 'text-primary' : 'text-medium-emphasis'">
             {{ item.costo_unitario > 0 ? Math.round(((item.precio_final - item.costo_unitario) / item.costo_unitario) * 100) : 0 }}%
           </span>
+        </template>
+        <!-- REQ-UX-MONEY-1: controlled text input for the precio field
+             mirrors MateriaPrimaForm's cost input. `type="text"` with
+             `inputmode="decimal"` preserves trailing zeros (e.g.
+             "$18.00" stays "$18.00" while editing) and aligns decimals
+             consistently with the rest of the app. -->
+        <template #[`item.precio_final`]="{ item }">
+          <v-text-field
+            :model-value="precioTextoFor(item.producto_id, item.precio_final)"
+            type="text"
+            inputmode="decimal"
+            density="compact"
+            hide-details
+            :disabled="!editable"
+            :data-testid="`evento-productos-precio-${item.producto_id}`"
+            class="text-center mx-auto"
+            style="max-width: 140px"
+            prefix="$"
+            @update:model-value="(v) => onPrecioInput(item.producto_id, v)"
+            @blur="() => onPrecioBlur(item.producto_id)"
+          />
         </template>
         <!-- productos-mejoras / cost breakdown: expandable row showing
              the per-producto ingredient breakdown via RecetaCostoDesglose.
