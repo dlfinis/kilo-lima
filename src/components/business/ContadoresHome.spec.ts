@@ -68,7 +68,7 @@ describe('ContadoresHome', () => {
     expect(wrapper.find('[data-testid="contador-ventas-hoy"]').text()).toContain('7')
 
     expect(wrapper.find('[data-testid="contador-materias-primas"]').text()).toContain('Materias primas')
-    expect(wrapper.find('[data-testid="contador-recetas"]').text()).toContain('Recetas')
+    expect(wrapper.find('[data-testid="contador-recetas"]').text()).toContain('Preparaciones')
     expect(wrapper.find('[data-testid="contador-eventos"]').text()).toContain('Eventos')
   })
 
@@ -93,7 +93,7 @@ describe('ContadoresHome', () => {
         routes: [
           { path: '/', component: { template: '<div />' } },
           { path: '/inventario', component: { template: '<div />' } },
-          { path: '/productos/recetas', component: { template: '<div />' } },
+          { path: '/productos/preparaciones', component: { template: '<div />' } },
           { path: '/eventos', component: { template: '<div />' } },
           { path: '/productos', component: { template: '<div />' } },
           { path: '/pos', component: { template: '<div />' } },
@@ -119,7 +119,7 @@ describe('ContadoresHome', () => {
     // href on each card so the test stays behavior-focused.
     const html = wrapper.html()
     expect(html).toContain('href="/inventario"')
-    expect(html).toContain('href="/productos/recetas"')
+    expect(html).toContain('href="/productos/preparaciones"')
     expect(html).toContain('href="/eventos"')
     expect(html).toContain('href="/productos"')
     expect(html).toContain('href="/pos"')

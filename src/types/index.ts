@@ -1,5 +1,6 @@
 export type { Database } from './database.types'
 export type {
+  CategoriaMateriaPrima,
   MateriaPrima,
   MateriaPrimaInput,
   Receta,
@@ -30,6 +31,7 @@ export type {
 export type {
   MetodoPago,
   CategoriaImprevisto,
+  CategoriaProducto,
   Producto,
   ProductoInput,
   Venta,

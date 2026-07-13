@@ -43,18 +43,18 @@ describe('Route consolidation (Phase 6)', () => {
     expect(router.currentRoute.value.name).toBeDefined()
   })
 
-  it('/productos/recetas resolves to RecetasView', async () => {
+  // catalog-domain-refactor / Slice 3: canonical route is /productos/preparaciones
+  it('/productos/preparaciones resolves to RecetasView', async () => {
     await setupRouter()
-    await router.push('/productos/recetas')
-    expect(router.currentRoute.value.path).toBe('/productos/recetas')
+    await router.push('/productos/preparaciones')
+    expect(router.currentRoute.value.path).toBe('/productos/preparaciones')
     expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('/productos/recetas/:id resolves to RecetaDetalleView', async () => {
+  it('/productos/preparaciones/:id resolves to RecetaDetalleView', async () => {
     await setupRouter()
-    await router.push('/productos/recetas/r-test-1')
-    expect(router.currentRoute.value.path).toBe('/productos/recetas/r-test-1')
-    // Matched: ProductosLayout (parent) + RecetaDetalleView (leaf child) = 2
+    await router.push('/productos/preparaciones/r-test-1')
+    expect(router.currentRoute.value.path).toBe('/productos/preparaciones/r-test-1')
     expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
   })
 
@@ -64,16 +64,32 @@ describe('Route consolidation (Phase 6)', () => {
     expect(router.currentRoute.value.path).toBe('/inventario')
   })
 
-  it('/recetas redirects to /productos/recetas', async () => {
+  // catalog-domain-refactor / Slice 3: /recetas redirects to canonical /productos/preparaciones
+  it('/recetas redirects to /productos/preparaciones', async () => {
     await setupRouter()
     await router.push('/recetas')
-    expect(router.currentRoute.value.path).toBe('/productos/recetas')
+    expect(router.currentRoute.value.path).toBe('/productos/preparaciones')
   })
 
-  it('/recetas/:id redirects to /productos/recetas/:id preserving param', async () => {
+  // catalog-domain-refactor / Slice 3: /recetas/:id redirects preserving param
+  it('/recetas/:id redirects to /productos/preparaciones/:id preserving param', async () => {
     await setupRouter()
     await router.push('/recetas/my-recipe-42')
-    expect(router.currentRoute.value.path).toBe('/productos/recetas/my-recipe-42')
+    expect(router.currentRoute.value.path).toBe('/productos/preparaciones/my-recipe-42')
+  })
+
+  // catalog-domain-refactor / Slice 3: legacy /productos/recetas redirects
+  it('/productos/recetas redirects to /productos/preparaciones', async () => {
+    await setupRouter()
+    await router.push('/productos/recetas')
+    expect(router.currentRoute.value.path).toBe('/productos/preparaciones')
+  })
+
+  // catalog-domain-refactor / Slice 3: legacy /productos/recetas/:id redirects
+  it('/productos/recetas/:id redirects to /productos/preparaciones/:id', async () => {
+    await setupRouter()
+    await router.push('/productos/recetas/some-recipe')
+    expect(router.currentRoute.value.path).toBe('/productos/preparaciones/some-recipe')
   })
 
   it('/productos breadcrumb is [Inicio, Productos]', async () => {
@@ -83,11 +99,20 @@ describe('Route consolidation (Phase 6)', () => {
     expect(meta.breadcrumb).toEqual(['Inicio', 'Productos'])
   })
 
-  it('/productos/recetas breadcrumb is [Inicio, Productos, Recetas]', async () => {
+  // catalog-domain-refactor / Slice 3: breadcrumb uses "Preparaciones"
+  it('/productos/preparaciones breadcrumb is [Inicio, Productos, Preparaciones]', async () => {
     await setupRouter()
-    await router.push('/productos/recetas')
+    await router.push('/productos/preparaciones')
     const meta = router.currentRoute.value.meta
-    expect(meta.breadcrumb).toEqual(['Inicio', 'Productos', 'Recetas'])
+    expect(meta.breadcrumb).toEqual(['Inicio', 'Productos', 'Preparaciones'])
+  })
+
+  // catalog-domain-refactor / Slice 3: detail breadcrumb
+  it('/productos/preparaciones/:id breadcrumb is [Inicio, Productos, Preparaciones, Detalle]', async () => {
+    await setupRouter()
+    await router.push('/productos/preparaciones/some-id')
+    const meta = router.currentRoute.value.meta
+    expect(meta.breadcrumb).toEqual(['Inicio', 'Productos', 'Preparaciones', 'Detalle'])
   })
 
   it('/inventario breadcrumb is [Inicio, Inventario]', async () => {

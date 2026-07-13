@@ -34,10 +34,15 @@ function conContexto<T>(callback: () => T): T {
 const mkProducto = (id: string, overrides: Partial<Producto> = {}): Producto => ({
   id,
   receta_id: `r-${id}`,
-  precio_venta: 5,
+  // catalog-domain-refactor / Slice 1
+  nombre: `Producto ${id}`,
+  categoria: null,
+  precio_venta: null,
   disponible: true,
   orden: 0,
   descripcion: null,
+  icono: null,
+  color: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -107,10 +112,13 @@ describe('useProductosStore', () => {
 
       const resultado = await store.crear({
         receta_id: 'r-1',
-        precio_venta: 7.5,
+        nombre: 'Producto de prueba',
+        categoria: null,
         disponible: true,
         orden: 0,
         descripcion: null,
+        icono: null,
+        color: null,
       })
 
       expect(resultado.error).toBeNull()
@@ -130,10 +138,13 @@ describe('useProductosStore', () => {
       const store = useProductosStore()
       const resultado = await store.crear({
         receta_id: 'r-1',
-        precio_venta: 5,
+        nombre: 'Producto de prueba',
+        categoria: null,
         disponible: true,
         orden: 0,
         descripcion: null,
+        icono: null,
+        color: null,
       })
 
       expect(resultado.error?.code).toBe('DUPLICATE_RECETA')
@@ -150,7 +161,7 @@ describe('useProductosStore', () => {
       const store = useProductosStore()
       store.productos.push(mkProducto('p-1', { precio_venta: 5, disponible: true }))
 
-      const resultado = await store.actualizar('p-1', { precio_venta: 8, disponible: false })
+      const resultado = await store.actualizar('p-1', { disponible: false })
 
       expect(resultado.error).toBeNull()
       expect(store.productos[0]?.precio_venta).toBe(8)

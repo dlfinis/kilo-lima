@@ -25,11 +25,13 @@ import RecetaCostoDesglose from '@/components/business/RecetaCostoDesglose.vue'
 import { useRecipes } from '@/composables/useRecipes'
 import { useProductos } from '@/composables/useProductos'
 import { useCalculoReceta } from '@/composables/useCalculoReceta'
+import { useIngredientsStore } from '@/stores/ingredients.store'
 import type { Producto, ProductoInput } from '@/types'
 
 const route = useRoute()
 const { recetas, cargarTodas } = useRecipes()
 const { productos, cargarPorReceta, crear, actualizar } = useProductos()
+const ingredientsStore = useIngredientsStore()
 
 const recetaId = computed<string | null>(() => {
   const value = route.params.id
@@ -52,6 +54,16 @@ const dialogoVenta = ref(false)
 onMounted(() => {
   if (recetas.value.length === 0) cargarTodas()
   if (recetaId.value) cargarPorReceta(recetaId.value)
+  // REQ-CATALOG-15 / REQ-CATALOG-42: cross-store computed
+  // `costoPorReceta` reads `ingredientsStore.materiasPrimas`. If the user
+  // navigates directly to /productos/recetas/:id (deep-link, shared URL,
+  // refresh) without first visiting /inventario, the store starts empty
+  // and every ingredient lookup returns null → cost shows $0.00 with a
+  // "Materia prima no disponible" banner the operator may miss.
+  // Loading it here guarantees the cost breakdown computes correctly.
+  if (ingredientsStore.materiasPrimas.length === 0) {
+    void ingredientsStore.cargarTodas()
+  }
 })
 
 function abrirDialogoVenta() {
@@ -78,7 +90,7 @@ async function manejarSubmitProducto(input: ProductoInput) {
       class="mb-4"
       data-testid="receta-detalle-no-encontrada"
     >
-      Receta no encontrada.
+      Preparación no encontrada.
     </v-alert>
 
     <template v-if="receta">
@@ -90,7 +102,7 @@ async function manejarSubmitProducto(input: ProductoInput) {
           data-testid="receta-detalle-vender"
           @click="abrirDialogoVenta"
         >
-          {{ productoAsociado ? 'Editar precio de venta' : 'Vender esta receta' }}
+          {{ productoAsociado ? 'Editar precio de venta' : 'Vender esta preparación' }}
         </v-btn>
       </div>
       <p v-if="receta.descripcion" class="mb-4" data-testid="receta-detalle-descripcion">
@@ -113,7 +125,7 @@ async function manejarSubmitProducto(input: ProductoInput) {
     >
       <v-card v-if="receta">
         <v-card-title>
-          {{ productoAsociado ? 'Editar precio de venta' : 'Vender esta receta' }}
+          {{ productoAsociado ? 'Editar precio de venta' : 'Vender esta preparación' }}
         </v-card-title>
         <v-card-text>
           <ProductoForm

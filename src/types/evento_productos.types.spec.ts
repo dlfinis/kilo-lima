@@ -98,7 +98,7 @@ describe('evento_productos.types', () => {
   })
 
   describe('EventoProductoConDetalle', () => {
-    it('extends EventoProducto with producto_nombre + receta_id + receta_nombre + costo_unitario + precio_sugerido + margen_efectivo + precio_final', () => {
+    it('extends EventoProducto with producto_nombre + receta_id + receta_nombre + costo_unitario + precio_sugerido + margen_efectivo + precio_final + producto_categoria + producto_icono + producto_color', () => {
       const fila: EventoProductoConDetalle = {
         id: 'ep-1',
         evento_id: 'e-1',
@@ -109,12 +109,15 @@ describe('evento_productos.types', () => {
         created_at: '2026-06-20T00:00:00Z',
         updated_at: '2026-06-20T00:00:00Z',
         producto_nombre: 'Pan básico',
+        producto_categoria: null,
         receta_id: 'r-1',
         receta_nombre: 'Pan básico',
         costo_unitario: 10,
         precio_sugerido: 16.67,
         margen_efectivo: 0.4,
         precio_final: 16.67,
+        producto_icono: null,
+        producto_color: null,
       }
       // Every base field is still present.
       expect(fila.evento_id).toBe('e-1')
@@ -140,12 +143,15 @@ describe('evento_productos.types', () => {
         created_at: '2026-06-20T00:00:00Z',
         updated_at: '2026-06-20T00:00:00Z',
         producto_nombre: 'Pan básico',
+        producto_categoria: null,
         receta_id: 'r-1',
         receta_nombre: 'Pan básico',
         costo_unitario: 10,
         precio_sugerido: 16.67,
         margen_efectivo: 0.4,
         precio_final: 16.67,
+        producto_icono: null,
+        producto_color: null,
       }
       expect(fila.precio_venta).toBeNull()
     })

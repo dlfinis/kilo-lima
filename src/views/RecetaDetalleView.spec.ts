@@ -2,7 +2,7 @@
 // the recipe detail view reads the route param `:id`, finds the
 // recipe in the store, and renders the cost breakdown via
 // `<RecetaCostoDesglose>`. If the id resolves to no recipe (or to a
-// recipe whose id is unknown), the view shows a "Receta no encontrada"
+// recipe whose id is unknown), the view shows a "Preparación no encontrada"
 // state — never a blank page.
 import { beforeEach, describe, expect, it } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
@@ -51,8 +51,8 @@ beforeEach(() => {
   router = createRouter({
     history: createMemoryHistory(),
     routes: [
-      { path: '/recetas', name: 'recetas', component: { template: '<div/>' } },
-      { path: '/recetas/:id', name: 'receta-detalle', component: RecetaDetalleView },
+      { path: '/productos/preparaciones', name: 'recetas', component: { template: '<div/>' } },
+      { path: '/productos/preparaciones/:id', name: 'receta-detalle', component: RecetaDetalleView },
     ],
   })
   // The stores use `inject('supabase')` at setup. Provide it via a
@@ -63,7 +63,7 @@ beforeEach(() => {
 })
 
 const montarVista = async (id: string) => {
-  router.push(`/recetas/${id}`)
+  router.push(`/productos/preparaciones/${id}`)
   await router.isReady()
   return mount(RecetaDetalleView, {
     attachTo: document.body,
@@ -99,7 +99,7 @@ describe('RecetaDetalleView', () => {
     expect(desglose.props('calculo')).toBeTruthy()
   })
 
-  it('shows "Receta no encontrada" when the id resolves to no recipe (REQ-CATALOG-30)', async () => {
+  it('shows "Preparación no encontrada" when the id resolves to no recipe (REQ-CATALOG-30)', async () => {
     const wrapper = await montarVista('nonexistent')
     const { useRecipesStore } = await import('@/stores/recipes.store')
     await aplicacion.runWithContext(() => {
@@ -107,7 +107,7 @@ describe('RecetaDetalleView', () => {
     })
     await flushPromises()
 
-    expect(wrapper.text()).toMatch(/Receta no encontrada/)
+    expect(wrapper.text()).toMatch(/Preparación no encontrada/)
   })
 
   it('hides null descriptions gracefully (REQ-CATALOG-14)', async () => {
@@ -136,7 +136,7 @@ describe('RecetaDetalleView', () => {
   })
 
   // REQ-POS-47 cross-slice: when the receta has no producto yet, the
-  // detail view shows a "Vender esta receta" button that opens a
+  // detail view shows a "Vender esta preparación" button that opens a
   // quick-create dialog. The actual crear call lands via the productos
   // store; for the spec we only assert the button + dialog surface.
 
@@ -154,7 +154,7 @@ describe('RecetaDetalleView', () => {
     expect(wrapper.find('[data-testid="receta-detalle-volver"]').exists()).toBe(false)
   })
 
-  it('shows "Vender esta receta" when the receta has no producto yet (REQ-POS-47)', async () => {
+  it('shows "Vender esta preparación" when the receta has no producto yet (REQ-POS-47)', async () => {
     const wrapper = await montarVista('r-1')
     const { useRecipesStore } = await import('@/stores/recipes.store')
     await aplicacion.runWithContext(() => {
@@ -164,10 +164,10 @@ describe('RecetaDetalleView', () => {
 
     const boton = wrapper.find('[data-testid="receta-detalle-vender"]')
     expect(boton.exists()).toBe(true)
-    expect(boton.text()).toContain('Vender esta receta')
+    expect(boton.text()).toContain('Vender esta preparación')
   })
 
-  it('opens the quick-create dialog with precio_venta input when "Vender esta receta" is clicked (REQ-POS-47)', async () => {
+  it('opens the quick-create dialog with precio_venta input when "Vender esta preparación" is clicked (REQ-POS-47)', async () => {
     const wrapper = await montarVista('r-1')
     const { useRecipesStore } = await import('@/stores/recipes.store')
     await aplicacion.runWithContext(() => {
@@ -179,7 +179,7 @@ describe('RecetaDetalleView', () => {
     await flushPromises()
 
     // Dialog teleports to body; check globally.
-    expect(document.body.textContent).toContain('Vender esta receta')
+    expect(document.body.textContent).toContain('Vender esta preparación')
     expect(document.querySelector('form.producto-form')).not.toBeNull()
   })
 })

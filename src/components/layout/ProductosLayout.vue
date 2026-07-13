@@ -25,7 +25,8 @@ const route = useRoute()
 
 const tabs = [
   { label: 'Productos', to: '/productos' },
-  { label: 'Recetas', to: '/productos/recetas' },
+  // catalog-domain-refactor / Slice 3: renamed from Recetas to Preparaciones
+  { label: 'Preparaciones', to: '/productos/preparaciones' },
 ]
 
 const activeTab = computed(() => route.path)

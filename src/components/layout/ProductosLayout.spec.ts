@@ -15,7 +15,7 @@ import ProductosLayout from './ProductosLayout.vue'
 
 const vuetify = createVuetify({ components, directives })
 
-function mkRouter(initialPath = '/productos'): Router {
+function mkRouter(): Router {
   const router = createRouter({
     history: createMemoryHistory(),
     routes: [
@@ -28,15 +28,16 @@ function mkRouter(initialPath = '/productos'): Router {
             name: 'productos',
             component: { template: '<div data-testid="productos-page">Productos Page</div>' },
           },
+          // catalog-domain-refactor / Slice 3: canonical path is preparaciones
           {
-            path: 'recetas',
+            path: 'preparaciones',
             name: 'recetas',
-            component: { template: '<div data-testid="recetas-page">Recetas Page</div>' },
+            component: { template: '<div data-testid="recetas-page">Preparaciones Page</div>' },
           },
           {
-            path: 'recetas/:id',
+            path: 'preparaciones/:id',
             name: 'receta-detalle',
-            component: { template: '<div data-testid="receta-detalle-page">Receta Detalle Page</div>' },
+            component: { template: '<div data-testid="receta-detalle-page">Preparación Detalle Page</div>' },
           },
         ],
       },
@@ -64,30 +65,32 @@ describe('ProductosLayout', () => {
     await router.isReady()
   })
 
-  it('renders sub-navigation with 2 tabs: Productos and Recetas', async () => {
+  // catalog-domain-refactor / Slice 3: renamed to Preparaciones
+  it('renders sub-navigation with 2 tabs: Productos and Preparaciones', async () => {
     const wrapper = mountLayout(router)
 
     const tabs = wrapper.findAll('.v-tab')
     expect(tabs).toHaveLength(2)
-    expect(tabs[0].text()).toContain('Productos')
-    expect(tabs[1].text()).toContain('Recetas')
+    expect(tabs[0]!.text()).toContain('Productos')
+    expect(tabs[1]!.text()).toContain('Preparaciones')
   })
 
   it('highlights the Productos tab as active when on /productos', async () => {
     const wrapper = mountLayout(router)
 
     const tabs = wrapper.findAll('.v-tab')
-    const productosTab = tabs[0]
+    const productosTab = tabs[0]!
     expect(productosTab.classes()).toContain('v-tab--selected')
   })
 
-  it('highlights the Recetas tab as active when on /productos/recetas', async () => {
-    await router.push('/productos/recetas')
+  // catalog-domain-refactor / Slice 3: canonical path for preparaciones
+  it('highlights the Preparaciones tab as active when on /productos/preparaciones', async () => {
+    await router.push('/productos/preparaciones')
     const wrapper = mountLayout(router)
 
     const tabs = wrapper.findAll('.v-tab')
-    const recetasTab = tabs[1]
-    expect(recetasTab.classes()).toContain('v-tab--selected')
+    const preparacionesTab = tabs[1]!
+    expect(preparacionesTab.classes()).toContain('v-tab--selected')
   })
 
   it('renders the child route via router-view (ProductosView at /productos)', async () => {
@@ -97,15 +100,17 @@ describe('ProductosLayout', () => {
     expect(wrapper.find('[data-testid="productos-page"]').exists()).toBe(true)
   })
 
-  it('renders the child route via router-view (RecetasView at /productos/recetas)', async () => {
-    await router.push('/productos/recetas')
+  // catalog-domain-refactor / Slice 3: use canonical path
+  it('renders the child route via router-view (PreparacionesView at /productos/preparaciones)', async () => {
+    await router.push('/productos/preparaciones')
     const wrapper = mountLayout(router)
 
     expect(wrapper.find('[data-testid="recetas-page"]').exists()).toBe(true)
   })
 
-  it('renders the child route via router-view (RecetaDetalleView at /productos/recetas/:id)', async () => {
-    await router.push('/productos/recetas/r-1')
+  // catalog-domain-refactor / Slice 3: use canonical path
+  it('renders the child route via router-view (PreparacionDetalle at /productos/preparaciones/:id)', async () => {
+    await router.push('/productos/preparaciones/r-1')
     const wrapper = mountLayout(router)
 
     expect(wrapper.find('[data-testid="receta-detalle-page"]').exists()).toBe(true)
@@ -115,16 +120,17 @@ describe('ProductosLayout', () => {
     const wrapper = mountLayout(router)
 
     const tabs = wrapper.findAll('.v-tab')
-    const productosTab = tabs[0]
+    const productosTab = tabs[0]!
     // Vuetify v-tab with :to renders a router-link — the href should target /productos
     expect(productosTab.attributes('href')).toBe('/productos')
   })
 
-  it('Recetas tab links to /productos/recetas', async () => {
+  // catalog-domain-refactor / Slice 3: renamed from Recetas to Preparaciones
+  it('Preparaciones tab links to /productos/preparaciones', async () => {
     const wrapper = mountLayout(router)
 
     const tabs = wrapper.findAll('.v-tab')
-    const recetasTab = tabs[1]
-    expect(recetasTab.attributes('href')).toBe('/productos/recetas')
+    const preparacionesTab = tabs[1]!
+    expect(preparacionesTab.attributes('href')).toBe('/productos/preparaciones')
   })
 })

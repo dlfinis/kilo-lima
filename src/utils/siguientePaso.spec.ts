@@ -2,7 +2,7 @@
 // the recommended next step for the home CTA. Six-branch hierarchy:
 //
 //   1. materiasPrimas === 0                → CREAR MATERIA PRIMA  /materias-primas (primary)
-//   2. recetas === 0                       → CREAR RECETA         /recetas        (primary)
+//   2. recetas === 0                       → CREAR PREPARACIÓN   /productos/preparaciones (primary)
 //   3. eventosTotal === 0                  → PLANIFICAR EVENTO    /eventos        (primary)
 //   4. eventosEnCurso === 0 && eventosTotal > 0
 //                                          → IR A EVENTOS         /eventos        (warning)
@@ -32,7 +32,7 @@ describe('obtenerSiguientePaso', () => {
     expect(paso!.testid).toBe('siguiente-paso-crear-materia-prima')
   })
 
-  it('returns CREAR RECETA when materiasPrimas>0 but recetas===0 (REQ-UX-17 branch 2)', () => {
+  it('returns CREAR PREPARACIÓN when materiasPrimas>0 but recetas===0 (REQ-UX-17 branch 2)', () => {
     const paso = obtenerSiguientePaso({
       materiasPrimas: 5,
       recetas: 0,
@@ -42,8 +42,8 @@ describe('obtenerSiguientePaso', () => {
       ventasHoy: 0,
     })
     expect(paso).not.toBeNull()
-    expect(paso!.textoBoton).toBe('CREAR RECETA')
-    expect(paso!.ruta).toBe('/productos/recetas')
+    expect(paso!.textoBoton).toBe('CREAR PREPARACIÓN')
+    expect(paso!.ruta).toBe('/productos/preparaciones')
     expect(paso!.colorBoton).toBe('primary')
   })
 

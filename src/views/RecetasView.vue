@@ -88,12 +88,12 @@ function cerrarDialogo() {
 <template>
   <v-container>
     <div class="d-flex align-center justify-space-between mb-4">
-      <h1>Recetas</h1>
+      <h1>Preparaciones</h1>
     </div>
 
     <FabNuevo
       testid="receta-fab-nuevo"
-      ariaLabel="Nueva receta"
+      ariaLabel="Nueva preparación"
       @click="abrirCrear"
     />
 
@@ -107,8 +107,8 @@ function cerrarDialogo() {
     </v-alert>
 
     <v-card v-if="!cargando && recetas.length === 0 && !error" class="pa-6 text-center" data-testid="receta-empty">
-      <p class="text-h6 mb-4">No hay recetas todavía</p>
-      <v-btn color="primary" @click="abrirCrear">Crear primera receta</v-btn>
+      <p class="text-h6 mb-4">No hay preparaciones todavía</p>
+      <v-btn color="primary" @click="abrirCrear">Crear primera preparación</v-btn>
     </v-card>
 
     <v-list v-if="recetas.length > 0" data-testid="receta-list">
@@ -148,7 +148,7 @@ function cerrarDialogo() {
       @update:model-value="(v) => { if (!v) cerrarDialogo() }"
     >
       <v-card>
-        <v-card-title>{{ dialogo.tipo === 'editar' ? 'Editar receta' : 'Nueva receta' }}</v-card-title>
+        <v-card-title>{{ dialogo.tipo === 'editar' ? 'Editar preparación' : 'Nueva preparación' }}</v-card-title>
         <v-card-text>
           <RecetaForm
             :valores-iniciales="recetaEnEdicion"

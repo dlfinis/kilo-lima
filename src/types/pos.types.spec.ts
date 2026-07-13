@@ -29,10 +29,15 @@ import type {
 const mkProducto = (overrides: Partial<Producto> = {}): Producto => ({
   id: 'p-1',
   receta_id: 'r-1',
-  precio_venta: 5,
+  // catalog-domain-refactor / Slice 1: required fields
+  nombre: 'Test Producto',
+  categoria: null,
+  precio_venta: null,
   disponible: true,
   orden: 0,
   descripcion: null,
+  icono: null,
+  color: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -109,10 +114,11 @@ describe('pos.types surface', () => {
   })
 
   it('Producto carries every SQL column (REQ-POS-44)', () => {
-    const producto = mkProducto()
+    const producto = mkProducto({ precio_venta: 5 })
     expect(producto.receta_id).toBe('r-1')
     expect(producto.precio_venta).toBe(5)
     expect(producto.disponible).toBe(true)
+    expect(producto.nombre).toBe('Test Producto')
     expect(producto.orden).toBe(0)
     expect(producto.created_at).toMatch(/^2026-/)
     expect(producto.updated_at).toMatch(/^2026-/)
@@ -121,10 +127,14 @@ describe('pos.types surface', () => {
   it('ProductoInput excludes id, created_at, updated_at (REQ-POS-44)', () => {
     const input: ProductoInput = {
       receta_id: 'r-1',
-      precio_venta: 5,
+      // catalog-domain-refactor / Slice 1: nombre is required
+      nombre: 'Brownie Feria',
+      categoria: 'dulce',
       disponible: true,
       orden: 0,
       descripcion: null,
+      icono: null,
+      color: null,
     }
     expect(input).not.toHaveProperty('id')
     expect(input).not.toHaveProperty('created_at')

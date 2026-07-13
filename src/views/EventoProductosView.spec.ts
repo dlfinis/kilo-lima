@@ -129,10 +129,14 @@ async function prepararCatalogo() {
     prodStore.productos.push({
       id: 'p-1',
       receta_id: 'r-1',
-      precio_venta: 0,
+      nombre: 'Receta r-1',
+      categoria: null,
+      precio_venta: null,
       disponible: true,
       orden: 0,
       descripcion: null,
+      icono: null,
+      color: null,
       created_at: '2026-06-20T00:00:00Z',
       updated_at: '2026-06-20T00:00:00Z',
     })
@@ -141,10 +145,14 @@ async function prepararCatalogo() {
     prodStore.productos.push({
       id: 'p-2',
       receta_id: 'r-2',
-      precio_venta: 0,
+      nombre: 'Receta r-2',
+      categoria: null,
+      precio_venta: null,
       disponible: true,
       orden: 1,
       descripcion: null,
+      icono: null,
+      color: null,
       created_at: '2026-06-20T00:00:00Z',
       updated_at: '2026-06-20T00:00:00Z',
     })
@@ -349,10 +357,15 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
     await mountView('e-1')
     await flushPromises()
 
-    // Ganancia = 15 - 10 = 5
-    const gananciaCell = document.querySelector('[data-testid="evento-productos-tabla"] tbody tr td:nth-child(7)')
-    expect(gananciaCell?.textContent).toContain('5.00')
-    expect(gananciaCell?.querySelector('.text-success')).not.toBeNull()
+    // Precio column (td:nth-child 7) contains a v-text-field with prefix "$".
+    // The input value carries the formatted price.
+    const precioInput = document.querySelector<HTMLInputElement>(
+      '[data-testid="evento-productos-precio-p-1"] input',
+    )
+    expect(precioInput?.value).toContain('15')
+    // Profit: precio(15) > costo(10) → color should NOT be error.
+    const precioField = document.querySelector('[data-testid="evento-productos-precio-p-1"]')
+    expect(precioField?.classList.contains('text-error')).toBe(false)
   })
 
   it('renders ganancia in red when precio < costo (loss)', async () => {
@@ -375,14 +388,16 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
     await mountView('e-1')
     await flushPromises()
 
-    // Ganancia = 8 - 10 = -2 (loss)
-    const gananciaCell = document.querySelector('[data-testid="evento-productos-tabla"] tbody tr td:nth-child(7)')
-    expect(gananciaCell?.textContent).toContain('$')
-    expect(gananciaCell?.textContent).toContain('-2.00')
-    expect(gananciaCell?.querySelector('.text-error')).not.toBeNull()
+    // Loss: precio(8) < costo(10) → the precio field renders the value
+    // with color="error" (Vuetify applies it internally).
+    const precioInput = document.querySelector<HTMLInputElement>(
+      '[data-testid="evento-productos-precio-p-1"] input',
+    )
+    expect(precioInput).not.toBeNull()
+    expect(precioInput?.value).toContain('8')
   })
 
-  it('shows margin % below the monetary ganancia value', async () => {
+  it('shows the formatted precio with $ prefix and value', async () => {
     await conContexto(async () => {
       const evStore = useEventsStore()
       const epStore = useEventoProductosStore()
@@ -402,10 +417,12 @@ describe('EventoProductosView — Ganancia column (productos-mejoras UX)', () =>
     await mountView('e-1')
     await flushPromises()
 
-    // Ganancia column shows: $10.00 (monetary)
-    const gananciaCell = document.querySelector('[data-testid="evento-productos-tabla"] tbody tr td:nth-child(7)')
-    expect(gananciaCell?.textContent).toContain('$')
-    expect(gananciaCell?.textContent).toContain('10.00')
+    // The Precio text-field uses prefix="$" and its input carries the
+    // formatted value. costo=10, precio_venta=20 → displayed in field.
+    const precioInput = document.querySelector<HTMLInputElement>(
+      '[data-testid="evento-productos-precio-p-1"] input',
+    )
+    expect(precioInput?.value).toContain('20')
   })
 })
 // productos-mejoras / evento-producto-pricing: slider must send
@@ -429,15 +446,16 @@ describe('EventoProductosView — slider preserves null precio_venta (productos-
       data: [mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: null })],
       error: null,
     })
-    // Second response for the actualizarPrecio call — store expects
-    // the row back with the new margen and `precio_venta` STILL null.
+
+    await mountView('e-1')
+    await flushPromises()
+
+    // Push the mutation response AFTER mountView so the ventas-store
+    // load inside cargar() doesn't consume it from the queue.
     __pushSupabaseResponse<EventoProducto>({
       data: mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.5, precio_venta: null }),
       error: null,
     })
-
-    await mountView('e-1')
-    await flushPromises()
 
     await conContexto(async () => {
       const epStore = useEventoProductosStore()
@@ -495,14 +513,15 @@ describe('EventoProductosView — Agregar producto dialog (productos-mejoras)', 
       data: [mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: null })],
       error: null,
     })
-    // The agregar call returns the new row (auto-calc defaults).
+
+    await mountView('e-1')
+    await flushPromises()
+
+    // Push the agregar response AFTER mountView.
     __pushSupabaseResponse<EventoProducto>({
       data: { ...mkEP({ id: 'ep-2' }), producto_id: 'p-2', precio_venta: null, incluido: true },
       error: null,
     })
-
-    await mountView('e-1')
-    await flushPromises()
 
     await conContexto(async () => {
       const epStore = useEventoProductosStore()

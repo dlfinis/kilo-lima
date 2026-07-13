@@ -306,7 +306,17 @@ export interface Database {
         Row: {
           id: string
           receta_id: string
-          precio_venta: number
+          // catalog-domain-refactor / Slice 1: commercial identity lives
+          // on Producto, independent from preparation name. Backfilled
+          // from recetas.nombre on migration.
+          nombre: string
+          // catalog-domain-refactor / Slice 1: free-text filter tag for
+          // POS. Nullable — not every product needs a category.
+          categoria: string | null
+          // catalog-domain-refactor / Slice 1: made nullable; event
+          // pricing (evento_productos.precio_venta) is the sole authority.
+          // Column stays for backward compat until cleanup slice.
+          precio_venta: number | null
           disponible: boolean
           orden: number
           // productos-mejoras / producto-descripcion: nullable description.
@@ -321,7 +331,12 @@ export interface Database {
         Insert: {
           id?: string
           receta_id: string
-          precio_venta: number
+          // catalog-domain-refactor / Slice 1: required commercial name.
+          nombre: string
+          // Optional filter tag — free-form text.
+          categoria?: string | null
+          // Made nullable; event pricing is the authority.
+          precio_venta?: number | null
           disponible?: boolean
           orden?: number
           descripcion?: string | null

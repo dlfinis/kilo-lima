@@ -4,7 +4,7 @@ import { mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import * as comps from 'vuetify/components'
 import * as dirs from 'vuetify/directives'
-import { computed, ref } from 'vue'
+import { computed } from 'vue'
 
 vi.mock('@/composables/useReporteEvento', () => ({
   useReporteEvento: () => ({

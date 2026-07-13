@@ -30,10 +30,26 @@ export type CategoriaImprevisto =
   | 'propina'
   | 'otro'
 
+// catalog-domain-refactor: closed set of product categories for POS
+// filtering. Starts as a fixed list; category management may later
+// move to a central configuration area shared with insumos.
+export type CategoriaProducto = 'dulce' | 'salado' | 'helado' | 'bebida'
+
 export interface Producto {
   id: string
   receta_id: string
-  precio_venta: number
+  // catalog-domain-refactor / Slice 1: commercial identity independent
+  // from preparation (receta.nombre). Required; unique. Backfilled on
+  // migration. UNIQUE constraint enforced at DB level.
+  nombre: string
+  // catalog-domain-refactor: closed-set category for POS filters.
+  // Nullable — not every product needs a tag. Must be one of the
+  // CategoriaProducto values when set.
+  categoria: CategoriaProducto | null
+  // catalog-domain-refactor / Slice 1: made nullable. Event pricing
+  // (evento_productos.precio_venta) is the sole sell-price authority.
+  // Column stays for backward compat until cleanup.
+  precio_venta: number | null
   disponible: boolean
   orden: number
   // productos-mejoras / producto-descripcion: nullable free-text
@@ -49,7 +65,10 @@ export interface Producto {
   updated_at: string
 }
 
-export type ProductoInput = Omit<Producto, 'id' | 'created_at' | 'updated_at'>
+// catalog-domain-refactor: ProductoInput requires `nombre` (commercial
+// name, unique), accepts optional closed-set `categoria`. precio_venta
+// is omitted — event pricing is the sole sell-price authority.
+export type ProductoInput = Omit<Producto, 'id' | 'created_at' | 'updated_at' | 'precio_venta'>
 
 export interface Venta {
   id: string

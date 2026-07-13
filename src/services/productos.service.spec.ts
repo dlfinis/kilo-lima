@@ -21,10 +21,15 @@ import { crearProductosService } from './productos.service'
 const mkProducto = (overrides: Partial<Producto> = {}): Producto => ({
   id: 'p-1',
   receta_id: 'r-1',
-  precio_venta: 5,
+  // catalog-domain-refactor / Slice 1
+  nombre: 'Test Producto',
+  categoria: null,
+  precio_venta: null,
   disponible: true,
   orden: 0,
   descripcion: null,
+  icono: null,
+  color: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -122,10 +127,13 @@ describe('crearProductosService', () => {
 
       const { data, error } = await makeService().crear({
         receta_id: 'r-1',
-        precio_venta: 7.5,
+        nombre: 'Test Producto',
+        categoria: null,
         disponible: true,
         orden: 0,
         descripcion: null,
+        icono: null,
+        color: null,
       })
 
       expect(error).toBeNull()
@@ -143,10 +151,13 @@ describe('crearProductosService', () => {
 
       const { data, error } = await makeService().crear({
         receta_id: 'r-1',
-        precio_venta: 5,
+        nombre: 'Test Producto',
+        categoria: null,
         disponible: true,
         orden: 0,
         descripcion: null,
+        icono: null,
+        color: null,
       })
 
       expect(data).toBeNull()
@@ -161,10 +172,13 @@ describe('crearProductosService', () => {
 
       const { data, error } = await makeService().crear({
         receta_id: 'r-1',
-        precio_venta: 5,
+        nombre: 'Test Producto',
+        categoria: null,
         disponible: true,
         orden: 0,
         descripcion: null,
+        icono: null,
+        color: null,
       })
 
       expect(data).toBeNull()
@@ -177,7 +191,7 @@ describe('crearProductosService', () => {
       const actualizado = mkProducto({ id: 'p-1', precio_venta: 6, disponible: false })
       __pushSupabaseResponse<Producto>({ data: actualizado, error: null })
 
-      const { data, error } = await makeService().actualizar('p-1', { precio_venta: 6, disponible: false })
+      const { data, error } = await makeService().actualizar('p-1', { disponible: false })
 
       expect(error).toBeNull()
       expect(data?.precio_venta).toBe(6)

@@ -1,3 +1,5 @@
+import type { CategoriaProducto } from './pos.types'
+
 // REQ-PRICING-1, REQ-FIN-12, REQ-FIN-13: types for the
 // `evento_productos` table and its joined-detail shape.
 //
@@ -57,6 +59,9 @@ export interface ActualizarMargenInput {
 // = `precio_venta ?? precio_sugerido` — manual override wins.
 export interface EventoProductoConDetalle extends EventoProducto {
   producto_nombre: string
+  // catalog-domain-refactor / Slice 3: closed-set category for
+  // POS filtering by category.
+  producto_categoria: CategoriaProducto | null
   receta_id: string
   receta_nombre: string
   costo_unitario: number

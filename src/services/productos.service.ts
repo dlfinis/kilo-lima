@@ -4,10 +4,11 @@
 // (`listarPorReceta`) that backs the "Vender esta receta" button in
 // `RecetaDetalleView` (REQ-POS-47).
 //
-// Error mapping is intentionally minimal but spans the only two DB-level
+// Error mapping is intentionally minimal but spans the DB-level
 // constraint violations the surface needs to distinguish from generic
 // failures:
 //   - UNIQUE(receta_id)            -> DUPLICATE_RECETA  (REQ-POS-2)
+//   - UNIQUE(nombre)               -> DUPLICATE_NOMBRE  (catalog-domain-refactor)
 //   - RESTRICT FK from venta_items -> VENTA_HISTORIAL   (REQ-POS-5)
 // Other PG errors pass through unchanged so the store / view can render
 // the raw message without lossy translation.
@@ -34,6 +35,15 @@ export interface ProductosService {
 function mapearErrorCrear(error: ServiceError | null): ServiceError | null {
   if (!error) return null
   if (error.code === '23505') {
+    // catalog-domain-refactor: distinguish between receta_id and nombre
+    // unique violations. PostgreSQL includes the constraint name in the
+    // error message (e.g. "...unique constraint \"productos_nombre_key\"").
+    if (error.message?.includes('productos_nombre_key')) {
+      return {
+        code: 'DUPLICATE_NOMBRE',
+        message: 'Ya existe un producto con este nombre comercial',
+      }
+    }
     return { code: 'DUPLICATE_RECETA', message: 'Ya existe un producto para esta receta' }
   }
   return error

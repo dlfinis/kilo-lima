@@ -45,7 +45,7 @@ beforeEach(async () => {
     routes: [
       { path: '/', component: { template: '<div />' } },
       { path: '/inventario', component: { template: '<div />' } },
-      { path: '/productos/recetas', component: { template: '<div />' } },
+      { path: '/productos/preparaciones', component: { template: '<div />' } },
       { path: '/eventos', component: { template: '<div />' } },
       { path: '/pos', component: { template: '<div />' } },
     ],

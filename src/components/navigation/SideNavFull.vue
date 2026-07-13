@@ -98,9 +98,9 @@ function isActive(itemRoute: string): boolean {
         </template>
         <v-list-item
           prepend-icon="mdi-chef-hat"
-          title="Recetas"
-          to="/productos/recetas"
-          :active="isActive('/productos/recetas')"
+          title="Preparaciones"
+          to="/productos/preparaciones"
+          :active="isActive('/productos/preparaciones')"
           active-class="v-list-item--active"
           @click="navigate"
         />

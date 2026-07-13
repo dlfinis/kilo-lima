@@ -8,7 +8,7 @@
 //   - Currency formatting matches the design's `Intl.NumberFormat`
 //   - The print button triggers `window.print()`
 //   - The dialog emits `update:modelValue(false)` when closed
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'

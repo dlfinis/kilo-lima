@@ -25,11 +25,15 @@ const vuetify = createVuetify({ components, directives })
 const mkProducto = (id: string, overrides: Partial<Producto> = {}): Producto => ({
   id,
   receta_id: `r-${id}`,
-  precio_venta: 5,
+  // catalog-domain-refactor / Slice 3: required fields
+  nombre: `Producto ${id}`,
+  categoria: null,
+  precio_venta: null,
   disponible: true,
   orden: 0,
   descripcion: null,
   icono: 'mdi-food',
+  color: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -67,7 +71,7 @@ async function mountView() {
 }
 
 describe('ProductosView', () => {
-  it('empty state links to /productos/recetas (Phase 6 consolidated route)', async () => {
+  it('empty state links to /productos/preparaciones (catalog-domain-refactor / Slice 3)', async () => {
     __pushSupabaseResponse<Producto[]>({ data: [], error: null })
     __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
 
@@ -76,7 +80,7 @@ describe('ProductosView', () => {
 
     const irRecetasBtn = wrapper.find('[data-testid="productos-ir-recetas"]')
     expect(irRecetasBtn.exists()).toBe(true)
-    expect(irRecetasBtn.attributes('href')).toBe('/productos/recetas')
+    expect(irRecetasBtn.attributes('href')).toBe('/productos/preparaciones')
   })
 
   it('shows the Productos title (REQ-POS-46)', async () => {
@@ -195,14 +199,13 @@ describe('ProductosView', () => {
     await botonNuevo?.trigger('click')
     await flushPromises()
 
-    // Set the receta + precio and submit the form by emitting submit
-    // from the inner ProductoForm so we don't need to interact with
-    // the v-select directly (which is awkward in jsdom).
+    // catalog-domain-refactor / Slice 3: ProductoInput requires nombre,
+    // optional categoria; precio_venta is deprecated.
     const productoForm = wrapper.findComponent(ProductoForm)
     expect(productoForm.exists()).toBe(true)
     await productoForm.vm.$emit('submit', {
       receta_id: 'r-1',
-      precio_venta: 5,
+      nombre: 'Producto Duplicado',
       disponible: true,
       orden: 0,
     })

@@ -8,7 +8,7 @@ export interface MateriaPrima {
   nombre: string
   unidad: UnidadMedida
   costo_por_unidad: number
-  categoria: CategoriaMateriaPrima
+  categoria?: CategoriaMateriaPrima
   // Optional on-hand stock; DB migration adds DEFAULT 0 for backward compat
   // with existing test factories that don't include it.
   cantidad_disponible?: number

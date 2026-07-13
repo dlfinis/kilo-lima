@@ -44,7 +44,7 @@ const routes = [
   { path: '/ventas', name: 'ventas', component: { template: '<div/>' } },
   { path: '/gastos', name: 'gastos', component: { template: '<div/>' } },
   { path: '/productos', name: 'productos', component: { template: '<div/>' } },
-  { path: '/productos/recetas', name: 'recetas', component: { template: '<div/>' } },
+  { path: '/productos/preparaciones', name: 'recetas', component: { template: '<div/>' } },
   { path: '/inventario', name: 'inventario', component: { template: '<div/>' } },
   { path: '/eventos', name: 'eventos', component: { template: '<div/>' } },
   { path: '/costos', name: 'costos', component: { template: '<div/>' } },
@@ -96,7 +96,7 @@ describe('SideNavFull (polymorphic permanent/temporary sidebar)', () => {
     const router = await mkRouter('/')
     const wrapper = mountSideNavFull(router)
     const text = wrapper.text()
-    const items = ['Inicio', 'Caja', 'Ventas', 'Gastos', 'Productos', 'Recetas', 'Materia prima', 'Eventos', 'Costos', 'Reportes', 'Rentabilidad', 'Ajustes', 'Equipo']
+    const items = ['Inicio', 'Caja', 'Ventas', 'Gastos', 'Productos', 'Preparaciones', 'Materia prima', 'Eventos', 'Costos', 'Reportes', 'Rentabilidad', 'Ajustes', 'Equipo']
     for (const item of items) {
       expect(text).toContain(item)
     }
@@ -118,13 +118,13 @@ describe('SideNavFull (polymorphic permanent/temporary sidebar)', () => {
     expect(activeItems[0]!.text()).toContain('Caja')
   })
 
-  it('highlights active route at /productos/recetas (nested)', async () => {
-    const router = await mkRouter('/productos/recetas')
+  it('highlights active route at /productos/preparaciones (nested)', async () => {
+    const router = await mkRouter('/productos/preparaciones')
     const wrapper = mountSideNavFull(router)
     const activeItems = wrapper.findAll('.v-list-item--active,.v-list-group--active')
     expect(activeItems.length).toBeGreaterThanOrEqual(1)
     const text = wrapper.text()
-    expect(text).toContain('Recetas')
+    expect(text).toContain('Preparaciones')
   })
 
   it('highlights active route at /reportes/rentabilidad (nested)', async () => {
@@ -296,8 +296,8 @@ describe('SideNavFull (polymorphic permanent/temporary sidebar)', () => {
     expect(reportesGroup!.classes()).toContain('v-list-group--open')
   })
 
-  it('auto-opens the productos group on /productos/recetas', async () => {
-    const router = await mkRouter('/productos/recetas')
+  it('auto-opens the productos group on /productos/preparaciones', async () => {
+    const router = await mkRouter('/productos/preparaciones')
     const wrapper = mountSideNavFull(router)
     const groups = wrapper.findAllComponents({ name: 'VListGroup' })
     const productosGroup = groups.find((g) => g.props('value') === 'productos')

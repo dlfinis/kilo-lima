@@ -24,13 +24,17 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/InventarioView.vue'),
     meta: { breadcrumb: ['Inicio', 'Inventario'] },
   },
+  // catalog-domain-refactor / Slice 3: canonical preparation routes.
+  // /recetas and /productos/recetas redirect to the new canonical
+  // /productos/preparaciones surface. Legacy deep links preserve their
+  // params.
   {
     path: '/recetas',
-    redirect: '/productos/recetas',
+    redirect: '/productos/preparaciones',
   },
   {
     path: '/recetas/:id',
-    redirect: (to) => `/productos/recetas/${to.params.id as string}`,
+    redirect: (to) => `/productos/preparaciones/${to.params.id as string}`,
   },
   // ---- Productos (Phase 6) ----
   {
@@ -44,16 +48,31 @@ const routes: RouteRecordRaw[] = [
         meta: { breadcrumb: ['Inicio', 'Productos'] },
       },
       {
-        path: 'recetas',
+        // catalog-domain-refactor / Slice 3: canonical preparation route.
+        // Name kept as 'recetas' for backward compat — internal named-route
+        // navigations still resolve.
+        path: 'preparaciones',
         name: 'recetas',
         component: () => import('@/views/RecetasView.vue'),
-        meta: { breadcrumb: ['Inicio', 'Productos', 'Recetas'] },
+        meta: { breadcrumb: ['Inicio', 'Productos', 'Preparaciones'] },
       },
       {
-        path: 'recetas/:id',
+        // catalog-domain-refactor / Slice 3: canonical preparation detail.
+        // Name kept as 'receta-detalle' for backward compat.
+        path: 'preparaciones/:id',
         name: 'receta-detalle',
         component: () => import('@/views/RecetaDetalleView.vue'),
-        meta: { breadcrumb: ['Inicio', 'Productos', 'Recetas', 'Detalle'] },
+        meta: { breadcrumb: ['Inicio', 'Productos', 'Preparaciones', 'Detalle'] },
+      },
+      {
+        // Legacy redirect: /productos/recetas → /productos/preparaciones
+        path: 'recetas',
+        redirect: '/productos/preparaciones',
+      },
+      {
+        // Legacy redirect: /productos/recetas/:id → /productos/preparaciones/:id
+        path: 'recetas/:id',
+        redirect: (to) => `/productos/preparaciones/${to.params.id as string}`,
       },
     ],
   },

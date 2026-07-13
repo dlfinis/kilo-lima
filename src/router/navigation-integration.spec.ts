@@ -61,20 +61,21 @@ describe('Navigation Integration (Phase 6)', () => {
   })
 
   describe('Nested navigation under /productos', () => {
-    it('navigates Productos → Recetas → Receta detalle', async () => {
+    // catalog-domain-refactor / Slice 3: canonical path is /productos/preparaciones
+    it('navigates Productos → Preparaciones → Preparación detalle', async () => {
       // Productos (default child)
       await router.push('/productos')
       expect(router.currentRoute.value.path).toBe('/productos')
       expect(router.currentRoute.value.name).toBe('productos')
 
-      // Recetas
-      await router.push('/productos/recetas')
-      expect(router.currentRoute.value.path).toBe('/productos/recetas')
+      // Preparaciones (canonical route; named 'recetas' for backward compat)
+      await router.push('/productos/preparaciones')
+      expect(router.currentRoute.value.path).toBe('/productos/preparaciones')
       expect(router.currentRoute.value.name).toBe('recetas')
 
-      // Receta detalle
-      await router.push('/productos/recetas/r-1')
-      expect(router.currentRoute.value.path).toBe('/productos/recetas/r-1')
+      // Preparación detalle (canonical; named 'receta-detalle' for backward compat)
+      await router.push('/productos/preparaciones/r-1')
+      expect(router.currentRoute.value.path).toBe('/productos/preparaciones/r-1')
       expect(router.currentRoute.value.name).toBe('receta-detalle')
     })
 
@@ -84,13 +85,14 @@ describe('Navigation Integration (Phase 6)', () => {
       expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
     })
 
-    it('/productos/recetas layout renders child route via ProductosLayout', async () => {
-      await router.push('/productos/recetas')
+    // catalog-domain-refactor / Slice 3: use canonical path
+    it('/productos/preparaciones layout renders child route via ProductosLayout', async () => {
+      await router.push('/productos/preparaciones')
       expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
     })
 
-    it('/productos/recetas/:id layout renders child route via ProductosLayout', async () => {
-      await router.push('/productos/recetas/r-1')
+    it('/productos/preparaciones/:id layout renders child route via ProductosLayout', async () => {
+      await router.push('/productos/preparaciones/r-1')
       expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
     })
   })
@@ -101,14 +103,16 @@ describe('Navigation Integration (Phase 6)', () => {
       expect(router.currentRoute.value.path).toBe('/inventario')
     })
 
-    it('/recetas redirects to /productos/recetas', async () => {
+    // catalog-domain-refactor / Slice 3: /recetas redirects to canonical path
+    it('/recetas redirects to /productos/preparaciones', async () => {
       await router.push('/recetas')
-      expect(router.currentRoute.value.path).toBe('/productos/recetas')
+      expect(router.currentRoute.value.path).toBe('/productos/preparaciones')
     })
 
-    it('/recetas/:id redirects to /productos/recetas/:id', async () => {
+    // catalog-domain-refactor / Slice 3: /recetas/:id redirects to canonical path
+    it('/recetas/:id redirects to /productos/preparaciones/:id', async () => {
       await router.push('/recetas/old-recipe-99')
-      expect(router.currentRoute.value.path).toBe('/productos/recetas/old-recipe-99')
+      expect(router.currentRoute.value.path).toBe('/productos/preparaciones/old-recipe-99')
     })
 
     it('/contabilidad redirects to /reportes/contabilidad', async () => {
@@ -128,14 +132,16 @@ describe('Navigation Integration (Phase 6)', () => {
       expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Productos'])
     })
 
-    it('/productos/recetas breadcrumb is [Inicio, Productos, Recetas]', async () => {
-      await router.push('/productos/recetas')
-      expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Productos', 'Recetas'])
+    // catalog-domain-refactor / Slice 3: breadcrumb uses "Preparaciones"
+    it('/productos/preparaciones breadcrumb is [Inicio, Productos, Preparaciones]', async () => {
+      await router.push('/productos/preparaciones')
+      expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Productos', 'Preparaciones'])
     })
 
-    it('/productos/recetas/:id breadcrumb is [Inicio, Productos, Recetas, Detalle]', async () => {
-      await router.push('/productos/recetas/r-1')
-      expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Productos', 'Recetas', 'Detalle'])
+    // catalog-domain-refactor / Slice 3: detail breadcrumb
+    it('/productos/preparaciones/:id breadcrumb is [Inicio, Productos, Preparaciones, Detalle]', async () => {
+      await router.push('/productos/preparaciones/r-1')
+      expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Productos', 'Preparaciones', 'Detalle'])
     })
 
     it('/inventario breadcrumb is [Inicio, Inventario]', async () => {
@@ -171,16 +177,20 @@ describe('Navigation Integration (Phase 6)', () => {
       expect(route.path).toBe('/productos')
     })
 
+    // catalog-domain-refactor / Slice 3: named route 'recetas' resolves
+    // to canonical path /productos/preparaciones
     it('named route "recetas" resolves from router', async () => {
       const route = router.resolve({ name: 'recetas' })
       expect(route.name).toBe('recetas')
-      expect(route.path).toBe('/productos/recetas')
+      expect(route.path).toBe('/productos/preparaciones')
     })
 
+    // catalog-domain-refactor / Slice 3: named route 'receta-detalle'
+    // resolves to canonical path /productos/preparaciones/:id
     it('named route "receta-detalle" resolves from router', async () => {
       const route = router.resolve({ name: 'receta-detalle', params: { id: 'r-1' } })
       expect(route.name).toBe('receta-detalle')
-      expect(route.path).toBe('/productos/recetas/r-1')
+      expect(route.path).toBe('/productos/preparaciones/r-1')
     })
 
     it('named route "inventario" resolves from router', async () => {

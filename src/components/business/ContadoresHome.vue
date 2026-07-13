@@ -20,7 +20,7 @@ const cargando = computed<boolean>(() => !props.contadores.cargado)
 // its icon. Keeping the array shape lets us loop in the template.
 const TARJETAS = [
   { testid: 'contador-materias-primas', etiqueta: 'Materias primas', ruta: '/inventario', icono: 'mdi-package-variant', color: 'primary', clave: 'materiasPrimas' as const },
-  { testid: 'contador-recetas', etiqueta: 'Recetas', ruta: '/productos/recetas', icono: 'mdi-book-open-variant', color: 'success', clave: 'recetas' as const },
+  { testid: 'contador-recetas', etiqueta: 'Preparaciones', ruta: '/productos/preparaciones', icono: 'mdi-book-open-variant', color: 'success', clave: 'recetas' as const },
   { testid: 'contador-eventos', etiqueta: 'Eventos', ruta: '/eventos', icono: 'mdi-calendar-check', color: 'warning', clave: 'eventosTotal' as const },
   { testid: 'contador-productos', etiqueta: 'Productos', ruta: '/productos', icono: 'mdi-store-outline', color: 'info', clave: 'productos' as const },
   { testid: 'contador-ventas-hoy', etiqueta: 'Ventas hoy', ruta: '/pos', icono: 'mdi-cart-outline', color: 'secondary', clave: 'ventasHoy' as const },

@@ -40,9 +40,9 @@ export function obtenerSiguientePaso(
   }
   if (rc === 0) {
     return {
-      texto: 'Ahora creá tu primera receta',
-      ruta: '/productos/recetas',
-      textoBoton: 'CREAR RECETA',
+      texto: 'Ahora creá tu primera preparación',
+      ruta: '/productos/preparaciones',
+      textoBoton: 'CREAR PREPARACIÓN',
       colorBoton: 'primary',
       testid: 'siguiente-paso-crear-receta',
     }

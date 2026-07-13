@@ -112,7 +112,10 @@ export function crearEventoProductosService(
     async inicializarDesdeCatalogo(eventoId) {
       // 1) Read the catalog. If empty, short-circuit (idempotent:
       //    nothing to upsert).
-      const productosResp = await supabase.from('productos').select('id, receta_id, precio_venta')
+      // catalog-domain-refactor / Slice 2: catalog price is no longer
+      // the sell-price authority; evento_productos.precio_venta is the
+      // sole pricing source. precio_venta removed from select.
+      const productosResp = await supabase.from('productos').select('id, receta_id')
       if (productosResp.error) {
         return { data: null, error: productosResp.error }
       }

@@ -66,8 +66,9 @@ describe('RecetasView', () => {
     const wrapper = await montarVista()
     await flushPromises()
 
-    expect(wrapper.text()).toContain('No hay recetas')
-    expect(wrapper.text()).toContain('Crear primera receta')
+    // catalog-domain-refactor / Slice 3: copy renamed to Preparaciones
+    expect(wrapper.text()).toContain('No hay preparaciones')
+    expect(wrapper.text()).toContain('Crear primera preparación')
   })
 
   it('renders the list when data is present (REQ-CATALOG-9)', async () => {
@@ -109,11 +110,12 @@ describe('RecetasView', () => {
     await flushPromises()
     const fab = wrapper.find('[data-testid="receta-fab-nuevo"]')
     expect(fab.exists()).toBe(true)
-    expect(fab.attributes('aria-label')).toBe('Nueva receta')
+    // catalog-domain-refactor / Slice 3: aria-label updated
+    expect(fab.attributes('aria-label')).toBe('Nueva preparación')
     await fab.trigger('click')
     await flushPromises()
 
-    expect(document.body.textContent ?? '').toContain('Nueva receta')
+    expect(document.body.textContent ?? '').toContain('Nueva preparación')
   })
 
   it('emits create flow: dialog → submit → store.crear is called', async () => {

@@ -521,78 +521,77 @@ on conflict do nothing;
 -- 5. PRODUCTOS
 -- 1 por receta · con margen override para que se vea la calculadora
 -- =====================================================================
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 15.00, true, 1, 'Galleta clásica con chispas', 'mdi-cookie',  '#A0522D'
+-- catalog-domain-refactor / Slice 1: nombre + categoria added.
+-- nombre defaults to receta.nombre per the product-form prefill spec.
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'dulce',  15.00, true, 1, 'Galleta clásica con chispas', 'mdi-cookie',  '#A0522D'
 from public.recetas r
 where r.nombre = 'Galleta de chocolate'
 on conflict (receta_id) do nothing;
 
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 35.00, true, 2, 'Pan de caja artesanal',      'mdi-bread-slice', '#D2691E'
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'salado', 35.00, true, 2, 'Pan de caja artesanal',      'mdi-bread-slice', '#D2691E'
 from public.recetas r
 where r.nombre = 'Pan básico'
 on conflict (receta_id) do nothing;
 
--- 5b. PRODUCTOS DE PASTELERÍA ECUATORIANA
--- Precios en USD, sugeridos para ferias urbanas (Quito / Guayaquil).
--- No se asignan a evento_productos: existen en el catálogo y se
--- activan por evento vía "Inicializar desde catálogo".
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 0.80, true,  3, 'Empanada de viento quiteña — masa rellena de queso, frita',           'mdi-food-croissant', '#E9967A'
+-- catalog-domain-refactor / Slice 1: nombre + categoria added to all inserts.
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'salado', 0.80, true,  3, 'Empanada de viento quiteña — masa rellena de queso, frita',           'mdi-food-croissant', '#E9967A'
 from public.recetas r
 where r.nombre = 'Empanada de viento'
 on conflict (receta_id) do nothing;
 
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 1.50, true,  4, 'Humita quiteña — tamal de maíz dulce envuelto en hoja',            'mdi-corn',           '#F4D03F'
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'salado', 1.50, true,  4, 'Humita quiteña — tamal de maíz dulce envuelto en hoja',            'mdi-corn',           '#F4D03F'
 from public.recetas r
 where r.nombre = 'Humita'
 on conflict (receta_id) do nothing;
 
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 1.50, true,  5, 'Quimbolito — tamal dulce al vapor con harina de maíz',            'mdi-bowl',           '#D4AC0D'
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'dulce',  1.50, true,  5, 'Quimbolito — tamal dulce al vapor con harina de maíz',            'mdi-bowl',           '#D4AC0D'
 from public.recetas r
 where r.nombre = 'Quimbolito'
 on conflict (receta_id) do nothing;
 
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 0.60, true,  6, 'Pan de yuca — bolitas crocantes de almidón de yuca y queso',     'mdi-baguette',       '#F5DEB3'
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'salado', 0.60, true,  6, 'Pan de yuca — bolitas crocantes de almidón de yuca y queso',     'mdi-baguette',       '#F5DEB3'
 from public.recetas r
 where r.nombre = 'Pan de yuca'
 on conflict (receta_id) do nothing;
 
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 2.00, true,  7, 'Tortilla de tiesto grande — asada en tiesto de barro',          'mdi-flatbread',      '#DAA520'
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'salado', 2.00, true,  7, 'Tortilla de tiesto grande — asada en tiesto de barro',          'mdi-flatbread',      '#DAA520'
 from public.recetas r
 where r.nombre = 'Tortilla de tiesto'
 on conflict (receta_id) do nothing;
 
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 0.75, true,  8, 'Rosquilla quiteña — rosca dulce con panela, horneada',           'mdi-cookie-outline', '#CD853F'
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'dulce',  0.75, true,  8, 'Rosquilla quiteña — rosca dulce con panela, horneada',           'mdi-cookie-outline', '#CD853F'
 from public.recetas r
 where r.nombre = 'Rosquilla quiteña'
 on conflict (receta_id) do nothing;
 
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 2.50, true,  9, 'Porción de pan de banano con mantequilla de maní',              'mdi-cake-variant',   '#FFE4B5'
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'dulce',  2.50, true,  9, 'Porción de pan de banano con mantequilla de maní',              'mdi-cake-variant',   '#FFE4B5'
 from public.recetas r
 where r.nombre = 'Pan de banano con maní'
 on conflict (receta_id) do nothing;
 
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 25.00, true, 10, 'Tanda de helado de paila de mora — artesanal por 3 L',          'mdi-ice-cream',      '#8B4789'
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'helado', 25.00, true, 10, 'Tanda de helado de paila de mora — artesanal por 3 L',          'mdi-ice-cream',      '#8B4789'
 from public.recetas r
 where r.nombre = 'Helado de paila (mora)'
 on conflict (receta_id) do nothing;
 
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 2.25, true, 11, 'Porción de bizcocho de colada morada — para Todos los Santos',  'mdi-cupcake',        '#8B4513'
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'dulce',  2.25, true, 11, 'Porción de bizcocho de colada morada — para Todos los Santos',  'mdi-cupcake',        '#8B4513'
 from public.recetas r
 where r.nombre = 'Bizcocho de colada morada'
 on conflict (receta_id) do nothing;
 
-insert into public.productos (receta_id, precio_venta, disponible, orden, descripcion, icono, color)
-select r.id, 6.00, true, 12, 'Jarra de canelazo 2 L — bebida caliente con canela',            'mdi-cup',            '#A0522D'
+insert into public.productos (receta_id, nombre, categoria, precio_venta, disponible, orden, descripcion, icono, color)
+select r.id, r.nombre, 'bebida', 6.00, true, 12, 'Jarra de canelazo 2 L — bebida caliente con canela',            'mdi-cup',            '#A0522D'
 from public.recetas r
 where r.nombre = 'Canelazo'
 on conflict (receta_id) do nothing;
@@ -603,25 +602,25 @@ on conflict (receta_id) do nothing;
 insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
 select e.id, p.id, 18.00, 0.55, true
 from public.eventos e, public.productos p
-where e.nombre = 'Festival Primavera 2026' and p.precio_venta = 15.00
+where e.nombre = 'Festival Primavera 2026' and p.nombre = 'Galleta de chocolate'
 on conflict (evento_id, producto_id) do nothing;
 
 insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
 select e.id, p.id, 42.00, 0.45, true
 from public.eventos e, public.productos p
-where e.nombre = 'Festival Primavera 2026' and p.precio_venta = 35.00
+where e.nombre = 'Festival Primavera 2026' and p.nombre = 'Pan básico'
 on conflict (evento_id, producto_id) do nothing;
 
 insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
 select e.id, p.id, null, null, true
 from public.eventos e, public.productos p
-where e.nombre = 'Feria del Centro' and p.precio_venta = 15.00
+where e.nombre = 'Feria del Centro' and p.nombre = 'Galleta de chocolate'
 on conflict (evento_id, producto_id) do nothing;
 
 insert into public.evento_productos (evento_id, producto_id, precio_venta, margen, incluido)
 select e.id, p.id, null, null, true
 from public.eventos e, public.productos p
-where e.nombre = 'Mercado Navideño 2025' and p.precio_venta = 35.00
+where e.nombre = 'Mercado Navideño 2025' and p.nombre = 'Pan básico'
 on conflict (evento_id, producto_id) do nothing;
 
 -- =====================================================================
@@ -773,7 +772,7 @@ insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario
 select v.id, p.id, 5, 18.00, 90.00, 7.27, 0.60, ep.id
 from public.ventas v
 join public.eventos e on e.id = v.evento_id
-join public.productos p on p.precio_venta = 15.00
+join public.productos p on p.nombre = 'Galleta de chocolate'
 join public.evento_productos ep
   on ep.evento_id = e.id and ep.producto_id = p.id
 where e.nombre = 'Festival Primavera 2026' and v.comprobante_numero = 'FPR-001';
@@ -783,7 +782,7 @@ insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario
 select v.id, p.id, 3, 42.00, 126.00, 23.10, 0.45, ep.id
 from public.ventas v
 join public.eventos e on e.id = v.evento_id
-join public.productos p on p.precio_venta = 35.00
+join public.productos p on p.nombre = 'Pan básico'
 join public.evento_productos ep
   on ep.evento_id = e.id and ep.producto_id = p.id
 where e.nombre = 'Festival Primavera 2026' and v.comprobante_numero = 'FPR-002';
@@ -793,7 +792,7 @@ insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario
 select v.id, p.id, 2, 30.00, 60.00, 23.10, 0.23, ep.id
 from public.ventas v
 join public.eventos e on e.id = v.evento_id
-join public.productos p on p.precio_venta = 35.00
+join public.productos p on p.nombre = 'Pan básico'
 join public.evento_productos ep
   on ep.evento_id = e.id and ep.producto_id = p.id
 where e.nombre = 'Festival Primavera 2026' and v.comprobante_numero = 'FPR-003';
@@ -803,14 +802,14 @@ insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario
 select v.id, p.id, 3, 35.00, 105.00
 from public.ventas v
 join public.eventos e on e.id = v.evento_id
-join public.productos p on p.precio_venta = 35.00
+join public.productos p on p.nombre = 'Pan básico'
 where e.nombre = 'Mercado Navideño 2025' and v.comprobante_numero = 'MNA-001';
 
 insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario, subtotal)
 select v.id, p.id, 5, 15.00, 75.00
 from public.ventas v
 join public.eventos e on e.id = v.evento_id
-join public.productos p on p.precio_venta = 15.00
+join public.productos p on p.nombre = 'Galleta de chocolate'
 where e.nombre = 'Mercado Navideño 2025' and v.comprobante_numero = 'MNA-001';
 
 -- Venta 5 (Navideño, efectivo, 140): 4 panes @ 35 = 140
@@ -818,7 +817,7 @@ insert into public.venta_items (venta_id, producto_id, cantidad, precio_unitario
 select v.id, p.id, 4, 35.00, 140.00
 from public.ventas v
 join public.eventos e on e.id = v.evento_id
-join public.productos p on p.precio_venta = 35.00
+join public.productos p on p.nombre = 'Pan básico'
 where e.nombre = 'Mercado Navideño 2025' and v.comprobante_numero = 'MNA-002';
 
 -- =====================================================================
@@ -857,7 +856,7 @@ select
   ))
 from public.ventas v
 join public.eventos e on e.id = v.evento_id
-join public.productos p on p.precio_venta = 35.00
+join public.productos p on p.nombre = 'Pan básico'
 where e.nombre = 'Festival Primavera 2026' and v.comprobante_numero = 'FPR-003';
 
 -- =====================================================================

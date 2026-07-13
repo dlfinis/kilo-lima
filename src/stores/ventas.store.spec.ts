@@ -75,10 +75,15 @@ const mkEvento = (id: string, overrides: Partial<Evento> = {}): Evento => ({
 const mkProducto = (id: string, overrides: Partial<Producto> = {}): Producto => ({
   id,
   receta_id: `r-${id}`,
-  precio_venta: 5,
+  // catalog-domain-refactor / Slice 1
+  nombre: `Producto ${id}`,
+  categoria: null,
+  precio_venta: null,
   disponible: true,
   orden: 0,
   descripcion: null,
+  icono: null,
+  color: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -189,7 +194,13 @@ function sembrarProducto(
     const productos = useProductosStore()
     productos.productos.push(mkProducto(productoId, { receta_id: recetaId }))
     const epStore = useEventoProductosStore()
+    // catalog-domain-refactor / Slice 2: append to the existing
+    // evento_productos list instead of overwriting. Multiple products
+    // may belong to the same evento, and registerVenta / carrito tests
+    // rely on the full list to resolve pricing for all seeded products.
+    const existentes = epStore.productosPorEvento.get('e-1') ?? []
     epStore.productosPorEvento.set('e-1', [
+      ...existentes,
       mkEventoProducto(`ep-${productoId}`, { producto_id: productoId, margen }),
     ])
   })

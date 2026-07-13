@@ -81,7 +81,12 @@ function sembrarProducto(productoId: string, opts: { costo?: number; margen?: nu
   productos.productos.push({
     id: productoId,
     receta_id: `r-${productoId}`,
-    precio_venta: 5,
+    // catalog-domain-refactor / Slice 1
+    nombre: `Producto ${productoId}`,
+    categoria: null,
+    icono: null,
+    color: null,
+    precio_venta: null,
     disponible: true,
     orden: 0,
     descripcion: null,
