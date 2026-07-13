@@ -2,6 +2,7 @@
 // mirror SQL columns 1:1 to eliminate name-mapping bugs, matching the
 // catalog.types.ts convention. *Input variants exclude DB-only fields
 // so forms receive the minimum contract per ISP (REQ-EVENTS-43).
+import type { CategoriaProducto } from './pos.types'
 
 export type EstadoEvento = 'planificacion' | 'en_curso' | 'cerrado'
 
@@ -63,6 +64,36 @@ export interface ProductoProduccion {
 }
 
 export type ProductoProduccionInput = Omit<ProductoProduccion, 'id' | 'created_at'>
+
+// event-product-management-refactor: joined shape for the unified
+// Gestión productos view. Combines producto_produccion (planned units)
+// with evento_producto (pricing, inclusion) + product/preparation
+// details. Follows the same pattern as EventoProductoConDetalle — the
+// composable reads stores once and joins in-memory so the view doesn't
+// refetch per row.
+export interface ProductoProduccionConDetalle {
+  // producto_produccion fields
+  id: string
+  evento_producto_id: string
+  unidades_a_producir: number
+  created_at: string
+  // evento_producto fields (pricing/inclusion context)
+  evento_id: string
+  producto_id: string
+  incluido: boolean
+  precio_venta: number | null
+  margen: number | null
+  // producto fields (commercial identity + recipe link)
+  producto_nombre: string
+  producto_categoria: CategoriaProducto | null
+  producto_icono: string | null
+  producto_color: string | null
+  receta_id: string
+  // preparation fields
+  receta_nombre: string
+  // derived cost from receta ingredients × materias primas
+  costo_unitario: number
+}
 
 // One row in the per-receta breakdown (REQ-EVENTS-22). Carries the
 // receta name so the UI can render the list without a second lookup.

@@ -29,6 +29,7 @@ import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { useProductosStore } from '@/stores/productos.store'
+import { useProductoProduccionStore } from '@/stores/productoProduccion.store'
 import { calcularCostoReceta, type LineaInput } from '@/composables/useCalculoReceta'
 import { redondearCentavos } from '@/utils/moneda'
 import { calcularBreakEvenUnidades, calcularPrecioMinimoBreakEven, type ContribucionConVolumen } from '@/utils/contribucion'
@@ -188,12 +189,18 @@ export function calcularProyeccion(
   }
 }
 
-// REQ-EVENTS-21: reactive seam that reads from 4 stores inside a
+// REQ-EVENTS-21: reactive seam that reads from stores inside a
 // `computed`. Returns null when eventoId is null/falsy (component
 // gates mounting on this). The stores provide the evento, its gastos,
 // its plan rows, plus the recipes and ingredients catalogs needed for
 // the cost lookup. Cross-store reads inside `computed()` are tracked
 // by Vue so any source change recomputes the projection.
+//
+// event-product-management-refactor: prefer `producto_produccion`
+// (event-product-centric plan) over legacy `plan_produccion`. The
+// pure function `calcularProyeccion` is unchanged — we normalize the
+// new rows into the existing `PlanProduccion[]` shape before calling
+// it, so the tested cost math stays intact.
 export function useProyeccionCostos(
   eventoId: MaybeRefOrGetter<string | null>,
 ): ComputedRef<ProyeccionResultado | null> {
@@ -204,6 +211,7 @@ export function useProyeccionCostos(
   const ingredientsStore = useIngredientsStore()
   const epStore = useEventoProductosStore()
   const productosStore = useProductosStore()
+  const ppStore = useProductoProduccionStore()
 
   return computed<ProyeccionResultado | null>(() => {
     const id = toValue(eventoId)
@@ -216,7 +224,41 @@ export function useProyeccionCostos(
     // PR3: both gastos and plan live in their own stores, keyed by
     // evento_id in a Map for O(1) detail-view reads.
     const gastosFijos = gastosStore.gastosPorEvento.get(id) ?? []
-    const plan = plansStore.planesPorEvento.get(id) ?? []
+
+    // event-product-management-refactor: prefer producto_produccion
+    // (new event-product-centric plan) over legacy plan_produccion.
+    // When producto_produccion rows exist for this event, normalize
+    // them into PlanProduccion[] shape so the pure projection function
+    // works unchanged. Fallback to plansStore when no new rows exist.
+    const ppRows = ppStore.produccionPorEvento.get(id) ?? []
+    let plan: PlanProduccion[]
+    if (ppRows.length > 0) {
+      // Normalize: pp → evento_producto → producto → receta_id.
+      // Each producto_produccion row maps to one PlanProduccion entry
+      // with receta_id derived from the linked product.
+      const epRows = epStore.productosPorEvento.get(id) ?? []
+      const epMap = new Map(epRows.map((ep) => [ep.id, ep]))
+      const productoMap = new Map(productosStore.productos.map((p) => [p.id, p]))
+
+      plan = ppRows
+        .map((pp): PlanProduccion | null => {
+          const ep = epMap.get(pp.evento_producto_id)
+          if (!ep) return null
+          const producto = productoMap.get(ep.producto_id)
+          if (!producto) return null
+          return {
+            id: pp.id,
+            evento_id: ep.evento_id,
+            receta_id: producto.receta_id,
+            unidades_a_producir: pp.unidades_a_producir,
+            created_at: pp.created_at,
+          }
+        })
+        .filter((row): row is PlanProduccion => row !== null)
+    } else {
+      // Fallback: legacy plan_produccion rows (backward compat).
+      plan = plansStore.planesPorEvento.get(id) ?? []
+    }
 
     // REQ-CON-4: pass priced products so the pure function can compute
     // break-even and contribution. Uses productoId → precio_venta from

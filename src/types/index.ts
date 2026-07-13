@@ -25,6 +25,7 @@ export type {
   PlanProduccionInput,
   ProductoProduccion,
   ProductoProduccionInput,
+  ProductoProduccionConDetalle,
   LineaProyeccion,
   ProyeccionResultado,
   DesgloseFijo,
