@@ -58,9 +58,20 @@ export function crearPlansService(supabase: SupabaseClient<Database>): PlansServ
       if (filas.length === 0) {
         return { data: [], error: null }
       }
+      // Sanitize insert payload: pick ONLY the 3 DB-writable fields.
+      // `id` (DEFAULT gen_random_uuid()) and `created_at` (DEFAULT now())
+      // are DB-owned — passing them (or nulls) from loaded rows that flow
+      // back through the grid would violate NOT NULL or clobber the DB's
+      // own values. Defense in depth at the service boundary protects
+      // every caller from accidentally leaking extra fields into insert.
+      const payload = filas.map((f) => ({
+        evento_id: f.evento_id,
+        receta_id: f.receta_id,
+        unidades_a_producir: f.unidades_a_producir,
+      }))
       const insercion = await supabase
         .from('plan_produccion')
-        .insert(filas as Database['public']['Tables']['plan_produccion']['Insert'][])
+        .insert(payload as Database['public']['Tables']['plan_produccion']['Insert'][])
         .select()
       return {
         data: (insercion.data as PlanProduccion[] | null) ?? null,

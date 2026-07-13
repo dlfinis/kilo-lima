@@ -128,6 +128,70 @@ describe('crearPlansService', () => {
       expect(metodos).toContain('delete')
       expect(metodos).not.toContain('insert')
     })
+
+    it('strips DB-owned fields (id, created_at) from the insert payload — loaded rows flowing back must not pass id/created_at', async () => {
+      __pushSupabaseResponse<null>({ data: null, error: null })
+      __pushSupabaseResponse<PlanProduccion[]>({
+        data: [mkPlan('p-new-1', { receta_id: 'r-1' })],
+        error: null,
+      })
+
+      // Simulate a row that was loaded from the DB (has id + created_at)
+      // and flowed back through the grid — the grid's spread keeps them.
+      const filaCargada = {
+        id: 'p-old-1',
+        evento_id: 'e-1',
+        receta_id: 'r-1',
+        unidades_a_producir: 20,
+        created_at: '2026-06-18T00:00:00Z',
+      } as unknown as PlanProduccionInput
+
+      const { error } = await makeService().reemplazarTodos('e-1', [filaCargada])
+
+      expect(error).toBeNull()
+      const insertCall = __getSupabaseMockCalls().find((l) => l.metodo === 'insert')
+      expect(insertCall).toBeDefined()
+      const payload = insertCall!.args[0] as Record<string, unknown>[]
+      expect(payload).toHaveLength(1)
+      // Only the 3 writable fields — id and created_at must be absent.
+      expect(Object.keys(payload[0]!)).toEqual(
+        expect.arrayContaining(['evento_id', 'receta_id', 'unidades_a_producir']),
+      )
+      expect(payload[0]).not.toHaveProperty('id')
+      expect(payload[0]).not.toHaveProperty('created_at')
+    })
+
+    it('strips explicit null id/created_at from the insert payload — prevents NOT NULL violation on DB defaults', async () => {
+      __pushSupabaseResponse<null>({ data: null, error: null })
+      __pushSupabaseResponse<PlanProduccion[]>({
+        data: [mkPlan('p-new-1')],
+        error: null,
+      })
+
+      // Simulate the exact failing scenario: a row carrying id: null and
+      // created_at: null, which would violate NOT NULL on insert.
+      const filaConNulos = {
+        id: null,
+        evento_id: 'e-1',
+        receta_id: 'r-1',
+        unidades_a_producir: 5,
+        created_at: null,
+      } as unknown as PlanProduccionInput
+
+      const { error } = await makeService().reemplazarTodos('e-1', [filaConNulos])
+
+      expect(error).toBeNull()
+      const insertCall = __getSupabaseMockCalls().find((l) => l.metodo === 'insert')
+      const payload = insertCall!.args[0] as Record<string, unknown>[]
+      expect(payload[0]).toEqual({
+        evento_id: 'e-1',
+        receta_id: 'r-1',
+        unidades_a_producir: 5,
+      })
+      // Confirm no nulls leaked through.
+      expect(payload[0]).not.toHaveProperty('id')
+      expect(payload[0]).not.toHaveProperty('created_at')
+    })
   })
 
   describe('eliminar', () => {
