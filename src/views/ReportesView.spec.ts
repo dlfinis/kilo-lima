@@ -4,7 +4,6 @@ import { mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
 import * as comps from 'vuetify/components'
 import * as dirs from 'vuetify/directives'
-import { createRouter, createWebHistory } from 'vue-router'
 import { createPinia, setActivePinia } from 'pinia'
 import { computed } from 'vue'
 
