@@ -113,6 +113,24 @@ describe('PlanificarEventoView', () => {
     expect(wrapper.find('[data-testid="proyeccion-card"]').exists()).toBe(true)
   })
 
+  it('uses the planificar-rail CSS class instead of inline min-width: 360px (plan-fila-layout)', async () => {
+    const evento = mkEvento('e-1')
+    await prepararStores(evento, [mkPlan('p-1')])
+    __pushSupabaseResponse<PlanProduccion[]>({
+      data: [mkPlan('p-1')],
+      error: null,
+    })
+
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+
+    const rail = wrapper.find('.planificar-rail')
+    expect(rail.exists()).toBe(true)
+    // The inline style was removed — the rail gets its sizing from
+    // the scoped CSS class.
+    expect(rail.attributes('style') ?? '').not.toContain('min-width: 360px')
+  })
+
   it('redirects to /eventos/:id?mensaje=evento-cerrado when the evento is cerrado (REQ-EVENTS-35)', async () => {
     const evento = mkEvento('e-1', { estado: 'cerrado' })
     await prepararStores(evento, [])

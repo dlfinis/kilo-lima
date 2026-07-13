@@ -11,17 +11,34 @@
 import { computed, ref, watch } from 'vue'
 
 import PlanProduccionRow from './PlanProduccionRow.vue'
-import type { PlanProduccionInput, Producto, RecetaConIngredientes } from '@/types'
+import type {
+  EventoProductoConDetalle,
+  PlanProduccionInput,
+  Producto,
+  RecetaConIngredientes,
+} from '@/types'
 import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
+
+// UI-only enriched option (design: plan-fila-layout). The selector
+// still needs `nombre` for the autocomplete title, while the row
+// needs both the commercial product name and the preparation name
+// for identity zones. No schema change — the persisted identifier
+// remains receta_id (REQ-EVENTS-15).
+export type RecetaPlanOption = RecetaConIngredientes & {
+  recetaNombre: string
+  productoId: string | null
+  productoNombre: string | null
+}
 
 const props = withDefaults(
   defineProps<{
     eventoId: string
     filasIniciales: PlanProduccionInput[]
     editable?: boolean
+    pricingData?: EventoProductoConDetalle[]
   }>(),
-  { editable: true },
+  { editable: true, pricingData: undefined },
 )
 
 const emit = defineEmits<{
@@ -37,11 +54,20 @@ const recetas = computed<RecetaConIngredientes[]>(() => useRecipesStore().receta
 // — the persisted identifier remains receta_id (REQ-EVENTS-15).
 const productos = computed<Producto[]>(() => useProductosStore().productos)
 
-const recetasParaPlan = computed<RecetaConIngredientes[]>(() => {
+const recetasParaPlan = computed<RecetaPlanOption[]>(() => {
   const byRecetaId = new Map(productos.value.map((p) => [p.receta_id, p]))
   return recetas.value.map((r) => {
     const producto = byRecetaId.get(r.id)
-    return producto ? { ...r, nombre: producto.nombre } : r
+    return {
+      ...r,
+      // SelectorReceta displays `nombre` — keep the product name when
+      // a linked product exists so the autocomplete shows the
+      // commercial identity.
+      nombre: producto?.nombre ?? r.nombre,
+      recetaNombre: r.nombre,
+      productoId: producto?.id ?? null,
+      productoNombre: producto?.nombre ?? null,
+    }
   })
 })
 
@@ -105,6 +131,14 @@ function calcularCostoLinea(fila: PlanProduccionInput): number {
   const unidades = Number(fila.unidades_a_producir) || 0
   return calculo.costoPorUnidad * unidades
 }
+
+// Unit cost for the row's cost zone supporting context (design:
+// plan-fila-layout). Same store path as calcularCostoLinea but
+// without the units multiplier.
+function calcularCostoUnitario(recetaId: string): number {
+  if (!recetaId) return 0
+  return useRecipesStore().costoPorReceta(recetaId).value.costoPorUnidad
+}
 </script>
 
 <template>
@@ -123,7 +157,9 @@ function calcularCostoLinea(fila: PlanProduccionInput): number {
       :fila="fila"
       :recetas="recetasParaPlan"
       :costo-linea="calcularCostoLinea(fila)"
+      :costo-unitario="calcularCostoUnitario(fila.receta_id)"
       :editable="editable"
+      :pricing-data="pricingData"
       @update="(f) => actualizarFila(indice, f)"
       @eliminar="quitarFila"
     />

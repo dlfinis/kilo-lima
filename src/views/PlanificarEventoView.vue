@@ -16,7 +16,9 @@ import PlanProduccionGrid from '@/components/business/PlanProduccionGrid.vue'
 import ProyeccionCostosCard from '@/components/business/ProyeccionCostosCard.vue'
 import { useEvents } from '@/composables/useEvents'
 import { usePlans } from '@/composables/usePlans'
+import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useProyeccionCostos } from '@/composables/useProyeccionCostos'
+import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { estadoEsEditable } from '@/utils/estado'
@@ -34,6 +36,12 @@ const { planesPorEvento, cargando: cargandoPlan, error: errorPlan, cargarPorEven
 const proyeccion = useProyeccionCostos(eventoId)
 const recipesStore = useRecipesStore()
 const productosStore = useProductosStore()
+const epStore = useEventoProductosStore()
+// plan-fila-layout: optional pricing context for rows. The composable
+// joins evento_productos + productos + recetas to produce
+// productosDelEvento; rows match by receta_id and render price/
+// margin chips only when the data is valid (no placeholders).
+const { productosDelEvento } = usePreciosEvento(eventoId)
 
 const editable = computed(() =>
   eventoActual.value ? estadoEsEditable(eventoActual.value.estado) : true,
@@ -44,6 +52,12 @@ const filasIniciales = computed(() =>
 
 const cargando = computed(() => cargandoPlan.value)
 const error = computed(() => errorPlan.value)
+
+// Gate: pass pricing data only when there's at least one entry so the
+// rows receive undefined (no pricing context) and omit the chips.
+const pricingDataParaGrid = computed(() =>
+  productosDelEvento.value.length > 0 ? productosDelEvento.value : undefined,
+)
 
 onMounted(async () => {
   if (!eventoId.value) return
@@ -57,7 +71,12 @@ onMounted(async () => {
     })
     return
   }
-  await Promise.all([cargarPorEvento(eventoId.value), recipesStore.cargarTodas(), productosStore.cargarTodas()])
+  await Promise.all([
+    cargarPorEvento(eventoId.value),
+    recipesStore.cargarTodas(),
+    productosStore.cargarTodas(),
+    epStore.cargarPorEvento(eventoId.value),
+  ])
 })
 
 async function manejarGuardar(filas: import('@/types').PlanProduccionInput[]) {
@@ -126,14 +145,26 @@ function formatearFecha(iso: string): string {
             :evento-id="eventoActual.id"
             :filas-iniciales="filasIniciales"
             :editable="editable"
+            :pricing-data="pricingDataParaGrid"
             @save="manejarGuardar"
           />
         </v-card>
 
-        <div class="planificar-rail" style="min-width: 360px">
+        <div class="planificar-rail">
           <ProyeccionCostosCard :proyeccion="proyeccion" />
         </div>
       </div>
     </template>
   </v-container>
 </template>
+
+<style scoped>
+/* plan-fila-layout: projection rail is secondary supporting context —
+   reduced visual weight so the planning list (flex-grow-1 card)
+   dominates the layout. */
+.planificar-rail {
+  min-width: 280px;
+  max-width: 340px;
+  flex: 1 1 280px;
+}
+</style>
