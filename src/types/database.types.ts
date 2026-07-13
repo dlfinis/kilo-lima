@@ -553,6 +553,29 @@ export interface Database {
       // `items_anteriores` / `items_nuevos` carry full item
       // snapshots so the audit row is self-contained. `motivo` is
       // required — operators must record a reason for every edit.
+      producto_produccion: {
+        Row: {
+          id: string
+          evento_producto_id: string
+          unidades_a_producir: number
+          created_at: string
+        }
+        Insert: {
+          id?: string
+          evento_producto_id: string
+          unidades_a_producir: number
+          created_at?: string
+        }
+        Update: Partial<Database['public']['Tables']['producto_produccion']['Insert']>
+        Relationships: [
+          {
+            foreignKeyName: 'producto_produccion_evento_producto_id_fkey'
+            columns: ['evento_producto_id']
+            referencedRelation: 'evento_productos'
+            referencedColumns: ['id']
+          },
+        ]
+      }
       venta_correcciones: {
         Row: {
           id: string

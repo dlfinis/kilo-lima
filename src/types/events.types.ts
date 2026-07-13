@@ -52,6 +52,18 @@ export interface PlanProduccion {
 
 export type PlanProduccionInput = Omit<PlanProduccion, 'id' | 'created_at'>
 
+// event-product-management-refactor: additive production plan keyed by
+// evento_producto_id. One row per event product — replaces plan_produccion
+// for new writes. plan_produccion stays readable for backward compat.
+export interface ProductoProduccion {
+  id: string
+  evento_producto_id: string
+  unidades_a_producir: number
+  created_at: string
+}
+
+export type ProductoProduccionInput = Omit<ProductoProduccion, 'id' | 'created_at'>
+
 // One row in the per-receta breakdown (REQ-EVENTS-22). Carries the
 // receta name so the UI can render the list without a second lookup.
 export interface LineaProyeccion {

@@ -23,6 +23,8 @@ export type {
   GastoFijoInput,
   PlanProduccion,
   PlanProduccionInput,
+  ProductoProduccion,
+  ProductoProduccionInput,
   LineaProyeccion,
   ProyeccionResultado,
   DesgloseFijo,
