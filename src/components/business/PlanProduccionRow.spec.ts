@@ -102,4 +102,21 @@ describe('PlanProduccionRow', () => {
     expect(wrapper.emitted('eliminar')).toBeTruthy()
     expect(wrapper.emitted('eliminar')?.[0]).toBeTruthy()
   })
+
+  it('passes an empty excludeIds so the pre-populated row keeps its selected receta visible', () => {
+    const recetas = [
+      mkReceta('r-1', { nombre: 'Pan de muerto' }),
+      mkReceta('r-2', { nombre: 'Galletas' }),
+    ]
+    const fila = mkFila({ receta_id: 'r-1' })
+    const wrapper = mountRow({ fila, recetas, costoLinea: 0 })
+
+    const selector = wrapper.findComponent({ name: 'SelectorReceta' })
+    expect(selector.props('modelValue')).toBe('r-1')
+    expect(selector.props('excludeIds')).toEqual([])
+    // The selected receta must be present in the selector's items so
+    // the autocomplete can render its title (not blank).
+    const items = selector.props('recetas') as RecetaConIngredientes[]
+    expect(items.find((r) => r.id === 'r-1')?.nombre).toBe('Pan de muerto')
+  })
 })

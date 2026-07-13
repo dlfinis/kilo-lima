@@ -11,7 +11,8 @@
 import { computed, ref, watch } from 'vue'
 
 import PlanProduccionRow from './PlanProduccionRow.vue'
-import type { PlanProduccionInput, RecetaConIngredientes } from '@/types'
+import type { PlanProduccionInput, Producto, RecetaConIngredientes } from '@/types'
+import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 
 const props = withDefaults(
@@ -30,6 +31,19 @@ const emit = defineEmits<{
 // Lazy store access — same pattern as SelectorReceta so the component
 // can be unit-tested with a `recetas` prop and skip Pinia init.
 const recetas = computed<RecetaConIngredientes[]>(() => useRecipesStore().recetas)
+
+// Stage B: surface the commercial product name when a producto exists
+// for a receta; otherwise fall back to receta.nombre. No schema change
+// — the persisted identifier remains receta_id (REQ-EVENTS-15).
+const productos = computed<Producto[]>(() => useProductosStore().productos)
+
+const recetasParaPlan = computed<RecetaConIngredientes[]>(() => {
+  const byRecetaId = new Map(productos.value.map((p) => [p.receta_id, p]))
+  return recetas.value.map((r) => {
+    const producto = byRecetaId.get(r.id)
+    return producto ? { ...r, nombre: producto.nombre } : r
+  })
+})
 
 const filas = ref<PlanProduccionInput[]>([])
 const errorDuplicado = ref<string | null>(null)
@@ -107,7 +121,7 @@ function calcularCostoLinea(fila: PlanProduccionInput): number {
       v-for="(fila, indice) in filas"
       :key="`${fila.receta_id}-${indice}`"
       :fila="fila"
-      :recetas="recetas"
+      :recetas="recetasParaPlan"
       :costo-linea="calcularCostoLinea(fila)"
       :editable="editable"
       @update="(f) => actualizarFila(indice, f)"

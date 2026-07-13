@@ -43,7 +43,9 @@ const lista = computed<RecetaConIngredientes[]>(() => {
 
 const items = computed(() =>
   lista.value
-    .filter((r) => !props.excludeIds.includes(r.id))
+    .filter(
+      (r) => !props.excludeIds.includes(r.id) || r.id === props.modelValue,
+    )
     .map((r) => ({ title: r.nombre, value: r.id })),
 )
 

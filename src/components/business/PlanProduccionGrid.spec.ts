@@ -15,8 +15,9 @@ import * as directives from 'vuetify/directives'
 import { createClient } from '@supabase/supabase-js'
 
 import PlanProduccionGrid from './PlanProduccionGrid.vue'
+import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
-import type { PlanProduccionInput, RecetaConIngredientes } from '@/types'
+import type { PlanProduccionInput, Producto, RecetaConIngredientes } from '@/types'
 
 const vuetify = createVuetify({ components, directives })
 
@@ -29,6 +30,19 @@ const mkReceta = (id: string, overrides: Partial<RecetaConIngredientes> = {}): R
   created_at: '2026-01-01T00:00:00Z',
   updated_at: '2026-01-01T00:00:00Z',
   ingredientes: [],
+  ...overrides,
+})
+
+const mkProducto = (overrides: Partial<Producto> & { id: string; receta_id: string; nombre: string }): Producto => ({
+  categoria: null,
+  precio_venta: null,
+  disponible: true,
+  orden: 0,
+  descripcion: null,
+  icono: null,
+  color: null,
+  created_at: '2026-01-01T00:00:00Z',
+  updated_at: '2026-01-01T00:00:00Z',
   ...overrides,
 })
 
@@ -46,6 +60,7 @@ const mountGrid = (
     eventoId?: string
     filasIniciales?: PlanProduccionInput[]
     editable?: boolean
+    productos?: Partial<Producto> & { id: string; receta_id: string; nombre: string }[]
   } = {},
 ) => {
   setActivePinia(createPinia())
@@ -56,6 +71,11 @@ const mountGrid = (
       mkReceta('r-1', { nombre: 'Pan de muerto' }),
       mkReceta('r-2', { nombre: 'Galletas' }),
     )
+    // Seed productos store when provided (Stage B).
+    if (props.productos) {
+      const productosStore = useProductosStore()
+      productosStore.productos.push(...props.productos.map((p) => mkProducto(p)))
+    }
   })
   return mount(PlanProduccionGrid, {
     props: {
@@ -128,5 +148,39 @@ describe('PlanProduccionGrid', () => {
 
     expect(wrapper.find('[data-testid="plan-agregar-fila"]').exists()).toBe(false)
     expect(wrapper.find('[data-testid="plan-guardar"]').exists()).toBe(false)
+  })
+
+  // Stage B: product-name enrichment
+  it('passes enriched recetas with producto.nombre when a linked product exists', () => {
+    const wrapper = mountGrid({
+      filasIniciales: [
+        { evento_id: 'e-1', receta_id: 'r-1', unidades_a_producir: 5 },
+      ],
+      productos: [{ id: 'p-1', receta_id: 'r-1', nombre: 'Pan de muerto 6-pack' }],
+    })
+
+    const filas = wrapper.findAll('[data-testid="plan-fila"]')
+    expect(filas).toHaveLength(1)
+    const selector = filas[0]?.findComponent({ name: 'SelectorReceta' })
+    expect(selector).toBeTruthy()
+    const recetasProp = selector!.props('recetas') as RecetaConIngredientes[]
+    const r1 = recetasProp.find((r) => r.id === 'r-1')
+    expect(r1?.nombre).toBe('Pan de muerto 6-pack')
+  })
+
+  it('falls back to receta.nombre when no linked product exists', () => {
+    const wrapper = mountGrid({
+      filasIniciales: [
+        { evento_id: 'e-1', receta_id: 'r-2', unidades_a_producir: 3 },
+      ],
+    })
+
+    const filas = wrapper.findAll('[data-testid="plan-fila"]')
+    expect(filas).toHaveLength(1)
+    const selector = filas[0]?.findComponent({ name: 'SelectorReceta' })
+    expect(selector).toBeTruthy()
+    const recetasProp = selector!.props('recetas') as RecetaConIngredientes[]
+    const r2 = recetasProp.find((r) => r.id === 'r-2')
+    expect(r2?.nombre).toBe('Galletas')
   })
 })

@@ -89,4 +89,24 @@ describe('SelectorReceta', () => {
     const items = auto.props('items') as { title: string; value: string }[]
     expect(items.map((it) => it.value)).toEqual(['r-2'])
   })
+
+  it('preserves the current modelValue in items even when it is in excludeIds', () => {
+    const recetas = [
+      mkReceta('r-1', { nombre: 'Pan de muerto' }),
+      mkReceta('r-2', { nombre: 'Galletas' }),
+      mkReceta('r-3', { nombre: 'Bizcochos' }),
+    ]
+    // r-1 is both the selected value AND in excludeIds — the selector
+    // must keep it visible so the autocomplete can render its title.
+    const wrapper = mountSelector({
+      modelValue: 'r-1',
+      recetas,
+      excludeIds: ['r-1'],
+    })
+
+    const auto = wrapper.findComponent({ name: 'VAutocomplete' })
+    const items = auto.props('items') as { title: string; value: string }[]
+    expect(items.map((it) => it.value)).toContain('r-1')
+    expect(items.find((it) => it.value === 'r-1')?.title).toBe('Pan de muerto')
+  })
 })

@@ -27,9 +27,11 @@ const emit = defineEmits<{
   eliminar: [recetaId: string]
 }>()
 
-const excludeIds = computed<string[]>(() =>
-  props.fila.receta_id ? [props.fila.receta_id] : [],
-)
+// Stage A bugfix: do not self-exclude the row's own receta from the
+// selector's items. The grid already prevents duplicate recetas via
+// validarDuplicados() (REQ-EVENTS-17), so row-level exclusion is
+// unnecessary and caused the selected name to render blank.
+const excludeIds = computed<string[]>(() => [])
 
 const formula = computed(() => {
   const unidades = Number(props.fila.unidades_a_producir) || 0

@@ -17,6 +17,7 @@ import ProyeccionCostosCard from '@/components/business/ProyeccionCostosCard.vue
 import { useEvents } from '@/composables/useEvents'
 import { usePlans } from '@/composables/usePlans'
 import { useProyeccionCostos } from '@/composables/useProyeccionCostos'
+import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { estadoEsEditable } from '@/utils/estado'
 
@@ -32,6 +33,7 @@ const { eventoActual, cargarPorId } = useEvents()
 const { planesPorEvento, cargando: cargandoPlan, error: errorPlan, cargarPorEvento, guardarPlan } = usePlans()
 const proyeccion = useProyeccionCostos(eventoId)
 const recipesStore = useRecipesStore()
+const productosStore = useProductosStore()
 
 const editable = computed(() =>
   eventoActual.value ? estadoEsEditable(eventoActual.value.estado) : true,
@@ -55,7 +57,7 @@ onMounted(async () => {
     })
     return
   }
-  await Promise.all([cargarPorEvento(eventoId.value), recipesStore.cargarTodas()])
+  await Promise.all([cargarPorEvento(eventoId.value), recipesStore.cargarTodas(), productosStore.cargarTodas()])
 })
 
 async function manejarGuardar(filas: import('@/types').PlanProduccionInput[]) {
