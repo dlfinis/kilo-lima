@@ -1,6 +1,7 @@
 // mobile-ux-redesign Phase 3: ProductGrid — responsive grid of
 // ProductButton components for the simplified POS mode. Emits
-// 'add-to-cart' when a product is clicked. Includes a search bar.
+// 'add-to-cart' when a product is clicked. Accepts optional
+// `busqueda` prop for external search control.
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
@@ -13,11 +14,11 @@ import ProductButton from './ProductButton.vue'
 const vuetify = createVuetify({ components, directives })
 
 const mkProductos = () => [
-  { id: 'p-1', nombre: 'Brownies', precio: 12.5, imagen: null },
-  { id: 'p-2', nombre: 'Limonada', precio: 8.0, imagen: null },
-  { id: 'p-3', nombre: 'Churros', precio: 6.5, imagen: null },
-  { id: 'p-4', nombre: 'Palomitas', precio: 5.0, imagen: null },
-  { id: 'p-5', nombre: 'Helado', precio: 10.0, imagen: null },
+  { id: 'p-1', nombre: 'Brownies', precio: 12.5, imagen: null, icono: 'mdi-food' },
+  { id: 'p-2', nombre: 'Limonada', precio: 8.0, imagen: null, icono: null },
+  { id: 'p-3', nombre: 'Churros', precio: 6.5, imagen: null, icono: 'mdi-food' },
+  { id: 'p-4', nombre: 'Palomitas', precio: 5.0, imagen: null, icono: null },
+  { id: 'p-5', nombre: 'Helado', precio: 10.0, imagen: null, icono: null },
 ]
 
 const mountGrid = (props = {}) =>
@@ -41,44 +42,43 @@ describe('ProductGrid', () => {
     expect(wrapper.emitted('add-to-cart')![0]).toEqual(['p-1'])
   })
 
-  it('renders a search input at the top', () => {
+  it('does NOT render an internal search input (search is owned by parent)', () => {
     const wrapper = mountGrid()
     const searchInput = wrapper.find('input[type="text"]')
-    expect(searchInput.exists()).toBe(true)
+    expect(searchInput.exists()).toBe(false)
   })
 
-  it('filters products by search text', async () => {
-    const wrapper = mountGrid()
-    const searchInput = wrapper.find('input[type="text"]')
-    await searchInput.setValue('Brown')
+  it('filters products by busqueda prop (external search)', async () => {
+    const wrapper = mountGrid({ busqueda: 'Brown' })
     const buttons = wrapper.findAllComponents(ProductButton)
     expect(buttons).toHaveLength(1)
     expect(wrapper.text()).toContain('Brownies')
   })
 
-  it('filters case-insensitively', async () => {
-    const wrapper = mountGrid()
-    const searchInput = wrapper.find('input[type="text"]')
-    await searchInput.setValue('brown')
+  it('filters case-insensitively via busqueda prop', () => {
+    const wrapper = mountGrid({ busqueda: 'brown' })
     const buttons = wrapper.findAllComponents(ProductButton)
     expect(buttons).toHaveLength(1)
   })
 
-  it('shows all products when search is empty', async () => {
-    const wrapper = mountGrid()
-    const searchInput = wrapper.find('input[type="text"]')
-    await searchInput.setValue('ch')
+  it('shows all products when busqueda is empty', () => {
+    let wrapper = mountGrid({ busqueda: 'ch' })
     expect(wrapper.findAllComponents(ProductButton)).toHaveLength(1)
-    await searchInput.setValue('')
+    wrapper = mountGrid({ busqueda: '' })
     expect(wrapper.findAllComponents(ProductButton)).toHaveLength(5)
   })
 
-  it('shows empty state message when no products match search', async () => {
+  it('shows all products when busqueda prop is omitted', () => {
     const wrapper = mountGrid()
-    const searchInput = wrapper.find('input[type="text"]')
-    await searchInput.setValue('xyznotfound')
+    expect(wrapper.findAllComponents(ProductButton)).toHaveLength(5)
+  })
+
+  it('shows empty state message when no products match busqueda', () => {
+    const wrapper = mountGrid({ busqueda: 'xyznotfound' })
     expect(wrapper.findAllComponents(ProductButton)).toHaveLength(0)
-    expect(wrapper.text()).toContain('Sin productos')
+    expect(wrapper.find('[data-testid="product-grid-empty"]').text()).toContain(
+      'No hay productos que coincidan con "xyznotfound"',
+    )
   })
 
   it('shows empty state message when productos array is empty', () => {

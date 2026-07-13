@@ -31,14 +31,12 @@ defineEmits<{
   eliminar: [productoId: string]
 }>()
 
-function nombreReceta(producto: Producto): string {
-  return props.recetas.find((r) => r.id === producto.receta_id)?.nombre ?? 'Receta'
-}
-
 const productosFiltrados = computed<Producto[]>(() => {
   const aguja = props.busqueda.trim().toLowerCase()
   if (!aguja) return props.productos
-  return props.productos.filter((p) => nombreReceta(p).toLowerCase().includes(aguja))
+  // catalog-domain-refactor / Slice 2: search by commercial product
+  // name (not receta name).
+  return props.productos.filter((p) => p.nombre.toLowerCase().includes(aguja))
 })
 
 const mostrarEmpty = computed(
@@ -73,7 +71,7 @@ function contribucionPara(producto: Producto): number | null {
       >
         <ProductoCard
           :producto="producto"
-          :nombre-receta="nombreReceta(producto)"
+          :nombre-receta="producto.nombre"
           :contribucion="contribucionPara(producto)"
           modo="pos"
           @agregar="(id) => $emit('agregar', id)"
@@ -96,10 +94,10 @@ function contribucionPara(producto: Producto): number | null {
       <v-btn
         v-if="productos.length === 0"
         color="primary"
-        :href="'/recetas'"
+        :href="'/productos/preparaciones'"
         data-testid="producto-grid-ir-recetas"
       >
-        Ir a Recetas
+        Ir a Preparaciones
       </v-btn>
     </v-alert>
   </div>

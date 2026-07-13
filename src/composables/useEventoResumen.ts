@@ -5,8 +5,6 @@
 // - Break-even en unidades y en ingresos
 // - Contribución promedio ponderada
 import { computed, type ComputedRef } from 'vue'
-
-import type { Evento } from '@/types'
 import { useEventsStore } from '@/stores/events.store'
 import { useGastosFijosStore } from '@/stores/gastosFijos.store'
 import { usePlansStore } from '@/stores/plans.store'

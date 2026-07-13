@@ -35,13 +35,13 @@ describe('CheckoutButton', () => {
 
   it('emits checkout event when clicked', async () => {
     const wrapper = mountBtn({ disabled: false })
-    await wrapper.trigger('click')
+    await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('checkout')).toBeTruthy()
   })
 
   it('does not emit checkout when disabled', async () => {
     const wrapper = mountBtn({ disabled: true })
-    await wrapper.trigger('click')
+    await wrapper.find('button').trigger('click')
     expect(wrapper.emitted('checkout')).toBeFalsy()
   })
 
@@ -53,17 +53,35 @@ describe('CheckoutButton', () => {
     expect(btn.classes()).toContain('v-btn--block')
   })
 
-  it('uses success color (green)', () => {
+  it('uses accent color (orange — the brief\'s "color de ventas")', () => {
     const wrapper = mountBtn()
     const btn = wrapper.find('button')
     expect(btn.exists()).toBe(true)
-    // Vuetify success class variant uses bg-success
-    expect(btn.classes().some((c) => c.includes('bg-success'))).toBe(true)
+    // Vuetify accent class variant uses bg-accent
+    expect(btn.classes().some((c) => c.includes('bg-accent'))).toBe(true)
   })
 
   it('renders with large sizing', () => {
     const wrapper = mountBtn()
     const btn = wrapper.find('button')
-    expect(btn.classes()).toContain('v-btn--size-x-large')
+    expect(btn.classes()).toContain('v-btn--size-large')
+  })
+
+  it('shows disabled hint caption when disabled and hint is provided', () => {
+    const wrapper = mountBtn({
+      disabled: true,
+      disabledHint: 'Agregar productos al carrito',
+    })
+    const hint = wrapper.find('[data-testid="checkout-disabled-hint"]')
+    expect(hint.exists()).toBe(true)
+    expect(hint.text()).toBe('Agregar productos al carrito')
+  })
+
+  it('does not show disabled hint caption when enabled', () => {
+    const wrapper = mountBtn({
+      disabled: false,
+      disabledHint: 'Agregar productos al carrito',
+    })
+    expect(wrapper.find('[data-testid="checkout-disabled-hint"]').exists()).toBe(false)
   })
 })

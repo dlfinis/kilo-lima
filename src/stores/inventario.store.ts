@@ -2,14 +2,14 @@
 // Thin reactive wrapper around the useInventario composable.
 // Exposes Pinia-style reactive state: items, stockCritico,
 // and unidadesPosiblesPorProducto for cross-view consumption.
-import { computed, inject, ref } from 'vue'
+import { computed, inject } from 'vue'
 import { defineStore } from 'pinia'
 import type { SupabaseClient } from '@supabase/supabase-js'
 
-import type { Database, MateriaPrima, RecetaConIngredientes } from '@/types'
+import type { Database, MateriaPrima } from '@/types'
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useRecipesStore } from '@/stores/recipes.store'
-import { alertLevel, unidadesPosibles, type AlertLevel } from '@/composables/useInventario'
+import { alertLevel, unidadesPosibles } from '@/composables/useInventario'
 
 export const useInventarioStore = defineStore('inventario', () => {
   // Supabase is required for store initialization but delegations go

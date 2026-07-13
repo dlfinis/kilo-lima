@@ -1,9 +1,10 @@
 // REQ-POS-12, REQ-POS-48, REQ-POS-54: confirmation dialog for
 // registering a venta. Shows the total, the active evento, and a
-// metodo_pago selector. The dialog is purely presentational — emits
-// `confirmar` with the chosen metodo_pago so the parent view owns
-// the actual `registrarVenta` call (the optimistic UI / revert
-// lives in the store, not here).
+// metodo_pago selector (button-group UX for fast choice). The
+// dialog is purely presentational — emits `confirmar` with the
+// chosen metodo_pago so the parent view owns the actual
+// `registrarVenta` call (the optimistic UI / revert lives in the
+// store, not here).
 //
 // v-dialog uses Teleport, so button click flows are exercised in
 // PosView.spec.ts at the integration level. This component spec
@@ -13,6 +14,10 @@
 // metodo_pago === 'efectivo', the dialog shows a monto_recibido input,
 // a live cambio preview, and an EXACTO button. The confirm emit now
 // carries the optional monto_recibido so the store can validate.
+//
+// UX improvement: the v-select was replaced by a button-group selector
+// for faster single-tap payment method choice. Tests verify each
+// method button renders and clicking one switches the active method.
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { mount, type VueWrapper } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
@@ -131,6 +136,53 @@ describe('RegistrarVentaDialog', () => {
   it('renders without an evento (the view still allows the dialog)', () => {
     mountDialog({ evento: null })
     expect(document.body.textContent).toContain('Sin evento')
+  })
+})
+
+// UX: button-group payment method selector — replaces the slower
+// v-select with single-tap buttons. Each method (efectivo,
+// transferencia, tarjeta, mixto) renders as a button with icon.
+describe('RegistrarVentaDialog — button-group payment selector (UX)', () => {
+  it('renders a button for each payment method', () => {
+    mountDialog()
+    for (const metodo of ['efectivo', 'transferencia', 'tarjeta', 'mixto']) {
+      const btn = document.querySelector(
+        `[data-testid="registrar-venta-metodo-${metodo}"]`,
+      )
+      expect(btn, `button for ${metodo} should exist`).toBeTruthy()
+    }
+  })
+
+  it('highlights the active method (tonal variant) and others are outlined', async () => {
+    mountDialog()
+    // Default is efectivo → first button should be tonal (selected).
+    const efectivoBtn = document.querySelector(
+      '[data-testid="registrar-venta-metodo-efectivo"]',
+    )
+    const transferenciaBtn = document.querySelector(
+      '[data-testid="registrar-venta-metodo-transferencia"]',
+    )
+    // Selected button uses tonal variant, unselected uses outlined.
+    expect(efectivoBtn?.classList.contains('v-btn--variant-tonal')).toBe(true)
+    expect(transferenciaBtn?.classList.contains('v-btn--variant-outlined')).toBe(true)
+  })
+
+  it('clicking a method button switches the active method', async () => {
+    const wrapper = mountDialog()
+    const vm = wrapper.vm as unknown as { metodoPago: MetodoPago }
+    expect(vm.metodoPago).toBe('efectivo')
+    // Click the "Tarjeta" button.
+    const tarjetaBtn = document.querySelector(
+      '[data-testid="registrar-venta-metodo-tarjeta"]',
+    ) as HTMLElement
+    tarjetaBtn?.click()
+    await wrapper.vm.$nextTick()
+    expect(vm.metodoPago).toBe('tarjeta')
+  })
+
+  it('does NOT render the old v-select (replaced by buttons)', () => {
+    mountDialog()
+    expect(document.querySelector('[data-testid="registrar-venta-metodo"]')).toBeFalsy()
   })
 })
 

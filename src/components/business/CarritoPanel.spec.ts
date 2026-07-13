@@ -27,10 +27,10 @@ const mkLinea = (overrides: Partial<LineaCarrito> = {}): LineaCarrito => ({
   ...overrides,
 })
 
-const mountPanel = (props?: { carrito?: LineaCarrito[]; total?: number }) => {
+const mountPanel = (props?: { carrito?: LineaCarrito[]; total?: number; hideRegisterButton?: boolean }) => {
   const p = props ?? {}
   return mount(CarritoPanel, {
-    props: { carrito: p.carrito ?? [], total: p.total ?? 0 },
+    props: { carrito: p.carrito ?? [], total: p.total ?? 0, hideRegisterButton: p.hideRegisterButton ?? false },
     global: { plugins: [vuetify] },
   })
 }
@@ -107,5 +107,11 @@ describe('CarritoPanel', () => {
     await item.vm.$emit('eliminar', 'p-1')
     expect(wrapper.emitted('update-cantidad')?.[0]).toEqual(['p-1', 5])
     expect(wrapper.emitted('eliminar')?.[0]).toEqual(['p-1'])
+  })
+
+  it('hides the Registrar venta button when hideRegisterButton is true', () => {
+    const wrapper = mountPanel({ carrito: [mkLinea()], total: 10, hideRegisterButton: true })
+    const boton = wrapper.find('[data-testid="carrito-registrar"]')
+    expect(boton.exists()).toBe(false)
   })
 })

@@ -14,8 +14,6 @@
 // vista lo establezca como precio de venta.
 import { computed } from 'vue'
 
-import { calcularPrecioPorMargen } from '@/utils/pricing'
-
 const props = withDefaults(defineProps<{
   modelValue: number
   costo: number
@@ -37,11 +35,9 @@ const porcentaje = computed<number>(() => Math.round((props.modelValue ?? 0) * 1
 // so values can exceed 100% (e.g. 133% ganancia on Pan básico). The
 // preview price and unit value are computed directly from the markup
 // formula instead of `calcularPrecioPorMargen` which clamps at ≥ 1.
-//   precioPreview = costo × (1 + markup)
-//   unitValue     = costo × markup  (= precioPreview − costo)
+//   unitValue     = costo × markup
 const costoNum = computed<number>(() => props.costo ?? 0)
 const markup = computed<number>(() => props.modelValue ?? 0)
-const precioPreview = computed<number>(() => costoNum.value * (1 + markup.value))
 const unitValue = computed<number>(() => costoNum.value * markup.value)
 const accentClass = computed(() =>
   props.color === 'orange' ? 'text-orange-darken-2' : 'text-success',
@@ -57,12 +53,6 @@ function onSliderInput(event: Event) {
   const ui = Number(target.value)
   const decimal = Math.max(0, Math.min(200, ui)) / 100
   emit('update:modelValue', decimal)
-}
-
-function onPrecioClick() {
-  if (!props.disabled) {
-    emit('apply-price', precioPreview.value)
-  }
 }
 </script>
 

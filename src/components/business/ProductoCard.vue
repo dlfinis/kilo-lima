@@ -16,8 +16,12 @@ const props = withDefaults(
     nombreReceta: string
     contribucion?: number | null
     modo?: 'pos' | 'catalogo'
+    // catalog-domain-refactor / Slice 2: optional event-scoped price
+    // for POS mode. When provided, it overrides product-level pricing.
+    // Slice 3 (PosView) wires this from usePreciosEvento.
+    precio?: number | null
   }>(),
-  { contribucion: null, modo: 'pos' },
+  { contribucion: null, modo: 'pos', precio: null },
 )
 
 const emit = defineEmits<{
@@ -80,24 +84,18 @@ function alHacerClick(): void {
           data-testid="producto-card-icono"
         />
 
-        <!-- Nombre centrado y visible -->
+        <!-- catalog-domain-refactor / Slice 2: display the commercial
+             product name (editable, unique) instead of the linked
+             receta name. -->
         <div class="text-body-1 font-weight-medium mb-1 producto-card__nombre">
-          {{ nombreReceta }}
+          {{ producto.nombre }}
         </div>
 
-        <!-- Precio grande debajo del titulo -->
+        <!-- catalog-domain-refactor / Slice 2: price from event pricing
+             or provided `precio` prop. Slice 3 wires event pricing in
+             PosView; fallback keeps the card safe for catalog mode. -->
         <div class="text-h5 font-weight-bold" data-testid="producto-card-precio">
-          {{ formatearUSD(producto.precio_venta) }}
-        </div>
-
-        <!-- Contribucion sutil -->
-        <div
-          v-if="contribucion !== null && contribucion !== undefined"
-          class="text-caption mt-1"
-          :class="contribucion >= 0 ? 'text-light-green-lighten-3' : 'text-red-lighten-2'"
-          data-testid="producto-card-contribucion"
-        >
-          +{{ formatearUSD(contribucion) }}
+          {{ formatearUSD(precio ?? producto.precio_venta ?? 0) }}
         </div>
       </div>
 
@@ -126,7 +124,7 @@ function alHacerClick(): void {
             size="32"
             :color="colorCard"
           />
-          <div class="text-h6 text-truncate">{{ nombreReceta }}</div>
+          <div class="text-h6 text-truncate">{{ producto.nombre }}</div>
           <v-spacer />
           <v-chip
             :color="colorCard"

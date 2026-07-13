@@ -16,10 +16,15 @@ const vuetify = createVuetify({ components, directives })
 const mkProducto = (overrides: Partial<Producto> = {}): Producto => ({
   id: 'p-1',
   receta_id: 'r-1',
-  precio_venta: 5,
+  // catalog-domain-refactor / Slice 1
+  nombre: 'Producto de prueba',
+  categoria: null,
+  precio_venta: null,
   disponible: true,
   orden: 0,
   descripcion: null,
+  icono: null,
+  color: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,

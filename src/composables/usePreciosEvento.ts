@@ -88,7 +88,13 @@ export function usePreciosEvento(
         const precioFinal = ep.precio_venta ?? precioSugerido
         return {
           ...ep,
-          producto_nombre: receta?.nombre ?? '(producto sin receta)',
+          // catalog-domain-refactor / Slice 2: producto.nombre is the
+          // commercial display identity. receta.nombre is for
+          // production/cost context only.
+          producto_nombre: producto?.nombre ?? '(producto sin nombre)',
+          // catalog-domain-refactor / Slice 3: closed-set category
+          // for POS filtering.
+          producto_categoria: producto?.categoria ?? null,
           receta_id: producto?.receta_id ?? '',
           receta_nombre: receta?.nombre ?? '',
           costo_unitario: costo,
@@ -101,15 +107,16 @@ export function usePreciosEvento(
       })
   })
 
+  // catalog-domain-refactor / Slice 2: event pricing
+  // (evento_productos.precio_venta ?? precio_sugerido) is the sole
+  // sell-price authority. No catalog-price fallback — products without
+  // evento pricing return 0 and should not appear in the POS grid.
   const precioParaProducto = computed<(productoId: string) => number>(() => {
     return (productoId: string): number => {
       const id = idRef.value
       if (!id) return 0
       const fila = productosDelEvento.value.find((ep) => ep.producto_id === productoId)
-      if (fila) return fila.precio_final
-      // Fallback to the catalog price when no evento_producto exists.
-      const producto = productosStore.productos.find((p) => p.id === productoId)
-      return producto?.precio_venta ?? 0
+      return fila ? fila.precio_final : 0
     }
   })
 

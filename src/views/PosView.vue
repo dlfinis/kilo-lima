@@ -60,6 +60,9 @@ import RegistrarVentaDialog from '@/components/business/RegistrarVentaDialog.vue
 import ResumenVentasHoy from '@/components/business/ResumenVentasHoy.vue'
 import { useEvents } from '@/composables/useEvents'
 import { useGastosImprevistos } from '@/composables/useGastosImprevistos'
+import { useIngredientsStore } from '@/stores/ingredients.store'
+import { useRecipesStore } from '@/stores/recipes.store'
+import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { usePosMode } from '@/composables/usePosMode'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useProductos } from '@/composables/useProductos'
@@ -82,6 +85,7 @@ const router = useRouter()
 const FLAG_POS_REDESIGN = import.meta.env.VITE_FLAG_POS_REDESIGN === 'true'
 
 const { cargando: cargandoProductos, error: errorProductos, cargarTodas } = useProductos()
+const epStore = useEventoProductosStore()
 const { recetas, cargarTodas: cargarRecetas } = useRecipes()
 const {
   carrito,
@@ -100,15 +104,49 @@ const {
   actualizarCantidad,
   quitarDelCarrito,
 } = useVentas()
-const { cargarTodas: cargarEventos } = useEvents()
+const {
+  cargarTodas: cargarEventos,
+  eventos,
+  cambiarEstado,
+} = useEvents()
 const {
   gastosPorEvento: gastosImprevistosPorEvento,
-  cargarPorEvento: cargarImprevistos,
   crear: crearImprevisto,
   eliminar: eliminarImprevisto,
   totalPorEvento: totalImprevistosPorEvento,
 } = useGastosImprevistos()
 const { online } = useOnlineStatus()
+
+// UX: Planificacion events that can be started from POS.
+const eventosPlanificacion = computed(() =>
+  eventos.value.filter((e) => e.estado === 'planificacion'),
+)
+
+const iniciandoEventoId = ref<string | null>(null)
+const errorIniciar = ref<string | null>(null)
+
+async function iniciarEventoDesdePOS(id: string): Promise<void> {
+  iniciandoEventoId.value = id
+  errorIniciar.value = null
+  errorCargaDependencias.value = null
+  const res = await cambiarEstado(id, 'en_curso')
+  iniciandoEventoId.value = null
+  if (res.error) {
+    errorIniciar.value = res.error.message
+    return
+  }
+  // Load the dependency chain for the newly-active event so
+  // sellable products (evento_productos + ingredients + recetas)
+  // appear immediately without a page refresh. Matches the
+  // active-event branch of cargarDatosPOS but avoids re-fetching
+  // every event and every product.
+  await Promise.all([
+    epStore.cargarPorEvento(id),
+    useIngredientsStore().cargarTodas(),
+  ])
+  if (recetas.value.length === 0) await cargarRecetas()
+  capturarErroresDependencias()
+}
 
 // mobile-ux-redesign Phase 3: POS mode flag for simplified vs full.
 const { isSimplifiedMode } = usePosMode()
@@ -118,6 +156,13 @@ const { isSimplifiedMode } = usePosMode()
 const cobrarHabilitado = computed(
   () => carrito.value.length > 0 && paymentMethod.value !== null,
 )
+
+/** UX hint shown below the checkout button when it is disabled. */
+const checkoutDisabledHint = computed(() => {
+  if (carrito.value.length === 0) return 'Agregar productos al carrito'
+  if (paymentMethod.value === null) return 'Seleccionar método de pago'
+  return ''
+})
 
 // Simplified-mode checkout: select payment and call registrarVenta.
 async function manejarCheckoutSimplificado() {
@@ -132,25 +177,15 @@ async function manejarCheckoutSimplificado() {
 // refresh. `productosDelEvento` already filters `incluido = true`; we
 // additionally filter out rows whose costo_unitario is 0 (receta has
 // no ingredients) so the POS never shows unsellable $0 cards.
-const { productosDelEvento, contribucionParaProducto } = usePreciosEvento(
+//
+// NOTE: cost/contribution display has been REMOVED from POS cards per
+// corrective pass — the POS catalog should be clean (no financial noise).
+const { productosDelEvento } = usePreciosEvento(
   () => eventoEnCurso.value?.id ?? null,
 )
 const productosParaGrid = computed(() =>
   productosDelEvento.value.filter((ep) => ep.costo_unitario > 0),
 )
-
-// REQ-CON-8: build a productId → contribution map for the grid.
-// Reads the new `contribucionParaProducto` getter from usePreciosEvento
-// for each producto in the grid so the ProductoCardGrid can render
-// each ContribucionBadge inline.
-const contribucionesPorProducto = computed<Record<string, number>>(() => {
-  const mapa: Record<string, number> = {}
-  for (const ep of productosParaGrid.value) {
-    const contrib = contribucionParaProducto.value(ep.producto_id)
-    if (contrib !== null) mapa[ep.producto_id] = contrib
-  }
-  return mapa
-})
 
 // mobile-ux-redesign Phase 3: simplified POS grid uses ProductGrid
 // which expects { id, nombre, precio, imagen } shape.
@@ -160,6 +195,7 @@ const productosSimplificados = computed(() =>
     nombre: ep.producto_nombre,
     precio: ep.precio_final,
     imagen: null,
+    icono: ep.producto_icono,
   })),
 )
 
@@ -171,6 +207,10 @@ const productosMapeados = computed<Producto[]>(() =>
   productosParaGrid.value.map((ep) => ({
     id: ep.producto_id,
     receta_id: ep.receta_id,
+    // catalog-domain-refactor / Slice 3: commercial product identity
+    // from evento_productos join (not from receta).
+    nombre: ep.producto_nombre,
+    categoria: ep.producto_categoria,
     precio_venta: ep.precio_final,
     disponible: true,
     orden: 0,
@@ -194,11 +234,36 @@ const recetasParaGrid = computed<RecetaConIngredientes[]>(() =>
   })),
 )
 
+// Track downstream dependency load failures so the UI can
+// distinguish "data failed to load" from "no products configured".
+// Dependencies are evento_productos (epStore) + ingredients + recetas
+// (all required for usePreciosEvento to compute sellable products).
+// Checked after full chain resolution in cargarDatosPOS / iniciarEventoDesdePOS.
+const errorCargaDependencias = ref<string | null>(null)
+
+function capturarErroresDependencias(): void {
+  const partes: string[] = []
+  const ingStore = useIngredientsStore()
+  const recetasStore = useRecipesStore()
+  if (epStore.error) partes.push('productos del evento')
+  if (ingStore.error) partes.push('materias primas')
+  if (recetasStore.error) partes.push('recetas')
+  errorCargaDependencias.value =
+    partes.length > 0 ? `Error al cargar: ${partes.join(', ')}` : null
+}
+
 // REQ-FIN-30: empty-state gating. Empty means "the active evento has
 // no included productos with computable costo" — either the operator
 // never configured the evento, or every producto is excluded / has no
 // receta cost. We surface the configurator instead of a generic empty.
 const hayProductosParaVender = computed(() => productosParaGrid.value.length > 0)
+
+// Only show "no products configured" when the dependency chain loaded
+// successfully — a failed epStore/ingredients/recetas load is a data error,
+// not a configuration gap.
+const mostrarSinProductos = computed(
+  () => !hayProductosParaVender.value && !errorCargaDependencias.value,
+)
 
 // REQ-FIN-29: badge text. evento.margen_ganancia is the default
 // margin (nullable in DB; falls back to "—" when unset).
@@ -208,7 +273,6 @@ const margenBadge = computed(() => {
   return `${Math.round(m * 100)}%`
 })
 
-const imprevistosAbierto = ref(false)
 const dialogoCrearImprevisto = ref(false)
 
 const busqueda = ref('')
@@ -284,24 +348,40 @@ async function aplicarCorreccion(payload: {
   ventaEnEdicion.value = null
 }
 
-// CargarEventos ensures eventoEnCurso is computed. The view fetches
-// eventos, productos, and recetas independently so the guard works
-// even if the user lands on /pos without first visiting /eventos or
-// /productos. usePreciosEvento (PR-2b) joins all three to compute
-// precio_final + costo_unitario for the POS grid.
+// CargarDatosPOS ensures the full dependency chain is loaded so
+// usePreciosEvento can compute sellable products even on a cold
+// /pos load. The chain is:
+//   1. eventos (for eventoEnCurso guard + margen fallback)
+//   2. productos catalog + recetas (for name/lookup)
+//   3. evento_productos (the join that links evento ↔ producto;
+//      without this, usePreciosEvento sees zero rows)
+//   4. ingredients (materias primas → costo_unitario computation)
 //
 // pos-redesign (REQ-POS-HOY-1): when the flag is on, ventas are
-// fetched in parallel with productos — the grid is never blocked by
-// the ventas fetch (REQ-POS-HOY-4).
+// fetched in parallel — the grid is never blocked by the ventas
+// fetch (REQ-POS-HOY-4).
 async function cargarDatosPOS() {
   await cargarEventos()
   const catalogo = cargarTodas()
-  if (FLAG_POS_REDESIGN && eventoEnCurso.value) {
-    await Promise.all([catalogo, cargarPorEvento(eventoEnCurso.value.id)])
+  errorCargaDependencias.value = null
+
+  if (eventoEnCurso.value) {
+    const cadena = [
+      catalogo,
+      epStore.cargarPorEvento(eventoEnCurso.value.id),
+      useIngredientsStore().cargarTodas(),
+    ]
+    if (FLAG_POS_REDESIGN) {
+      cadena.push(cargarPorEvento(eventoEnCurso.value.id))
+    }
+    await Promise.all(cadena)
   } else {
     await catalogo
   }
   if (recetas.value.length === 0) await cargarRecetas()
+  if (eventoEnCurso.value) {
+    capturarErroresDependencias()
+  }
 }
 
 onMounted(cargarDatosPOS)
@@ -309,17 +389,6 @@ onMounted(cargarDatosPOS)
 // se reactiva (si esta dentro de KeepAlive o se navega de vuelta).
 // Esto asegura que los cambios hechos en ProductosView se reflejen.
 onActivated(cargarDatosPOS)
-
-// REQ-POS-40: cargar los imprevistos del evento en curso cuando el
-// usuario expande la sección colapsable. Lazy load keeps the initial
-// mount fast and avoids extra Supabase calls when the user never
-// opens the section.
-async function alExpandirImprevistos() {
-  if (!eventoEnCurso.value) return
-  if (!gastosImprevistosPorEvento.value.has(eventoEnCurso.value.id)) {
-    await cargarImprevistos(eventoEnCurso.value.id)
-  }
-}
 
 const listaImprevistos = computed(() =>
   eventoEnCurso.value
@@ -345,11 +414,6 @@ async function manejarEliminarImprevisto(id: string) {
   return eliminarImprevisto(id)
 }
 
-function toggleImprevistos() {
-  imprevistosAbierto.value = !imprevistosAbierto.value
-  if (imprevistosAbierto.value) alExpandirImprevistos()
-}
-
 // REQ-FIN-31 (PR-2b): delegate everything to the store. The store
 // snapshots precio + costo + margen from usePreciosEvento so we don't
 // re-read the catalogo or evento_productos here.
@@ -360,6 +424,31 @@ function manejarAgregar(productoId: string) {
 function irAConfigurarProductos() {
   if (!eventoEnCurso.value) return
   router.push(`/eventos/${eventoEnCurso.value.id}/productos`)
+}
+
+// UX: inline quick-init — bulk-add all catalog products to the
+// active evento so the operator can start selling immediately
+// without navigating to the configurator (REQ-FIN-30 extended).
+const inicializandoCatalogo = ref(false)
+const errorInicializarCatalogo = ref<string | null>(null)
+
+async function inicializarProductosDesdeCatalogo(): Promise<void> {
+  if (!eventoEnCurso.value) return
+  inicializandoCatalogo.value = true
+  errorInicializarCatalogo.value = null
+  const res = await epStore.inicializarDesdeCatalogo(eventoEnCurso.value.id)
+  inicializandoCatalogo.value = false
+  if (res.error) {
+    errorInicializarCatalogo.value = res.error.message
+    return
+  }
+  // Reload the catalog + recetas + ingredients so usePreciosEvento
+  // recomputes costo_unitario for the newly-added rows.
+  await cargarTodas()
+  if (recetas.value.length === 0) await cargarRecetas()
+  if (useIngredientsStore().materiasPrimas.length === 0) {
+    await useIngredientsStore().cargarTodas()
+  }
 }
 
 function abrirDialogoRegistrar() {
@@ -406,113 +495,229 @@ async function reintentarHistorial() {
 </script>
 
 <template>
-  <v-container>
-    <div class="d-flex align-center justify-space-between mb-4">
-      <h1 data-testid="pos-titulo">POS</h1>
+  <v-container class="px-2">
+    <!-- Header: compact operational strip.
+         POS heading always visible — smaller when an event is active. -->
+    <div class="d-flex align-center justify-space-between mb-2">
+      <h1
+        :class="eventoEnCurso ? 'text-caption font-weight-bold text-medium-emphasis' : 'text-h5'"
+        data-testid="pos-titulo"
+      >
+        POS
+      </h1>
       <div class="d-flex align-center ga-2">
         <v-chip
-          v-if="margenBadge"
-          size="small"
-          color="primary"
-          variant="tonal"
-          data-testid="pos-margen-badge"
-        >
-          Margen: {{ margenBadge }}
-        </v-chip>
-        <v-chip
+          v-if="!eventoEnCurso"
           :color="online ? 'success' : 'error'"
-          size="small"
+          size="x-small"
+          variant="tonal"
           data-testid="pos-online"
         >
           {{ online ? 'En línea' : 'Sin conexión' }}
         </v-chip>
-        <!-- pos-redesign (REQ-POS-HISTORIAL-1): operator-accessible
-             detailed event sales history. Gated by the same feature
-             flag as the rest of the pos-redesign surface. -->
-        <v-btn
-          v-if="FLAG_POS_REDESIGN && eventoEnCurso"
-          size="small"
-          variant="tonal"
-          color="primary"
-          prepend-icon="mdi-history"
-          data-testid="pos-historial-btn"
-          @click="historialAbierto = true"
-        >
-          Ver historial
-        </v-btn>
-        <!-- Gastos imprevistos: acceso rápido con menú desplegable -->
-        <v-menu v-if="eventoEnCurso" :close-on-content-click="false" location="bottom end">
-          <template #activator="{ props: menuProps }">
-            <v-btn
-              v-bind="menuProps"
-              icon="mdi-cash-remove"
-              size="small"
-              variant="tonal"
-              color="warning"
-              data-testid="pos-imprevistos-btn"
-            >
-              <v-badge
-                v-if="totalImprevistos > 0"
-                :content="`$${totalImprevistos.toFixed(0)}`"
-                color="error"
-                inline
-              />
-            </v-btn>
-          </template>
-          <v-card min-width="320" max-width="400" data-testid="pos-imprevistos-menu">
-            <v-card-title class="d-flex align-center text-body-1">
-              <v-icon class="mr-2">mdi-cash-remove</v-icon>
-              Gastos imprevistos
-              <v-spacer />
-              <v-chip size="x-small" data-testid="pos-imprevistos-total">
-                ${{ totalImprevistos.toFixed(2) }}
-              </v-chip>
-            </v-card-title>
-            <v-divider />
-            <v-card-text class="pa-2" style="max-height: 300px; overflow-y: auto">
-              <v-list v-if="listaImprevistos.length > 0" density="compact" data-testid="pos-imprevistos-lista">
-                <GastoImprevistoListItem
-                  v-for="gasto in listaImprevistos"
-                  :key="gasto.id"
-                  :gasto="gasto"
-                  @eliminar="manejarEliminarImprevisto"
-                />
-              </v-list>
-              <p v-else class="text-medium-emphasis text-center py-4" data-testid="pos-imprevistos-empty">
-                Sin imprevistos registrados
-              </p>
-            </v-card-text>
-            <v-divider />
-            <v-card-actions>
-              <v-btn
-                color="primary"
-                size="small"
-                prepend-icon="mdi-plus"
-                block
-                data-testid="pos-imprevistos-nuevo"
-                @click="dialogoCrearImprevisto = true"
-              >
-                Nuevo imprevisto
-              </v-btn>
-            </v-card-actions>
-          </v-card>
-        </v-menu>
       </div>
     </div>
 
-    <!-- REQ-POS-16 / REQ-POS-39: no evento en_curso guard -->
-    <v-alert
-      v-if="!eventoEnCurso"
-      type="warning"
-      class="mb-4"
-      data-testid="pos-sin-evento"
+    <!-- Active-event header bar: single tight row with all
+         operational context + actions. -->
+    <div
+      v-if="eventoEnCurso"
+      class="pos-context-bar d-flex align-center ga-2 mb-3 py-1 px-3"
+      data-testid="pos-evento-activo-panel"
     >
-      <p class="text-h6 mb-2">No hay un evento en curso</p>
-      <p class="mb-3">Para registrar ventas primero activá un evento en /eventos.</p>
-      <v-btn color="primary" :href="'/eventos'" data-testid="pos-ir-eventos">
-        Ir a Eventos
+      <v-icon color="success" size="x-small">mdi-play-circle</v-icon>
+      <span class="text-caption font-weight-medium">{{ eventoEnCurso.nombre }}</span>
+      <span class="text-caption text-medium-emphasis d-none d-sm-inline">{{ eventoEnCurso.fecha }}</span>
+      <v-chip
+        size="x-small"
+        color="success"
+        variant="tonal"
+        data-testid="pos-evento-activo-estado"
+      >
+        En curso
+      </v-chip>
+      <v-spacer />
+      <!-- Online indicator inline -->
+      <v-icon
+        :color="online ? 'success' : 'error'"
+        size="10"
+        data-testid="pos-online"
+        class="d-none d-sm-inline"
+      >
+        {{ online ? 'mdi-circle' : 'mdi-circle-outline' }}
+      </v-icon>
+      <!-- pos-redesign history button -->
+      <v-btn
+        v-if="FLAG_POS_REDESIGN"
+        size="x-small"
+        variant="text"
+        color="primary"
+        prepend-icon="mdi-history"
+        data-testid="pos-historial-btn"
+        @click="historialAbierto = true"
+      >
+        Historial
       </v-btn>
-    </v-alert>
+      <!-- Margen badge: compact, inline -->
+      <v-chip
+        v-if="margenBadge"
+        size="x-small"
+        color="primary"
+        variant="tonal"
+        data-testid="pos-margen-badge"
+      >
+        {{ margenBadge }}
+      </v-chip>
+      <!-- Gastos imprevistos: quick-access menu -->
+      <v-menu v-if="eventoEnCurso" :close-on-content-click="false" location="bottom end">
+        <template #activator="{ props: menuProps }">
+          <v-btn
+            v-bind="menuProps"
+            icon="mdi-cash-remove"
+            size="x-small"
+            variant="text"
+            color="warning"
+            data-testid="pos-imprevistos-btn"
+          >
+            <v-badge
+              v-if="totalImprevistos > 0"
+              :content="`$${totalImprevistos.toFixed(0)}`"
+              color="error"
+              inline
+            />
+          </v-btn>
+        </template>
+        <v-card min-width="320" max-width="400" data-testid="pos-imprevistos-menu">
+          <v-card-title class="d-flex align-center text-body-1">
+            <v-icon class="mr-2">mdi-cash-remove</v-icon>
+            Gastos imprevistos
+            <v-spacer />
+            <v-chip size="x-small" data-testid="pos-imprevistos-total">
+              ${{ totalImprevistos.toFixed(2) }}
+            </v-chip>
+          </v-card-title>
+          <v-divider />
+          <v-card-text class="pa-2" style="max-height: 300px; overflow-y: auto">
+            <v-list v-if="listaImprevistos.length > 0" density="compact" data-testid="pos-imprevistos-lista">
+              <GastoImprevistoListItem
+                v-for="gasto in listaImprevistos"
+                :key="gasto.id"
+                :gasto="gasto"
+                @eliminar="manejarEliminarImprevisto"
+              />
+            </v-list>
+            <p v-else class="text-medium-emphasis text-center py-4" data-testid="pos-imprevistos-empty">
+              Sin imprevistos registrados
+            </p>
+          </v-card-text>
+          <v-divider />
+          <v-card-actions>
+            <v-btn
+              color="primary"
+              size="small"
+              prepend-icon="mdi-plus"
+              block
+              data-testid="pos-imprevistos-nuevo"
+              @click="dialogoCrearImprevisto = true"
+            >
+              Nuevo imprevisto
+            </v-btn>
+          </v-card-actions>
+        </v-card>
+      </v-menu>
+      <!-- Gestionar productos: subdued link -->
+      <v-btn
+        size="x-small"
+        variant="text"
+        prepend-icon="mdi-cog"
+        color="grey-darken-1"
+        data-testid="pos-gestionar-productos-link"
+        @click="irAConfigurarProductos"
+      >
+        Productos
+      </v-btn>
+    </div>
+
+    <!-- REQ-POS-16 / REQ-POS-39: no evento en_curso — management panel -->
+    <div v-if="!eventoEnCurso">
+      <!-- Planning events available: let the operator start one directly -->
+      <div v-if="eventosPlanificacion.length > 0">
+        <v-alert
+          type="info"
+          density="compact"
+          variant="tonal"
+          class="mb-3"
+          data-testid="pos-gestion-sin-evento"
+        >
+          <p class="text-body-2 mb-2">No hay un evento en curso</p>
+          <p class="text-caption mb-2">Seleccioná un evento planificado para comenzar a vender:</p>
+        </v-alert>
+        <v-row data-testid="pos-planificacion-lista">
+          <v-col
+            v-for="ev in eventosPlanificacion"
+            :key="ev.id"
+            cols="12"
+            sm="6"
+            md="4"
+          >
+            <v-card
+              variant="outlined"
+              data-testid="pos-planificacion-card"
+            >
+              <v-card-item density="compact">
+                <template #title>
+                  {{ ev.nombre }}
+                </template>
+                <template #subtitle>
+                  {{ ev.fecha }}
+                  <span v-if="ev.ubicacion"> — {{ ev.ubicacion }}</span>
+                </template>
+              </v-card-item>
+              <v-card-actions>
+                <v-btn
+                  color="primary"
+                  size="small"
+                  variant="tonal"
+                  :loading="iniciandoEventoId === ev.id"
+                  :disabled="iniciandoEventoId !== null"
+                  prepend-icon="mdi-play"
+                  data-testid="pos-iniciar-evento-btn"
+                  @click="iniciarEventoDesdePOS(ev.id)"
+                >
+                  Iniciar evento
+                </v-btn>
+              </v-card-actions>
+            </v-card>
+          </v-col>
+        </v-row>
+        <v-alert
+          v-if="errorIniciar"
+          type="error"
+          density="compact"
+          variant="tonal"
+          class="mt-3"
+          data-testid="pos-iniciar-error"
+        >
+          {{ errorIniciar }}
+        </v-alert>
+      </div>
+
+      <!-- No events at all (not even planificacion): guide to create one -->
+      <v-alert
+        v-else
+        type="warning"
+        density="compact"
+        variant="tonal"
+        class="mb-3"
+        data-testid="pos-sin-evento"
+      >
+        <p class="text-body-2 mb-2">No hay un evento en curso</p>
+        <p class="text-caption mb-2">Para registrar ventas primero creá un evento en la sección Eventos.</p>
+        <v-btn color="primary" size="small" variant="tonal" :href="'/eventos'" data-testid="pos-ir-eventos">
+          Ir a Eventos
+        </v-btn>
+      </v-alert>
+    </div>
 
     <template v-else>
       <!-- pos-redesign (REQ-POS-58, REQ-POS-HOY-1..4): per-metodo_pago
@@ -523,21 +728,22 @@ async function reintentarHistorial() {
         :cargando="cargandoVentas"
       />
 
-      <!-- REQ-POS-23: search input. Plain HTML <input> to avoid Vuetify
-           v-text-field's injectDefaults dependency in test mounts
-           (the search field is read-only UX, not a complex form). -->
+      <!-- REQ-POS-23: search input. Clean, rounded, light weight. -->
       <div class="mb-4">
-        <input
+        <v-text-field
           v-model="busqueda"
-          placeholder="Buscar producto"
+          placeholder="Buscar producto…"
+          prepend-inner-icon="mdi-magnify"
+          variant="outlined"
+          density="compact"
+          hide-details
+          clearable
           data-testid="pos-buscar"
-          style="width: 100%; padding: 8px; border: 1px solid #ccc; border-radius: 4px"
+          class="pos-search"
         />
       </div>
 
-      <!-- REQ-POS-49: loading state. PR-2b keeps the productos store
-           fetch as a hint (cargando); the grid is driven by
-           usePreciosEvento. -->
+      <!-- REQ-POS-49: loading state. -->
       <v-progress-linear
         v-if="cargandoProductos"
         indeterminate
@@ -550,72 +756,122 @@ async function reintentarHistorial() {
       <v-alert
         v-if="errorProductos && !cargandoProductos"
         type="error"
-        class="mb-4"
+        density="compact"
+        variant="tonal"
+        class="mb-3"
         data-testid="pos-error"
       >
         {{ errorProductos }}
         <template #append>
-          <v-btn variant="text" @click="reintentar">Reintentar</v-btn>
+          <v-btn variant="text" size="x-small" @click="reintentar">Reintentar</v-btn>
         </template>
       </v-alert>
 
-      <!-- REQ-FIN-30: empty-state — direct the operator to the
-           EventoProductosView instead of showing a blank grid. -->
+      <!-- Dependency-load failure: distinguish "data failed to load"
+           from "no products configured". -->
       <v-alert
-        v-if="!hayProductosParaVender && !cargandoProductos && !errorProductos"
+        v-if="errorCargaDependencias && !cargandoProductos && !errorProductos"
+        type="error"
+        density="compact"
+        variant="tonal"
+        class="mb-3"
+        data-testid="pos-error-dependencias"
+      >
+        {{ errorCargaDependencias }}
+        <template #append>
+          <v-btn variant="text" size="x-small" data-testid="pos-reintentar-dependencias" @click="cargarDatosPOS">Reintentar</v-btn>
+        </template>
+      </v-alert>
+
+      <!-- REQ-FIN-30: empty-state — compact guidance for the operator
+           without bulky panels. Two clear actions: quick-init or manual config. -->
+      <v-alert
+        v-if="mostrarSinProductos && !cargandoProductos && !errorProductos"
         type="info"
-        class="mb-4"
+        density="compact"
+        variant="tonal"
+        class="mb-3"
         data-testid="pos-evento-sin-productos"
       >
-        <p class="text-h6 mb-2">No hay productos configurados para este evento</p>
-        <p class="mb-3">Activá los productos y los márgenes antes de empezar a vender.</p>
-        <v-btn
-          color="primary"
-          data-testid="pos-configurar-productos"
-          @click="irAConfigurarProductos"
+        <p class="text-body-2 mb-2">No hay productos configurados para este evento</p>
+        <div class="d-flex flex-wrap ga-2">
+          <v-btn
+            color="primary"
+            size="small"
+            variant="tonal"
+            :loading="inicializandoCatalogo"
+            :disabled="inicializandoCatalogo"
+            prepend-icon="mdi-rocket-launch"
+            data-testid="pos-inicializar-catalogo"
+            @click="inicializarProductosDesdeCatalogo"
+          >
+            Inicializar desde catálogo
+          </v-btn>
+          <v-btn
+            color="primary"
+            size="small"
+            variant="outlined"
+            data-testid="pos-configurar-productos"
+            @click="irAConfigurarProductos"
+          >
+            Configurar productos
+          </v-btn>
+        </div>
+        <v-alert
+          v-if="errorInicializarCatalogo"
+          type="error"
+          class="mt-2"
+          density="compact"
+          variant="tonal"
+          data-testid="pos-inicializar-catalogo-error"
         >
-          Configurar productos
-        </v-btn>
+          {{ errorInicializarCatalogo }}
+        </v-alert>
       </v-alert>
 
       <!-- mobile-ux-redesign Phase 3: Simplified POS mode (active event).
-           Layout is a single row with products on the left and the cart
-           pinned to the right at ALL breakpoints — xs through lg. The
-           split is 8/4 on mobile/tablet so the product grid can render
-           2 items per row at cols="4", and 9/3 on lg for more breathing
-           room. -->
+           Single-row layout: products + unified cart/payment/checkout
+           stack so the operator scans cart contents, payment choice,
+           and the checkout action together without scrolling.
+           On xs/sm the row stacks vertically (products full-width,
+           then cart+payment+checkout full-width below).
+           On md+ side-by-side: products 8 cols, checkout 4 cols. -->
       <template v-if="isSimplifiedMode && !cargandoProductos && !errorProductos">
         <v-row>
-          <v-col cols="8" sm="8" md="8" lg="9" data-testid="pos-products-col">
+          <v-col cols="12" sm="12" md="8" lg="9" data-testid="pos-products-col">
             <ProductGrid
               :productos="productosSimplificados"
+              :busqueda="busqueda"
               @add-to-cart="manejarAgregar"
             />
           </v-col>
-          <v-col cols="4" sm="4" md="4" lg="3" data-testid="pos-cart-col">
+          <v-col
+            cols="12"
+            sm="12"
+            md="4"
+            lg="3"
+            class="d-flex flex-column"
+            data-testid="pos-cart-col"
+          >
             <CarritoPanel
               :carrito="carrito"
               :total="totalCarrito"
+              :hide-register-button="true"
               @registrar-venta="abrirDialogoRegistrar"
               @vaciar="vaciarCarrito"
               @update-cantidad="actualizarCantidad"
               @eliminar="quitarDelCarrito"
             />
-          </v-col>
-        </v-row>
-        <v-row class="mt-4">
-          <v-col cols="12" md="8">
             <PaymentSelector
               :model-value="paymentMethod"
+              class="mt-3"
               @update:model-value="setPaymentMethod"
             />
-          </v-col>
-        </v-row>
-        <v-row class="mt-4">
-          <v-col cols="12">
             <CheckoutButton
               :disabled="!cobrarHabilitado"
               :total="totalCarrito"
+              :disabled-hint="checkoutDisabledHint"
+              class="mt-3"
               @checkout="manejarCheckoutSimplificado"
             />
           </v-col>
@@ -629,7 +885,6 @@ async function reintentarHistorial() {
             :productos="productosMapeados"
             :recetas="recetasParaGrid"
             :busqueda="busqueda"
-            :contribuciones-por-producto="contribucionesPorProducto"
             @agregar="manejarAgregar"
           />
         </v-col>
@@ -714,3 +969,21 @@ async function reintentarHistorial() {
     />
   </v-container>
 </template>
+
+<style scoped>
+/* Visual polish: POS-specific component styling.
+   Kept scoped so it doesn't leak into dialogs or other views. */
+
+.pos-context-bar {
+  background: rgba(var(--v-theme-surface-variant), 0.4);
+  border-radius: 6px;
+  min-height: 36px;
+}
+
+.pos-search :deep(.v-field__outline) {
+  --v-field-border-opacity: 0.25;
+}
+.pos-search :deep(.v-field) {
+  border-radius: 8px;
+}
+</style>

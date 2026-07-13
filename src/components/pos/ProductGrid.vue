@@ -1,8 +1,10 @@
 <script setup lang="ts">
-// mobile-ux-redesign Phase 3: ProductGrid — responsive grid of
-// ProductButton components for the simplified POS. Includes a search
-// bar. Emits 'add-to-cart' with the productoId when a button is clicked.
-import { computed, ref } from 'vue'
+// ProductGrid — responsive grid of ProductButton components
+// for the POS. Accepts an optional `busqueda` prop to filter
+// products externally. Emits 'add-to-cart' with the productoId.
+//
+// Visual polish: denser grid, lighter empty state.
+import { computed } from 'vue'
 
 import ProductButton from './ProductButton.vue'
 
@@ -12,17 +14,17 @@ const props = defineProps<{
     nombre: string
     precio: number
     imagen?: string | null
+    icono?: string | null
   }>
+  busqueda?: string
 }>()
 
 const emit = defineEmits<{
   'add-to-cart': [productoId: string]
 }>()
 
-const busqueda = ref('')
-
 const productosFiltrados = computed(() => {
-  const q = busqueda.value.trim().toLowerCase()
+  const q = (props.busqueda ?? '').trim().toLowerCase()
   if (!q) return props.productos
   return props.productos.filter(
     (p) => p.nombre.toLowerCase().includes(q) || p.id.toLowerCase().includes(q),
@@ -36,28 +38,9 @@ function manejarClick(product: { id: string }) {
 
 <template>
   <div class="product-grid">
-    <!-- Search bar -->
-    <v-text-field
-      v-model="busqueda"
-      placeholder="Buscar producto"
-      prepend-inner-icon="mdi-magnify"
-      variant="outlined"
-      density="comfortable"
-      hide-details
-      clearable
-      class="mb-4"
-      data-testid="product-grid-search"
-    />
-
-    <!-- Filtered product grid -->
-    <p
-      v-if="productosFiltrados.length === 0"
-      class="text-medium-emphasis text-center py-8"
-    >
-      Sin productos
-    </p>
-
-    <v-row v-else>
+    <!-- Filtered product grid — denser: 3 cols on md, 4 on lg.
+         On xs/sm the grid already uses cols=6 (2 per row). -->
+    <v-row v-if="productosFiltrados.length > 0" dense>
       <v-col
         v-for="p in productosFiltrados"
         :key="p.id"
@@ -68,5 +51,17 @@ function manejarClick(product: { id: string }) {
         <ProductButton :product="p" @click="manejarClick" />
       </v-col>
     </v-row>
+
+    <!-- Empty state: minimal and intentional -->
+    <div
+      v-else
+      class="text-medium-emphasis text-body-2 text-center py-8"
+      data-testid="product-grid-empty"
+    >
+      <v-icon size="40" color="grey-lighten-1" class="mb-2">mdi-magnify-close</v-icon>
+      <p class="mb-0">
+        {{ busqueda?.trim() ? `No hay productos que coincidan con "${busqueda}"` : 'Sin productos' }}
+      </p>
+    </div>
   </div>
 </template>

@@ -10,6 +10,10 @@
 // optional montoRecibido so the store can validate (MONTO_INSUFICIENTE
 // when monto < total). For non-efectivo methods, the cash-back fields
 // are hidden and the emit omits montoRecibido.
+//
+// UX improvement: fast-choice button-group payment method selector
+// replaces the slower v-select. Operator taps once to pick; the
+// selected method is visually highlighted.
 import { computed, ref, watch } from 'vue'
 
 import { formatearUSD } from '@/utils/format'
@@ -32,9 +36,16 @@ const emit = defineEmits<{
 const metodoPago = ref<MetodoPago>('efectivo')
 // Single source of truth — `METODOS_PAGO` lives in pos.types.ts so the
 // history dialog and the edit dialog stay in lockstep with the
-// `MetodoPago` union. Adding a new method only requires updating
-// pos.types.ts.
+// `MetodoPago` union.
 const opciones = METODOS_PAGO
+
+// Icon per payment method for the button-group UX.
+const iconosPorMetodo: Record<MetodoPago, string> = {
+  efectivo: 'mdi-cash',
+  transferencia: 'mdi-cellphone',
+  tarjeta: 'mdi-credit-card',
+  mixto: 'mdi-cash-multiple',
+}
 
 // Billetes rápidos para velocidad en feria. Tapping uno de estos
 // suma ese monto al monto_recibido (acumulativo — el operador puede
@@ -73,7 +84,7 @@ function exacto(): void {
 function establecerMetodoPago(metodo: MetodoPago): void {
   metodoPago.value = metodo
 }
-defineExpose({ exacto, montoRecibido, cambio, alConfirmar, establecerMetodoPago })
+defineExpose({ exacto, montoRecibido, cambio, alConfirmar, establecerMetodoPago, metodoPago })
 
 watch(
   () => props.modelValue,
@@ -123,14 +134,35 @@ function alConfirmar(): void {
           <span class="text-medium-emphasis">Total:</span>
           <span class="ml-1 text-h6">{{ totalTexto }}</span>
         </div>
-        <v-select
-          v-model="metodoPago"
-          :items="opciones"
-          item-title="label"
-          item-value="value"
-          label="Método de pago"
-          data-testid="registrar-venta-metodo"
-        />
+
+        <!-- UX: fast-choice button-group payment method selector.
+             Replaces the slower v-select with single-tap buttons.
+             Operator taps once to pick; selected method is highlighted. -->
+        <div class="mb-3">
+          <p class="text-caption text-medium-emphasis mb-1">Método de pago</p>
+          <v-row dense>
+            <v-col
+              v-for="opcion in opciones"
+              :key="opcion.value"
+              cols="6"
+            >
+              <v-btn
+                :color="metodoPago === opcion.value ? 'primary' : undefined"
+                :variant="metodoPago === opcion.value ? 'tonal' : 'outlined'"
+                block
+                size="large"
+                class="py-3"
+                :data-testid="`registrar-venta-metodo-${opcion.value}`"
+                @click="metodoPago = opcion.value"
+              >
+                <div class="d-flex flex-column align-center ga-1">
+                  <v-icon size="24">{{ iconosPorMetodo[opcion.value] }}</v-icon>
+                  <span class="text-caption">{{ opcion.label }}</span>
+                </div>
+              </v-btn>
+            </v-col>
+          </v-row>
+        </div>
 
         <!-- pos-redesign (REQ-POS-CAMBIO-1): monto_recibido input
              shown only when metodo_pago === 'efectivo'. Other

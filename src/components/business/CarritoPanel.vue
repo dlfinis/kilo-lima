@@ -6,6 +6,10 @@
 //
 // Pure presentational — every action is an emit so the parent view
 // owns the store calls (registrarVenta, vaciarCarrito).
+//
+// Visual polish: tighter checkout stack — header with icon,
+// clean item list with dividers, prominent total, subdued
+// secondary actions.
 import { computed, ref } from 'vue'
 
 import { formatearUSD } from '@/utils/format'
@@ -15,6 +19,7 @@ import type { LineaCarrito } from '@/types'
 const props = defineProps<{
   carrito: LineaCarrito[]
   total: number
+  hideRegisterButton?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -40,15 +45,34 @@ function cancelarVaciar() {
 </script>
 
 <template>
-  <v-card class="pa-4 d-flex flex-column" data-testid="carrito-panel">
-    <h2 class="text-h6 mb-2">Carrito</h2>
-
-    <div v-if="carrito.length === 0" class="text-medium-emphasis py-6 text-center"
-      data-testid="carrito-vacio">
-      Carrito vacío
+  <v-card
+    variant="flat"
+    class="carrito-panel pa-3 d-flex flex-column"
+    color="surface-variant"
+    data-testid="carrito-panel"
+  >
+    <!-- Header with cart icon -->
+    <div class="d-flex align-center ga-2 mb-3">
+      <v-icon size="20" color="primary">mdi-cart-outline</v-icon>
+      <span class="text-subtitle-1 font-weight-bold">Carrito</span>
+      <v-spacer />
+      <span
+        v-if="carrito.length > 0"
+        class="text-caption text-medium-emphasis"
+      >{{ carrito.length }} item(s)</span>
     </div>
 
-    <div v-else class="flex-grow-1">
+    <!-- Items area -->
+    <div
+      v-if="carrito.length === 0"
+      class="text-medium-emphasis text-body-2 py-6 text-center"
+      data-testid="carrito-vacio"
+    >
+      <v-icon size="32" color="grey-lighten-1" class="mb-1">mdi-cart-remove</v-icon>
+      <p class="mb-0">Carrito vacío</p>
+    </div>
+
+    <div v-else class="flex-grow-1 carrito-items">
       <VentaItem
         v-for="linea in carrito"
         :key="linea.producto_id"
@@ -58,16 +82,19 @@ function cancelarVaciar() {
       />
     </div>
 
-    <div class="mt-4">
+    <!-- Totals and CTAs -->
+    <div class="carrito-footer mt-3 pt-3" style="border-top: 1px solid rgba(var(--v-border-color), 0.4)">
       <div class="d-flex justify-space-between align-center mb-2">
-        <span class="text-h6">Total</span>
-        <span class="text-h5" data-testid="carrito-total">{{ totalTexto }}</span>
+        <span class="text-subtitle-2">Total</span>
+        <span class="text-h6 font-weight-bold" data-testid="carrito-total">{{ totalTexto }}</span>
       </div>
       <v-btn
+        v-if="!props.hideRegisterButton"
         color="primary"
         size="large"
         block
         :disabled="carrito.length === 0"
+        prepend-icon="mdi-cart-arrow-right"
         data-testid="carrito-registrar"
         @click="emit('registrar-venta')"
       >
@@ -75,9 +102,10 @@ function cancelarVaciar() {
       </v-btn>
       <v-btn
         v-if="carrito.length > 0"
-        class="mt-2"
+        class="mt-1"
         variant="text"
-        color="error"
+        size="small"
+        color="grey-darken-1"
         block
         data-testid="carrito-vaciar"
         @click="abrirDialogoVaciar"
@@ -117,3 +145,12 @@ function cancelarVaciar() {
     </v-dialog>
   </v-card>
 </template>
+
+<style scoped>
+.carrito-panel {
+  border-radius: 8px;
+}
+.carrito-footer {
+  margin-top: auto;
+}
+</style>

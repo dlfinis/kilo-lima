@@ -3,6 +3,9 @@
 // +/- qty controls, subtotal, and a remove (×) button. Every
 // interaction is an emit so the parent (CarritoPanel) owns the store
 // mutation.
+//
+// Visual polish: tighter spacing, subtle border between items,
+// cleaner qty controls.
 import { computed } from 'vue'
 
 import { formatearUSD } from '@/utils/format'
@@ -33,40 +36,57 @@ function decrementar() {
 </script>
 
 <template>
-  <div class="d-flex align-center ga-2 py-2" data-testid="venta-item">
-    <div class="flex-grow-1">
-      <div class="text-body-1">{{ linea.nombre }}</div>
+  <div
+    class="venta-item d-flex align-center ga-2 py-2"
+    data-testid="venta-item"
+  >
+    <div class="flex-grow-1" style="min-width: 0">
+      <div class="text-body-2 font-weight-medium text-truncate">{{ linea.nombre }}</div>
       <div class="text-caption text-medium-emphasis">
-        {{ linea.cantidad }} × {{ subtotalTexto }}
+        {{ subtotalTexto }}
       </div>
     </div>
     <template v-if="editable">
-      <v-btn
-        icon="mdi-minus"
-        size="small"
-        variant="text"
-        data-testid="venta-item-menos"
-        @click="decrementar"
-      />
-      <div class="text-body-1" style="min-width: 1.5rem; text-align: center">
-        {{ linea.cantidad }}
+      <div class="d-flex align-center ga-0">
+        <v-btn
+          icon="mdi-minus"
+          size="x-small"
+          variant="text"
+          density="compact"
+          data-testid="venta-item-menos"
+          @click="decrementar"
+        />
+        <span class="text-caption font-weight-bold mx-1" style="min-width: 1.25rem; text-align: center">
+          {{ linea.cantidad }}
+        </span>
+        <v-btn
+          icon="mdi-plus"
+          size="x-small"
+          variant="text"
+          density="compact"
+          data-testid="venta-item-mas"
+          @click="incrementar"
+        />
       </div>
       <v-btn
-        icon="mdi-plus"
-        size="small"
-        variant="text"
-        data-testid="venta-item-mas"
-        @click="incrementar"
-      />
-      <v-btn
         icon="mdi-close"
-        size="small"
+        size="x-small"
         variant="text"
-        color="error"
+        color="grey-lighten-1"
+        density="compact"
         data-testid="venta-item-eliminar"
         @click="emit('eliminar', linea.producto_id)"
       />
     </template>
-    <div v-else class="text-body-1">{{ linea.cantidad }} × {{ subtotalTexto }}</div>
+    <div v-else class="text-body-2">{{ linea.cantidad }} × {{ subtotalTexto }}</div>
   </div>
 </template>
+
+<style scoped>
+.venta-item {
+  border-bottom: 1px solid rgba(var(--v-border-color), 0.3);
+}
+.venta-item:last-child {
+  border-bottom: none;
+}
+</style>

@@ -33,7 +33,7 @@ defineEmits<{
       v-else
       :data-testid="`producto-item-precio-${producto.id}`"
     >
-      {{ formatearUSD(producto.precio_venta) }}
+      {{ formatearUSD(producto.precio_venta ?? 0) }}
       <span v-if="!producto.disponible" class="text-warning ml-2" data-testid="producto-item-baja">
         · No disponible
       </span>
@@ -43,7 +43,7 @@ defineEmits<{
       :data-testid="`producto-item-precio-${producto.id}`"
       class="text-caption"
     >
-      {{ formatearUSD(producto.precio_venta) }}
+      {{ formatearUSD(producto.precio_venta ?? 0) }}
       <span v-if="!producto.disponible" class="text-warning ml-2" data-testid="producto-item-baja">
         · No disponible
       </span>

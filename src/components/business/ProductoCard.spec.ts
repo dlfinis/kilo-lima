@@ -15,11 +15,15 @@ const vuetify = createVuetify({ components, directives })
 const mkProducto = (overrides: Partial<Producto> = {}): Producto => ({
   id: 'p-1',
   receta_id: 'r-1',
-  precio_venta: 5,
+  // catalog-domain-refactor / Slice 1
+  nombre: 'Producto de prueba',
+  categoria: null,
+  precio_venta: null,
   disponible: true,
   orden: 0,
   descripcion: null,
   icono: 'mdi-food',
+  color: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -36,10 +40,10 @@ const mountCard = (props: { producto: Producto; nombreReceta?: string; contribuc
   })
 
 describe('ProductoCard — POS redesign', () => {
-  it('renders the recipe name and formatted price', () => {
+  it('renders the product name and formatted price', () => {
     const wrapper = mountCard({ producto: mkProducto({ precio_venta: 5 }) })
 
-    expect(wrapper.text()).toContain('Pan basico')
+    expect(wrapper.text()).toContain('Producto de prueba')
     expect(wrapper.text()).toMatch(/5[.,]00/)
   })
 
@@ -73,34 +77,6 @@ describe('ProductoCard — POS redesign', () => {
     await card.trigger('click')
 
     expect(wrapper.emitted('agregar')).toBeFalsy()
-  })
-
-  it('does NOT render ContribucionBadge when no contribution prop is passed', () => {
-    const wrapper = mountCard({ producto: mkProducto() })
-    expect(wrapper.find('[data-testid="producto-card-contribucion"]').exists()).toBe(false)
-  })
-
-  it('renders contribucion text below the price when provided', () => {
-    const wrapper = mountCard({
-      producto: mkProducto({ precio_venta: 15 }),
-      contribucion: 5,
-    })
-    const contribucion = wrapper.find('[data-testid="producto-card-contribucion"]')
-    expect(contribucion.exists()).toBe(true)
-    expect(contribucion.text()).toContain('5.00')
-    // POS mode uses light-green for positive contribution (dark theme card)
-    expect(contribucion.classes().some((c) => c.includes('light-green'))).toBe(true)
-  })
-
-  it('renders red contribucion text when contribution < 0', () => {
-    const wrapper = mountCard({
-      producto: mkProducto({ precio_venta: 3 }),
-      contribucion: -2,
-    })
-    const contribucion = wrapper.find('[data-testid="producto-card-contribucion"]')
-    expect(contribucion.exists()).toBe(true)
-    // POS mode uses red for negative contribution (dark theme card)
-    expect(contribucion.classes().some((c) => c.includes('red'))).toBe(true)
   })
 
   it('supports keyboard navigation (Enter/Space to add)', async () => {

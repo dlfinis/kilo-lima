@@ -47,12 +47,6 @@ vi.mock('@/composables/useInventario', () => {
     return min === Infinity ? 0 : min
   }
 
-  // Stock: 500g harina, 200g azúcar
-  const stock = new Map<string, number>([
-    ['mp-harina', 500],
-    ['mp-azucar', 200],
-  ])
-
   // Ingredients list (MateriaPrima-shaped)
   const ingredientes = [
     { id: 'mp-harina', nombre: 'Harina', cantidad_disponible: 500, unidad: 'g', categoria: 'ingrediente', costo_por_unidad: 2.5, notas: null, created_at: '', updated_at: '' },

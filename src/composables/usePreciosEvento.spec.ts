@@ -117,6 +117,10 @@ describe('usePreciosEvento', () => {
       prodStore.productos.push({
         id: 'p-1',
         receta_id: 'r-1',
+        nombre: 'Producto de prueba',
+        categoria: null,
+        icono: null,
+        color: null,
         precio_venta: 0,
         disponible: true,
         orden: 0,
@@ -138,7 +142,9 @@ describe('usePreciosEvento', () => {
       expect(fila.margen_efectivo).toBe(0.5)
       // precio_final = precio_venta ?? precio_sugerido = 40
       expect(fila.precio_final).toBe(40)
-      expect(fila.producto_nombre).toBe('Receta r-1')
+      // catalog-domain-refactor / Slice 2: producto_nombre is now
+      // the commercial product name (producto.nombre), not receta.nombre.
+      expect(fila.producto_nombre).toBe('Producto de prueba')
     })
   })
 
@@ -155,6 +161,10 @@ describe('usePreciosEvento', () => {
       prodStore.productos.push({
         id: 'p-1',
         receta_id: 'r-1',
+        nombre: 'Producto de prueba',
+        categoria: null,
+        icono: null,
+        color: null,
         precio_venta: 0,
         disponible: true,
         orden: 0,
@@ -196,6 +206,10 @@ describe('usePreciosEvento', () => {
       prodStore.productos.push({
         id: 'p-1',
         receta_id: 'r-1',
+        nombre: 'Producto de prueba',
+        categoria: null,
+        icono: null,
+        color: null,
         precio_venta: 0,
         disponible: true,
         orden: 0,
@@ -217,12 +231,19 @@ describe('usePreciosEvento', () => {
     })
   })
 
-  it('precioParaProducto falls back to producto.precio_venta when no evento_producto exists', () => {
+  // catalog-domain-refactor / Slice 2: evento_productos.precio_venta is
+  // the sole sell-price authority. Without an evento_producto row, the
+  // product has NO price in the current evento context (returns 0).
+  it('returns 0 when no evento_producto exists (no catalog-price fallback)', () => {
     conContexto(() => {
       const prodStore = useProductosStore()
       prodStore.productos.push({
         id: 'p-x',
         receta_id: 'r-x',
+        nombre: 'Producto de prueba',
+        categoria: null,
+        icono: null,
+        color: null,
         precio_venta: 12.5,
         disponible: true,
         orden: 0,
@@ -232,7 +253,11 @@ describe('usePreciosEvento', () => {
       })
 
       const { precioParaProducto } = usePreciosEvento('e-1')
-      expect(precioParaProducto.value('p-x')).toBe(12.5)
+      // No evento_producto exists → no event-scoped price → 0.
+      // The POS grid excludes products without event pricing via
+      // `incluido = true` filtering; this contract ensures that
+      // stale catalog prices never leak into POS display.
+      expect(precioParaProducto.value('p-x')).toBe(0)
     })
   })
 
@@ -248,6 +273,10 @@ describe('usePreciosEvento', () => {
         {
           id: 'p-1',
           receta_id: 'r-1',
+          nombre: 'Producto de prueba',
+          categoria: null,
+          icono: null,
+          color: null,
           precio_venta: 0,
           disponible: true,
           orden: 0,
@@ -258,6 +287,10 @@ describe('usePreciosEvento', () => {
         {
           id: 'p-2',
           receta_id: 'r-2',
+          nombre: 'Producto de prueba 2',
+          categoria: null,
+          icono: null,
+          color: null,
           precio_venta: 0,
           disponible: true,
           orden: 1,
@@ -295,6 +328,10 @@ describe('usePreciosEvento', () => {
       prodStore.productos.push({
         id: 'p-1',
         receta_id: 'r-x',
+        nombre: 'Producto de prueba',
+        categoria: null,
+        icono: null,
+        color: null,
         precio_venta: 0,
         disponible: true,
         orden: 0,
@@ -341,6 +378,10 @@ describe('usePreciosEvento — contribucionParaProducto (REQ-CON-8)', () => {
       prodStore.productos.push({
         id: 'p-1',
         receta_id: 'r-1',
+        nombre: 'Producto de prueba',
+        categoria: null,
+        icono: null,
+        color: null,
         precio_venta: 0,
         disponible: true,
         orden: 0,
@@ -382,6 +423,10 @@ describe('usePreciosEvento — contribucionParaProducto (REQ-CON-8)', () => {
       prodStore.productos.push({
         id: 'p-1',
         receta_id: 'r-1',
+        nombre: 'Producto de prueba',
+        categoria: null,
+        icono: null,
+        color: null,
         precio_venta: 0,
         disponible: true,
         orden: 0,
@@ -429,6 +474,10 @@ describe('usePreciosEvento — contribucionParaProducto (REQ-CON-8)', () => {
       prodStore.productos.push({
         id: 'p-1',
         receta_id: 'r-1',
+        nombre: 'Producto de prueba',
+        categoria: null,
+        icono: null,
+        color: null,
         precio_venta: 0,
         disponible: true,
         orden: 0,
@@ -470,6 +519,10 @@ describe('usePreciosEvento — precioMinimoParaProducto (REQ-CON-8)', () => {
       prodStore.productos.push({
         id: 'p-1',
         receta_id: 'r-1',
+        nombre: 'Producto de prueba',
+        categoria: null,
+        icono: null,
+        color: null,
         precio_venta: 0,
         disponible: true,
         orden: 0,

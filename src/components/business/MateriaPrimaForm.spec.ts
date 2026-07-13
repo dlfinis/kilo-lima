@@ -269,7 +269,7 @@ describe('MateriaPrimaForm', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    const submitEvent = wrapper.emitted('submit')
+    const submitEvent = wrapper.emitted('submit') as [MateriaPrimaInput][] | undefined
     expect(submitEvent).toBeTruthy()
     expect(submitEvent?.[0]?.[0].costo_por_unidad).toBe(0.12345)
   })
@@ -288,7 +288,7 @@ describe('MateriaPrimaForm', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    const submitEvent = wrapper.emitted('submit')
+    const submitEvent = wrapper.emitted('submit') as [MateriaPrimaInput][] | undefined
     expect(submitEvent).toBeTruthy()
     expect(submitEvent?.[0]?.[0].costo_por_unidad).toBe(2.5)
   })
@@ -304,7 +304,7 @@ describe('MateriaPrimaForm', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    const submitEvent = wrapper.emitted('submit')
+    const submitEvent = wrapper.emitted('submit') as [MateriaPrimaInput][] | undefined
     expect(submitEvent?.[0]?.[0].costo_por_unidad).toBe(0.123)
   })
 
@@ -350,7 +350,7 @@ describe('MateriaPrimaForm', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    const submitEvent = wrapper.emitted('submit')
+    const submitEvent = wrapper.emitted('submit') as [MateriaPrimaInput][] | undefined
     expect(submitEvent).toBeTruthy()
     expect(submitEvent?.[0]?.[0].costo_por_unidad).toBe(0.12345)
   })
@@ -374,7 +374,7 @@ describe('MateriaPrimaForm', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    const submitEvent = wrapper.emitted('submit')
+    const submitEvent = wrapper.emitted('submit') as [MateriaPrimaInput][] | undefined
     expect(submitEvent).toBeTruthy()
     expect(submitEvent?.[0]?.[0].costo_por_unidad).toBe(0.12345)
   })
@@ -407,7 +407,7 @@ describe('MateriaPrimaForm', () => {
     await wrapper.find('form').trigger('submit.prevent')
     await flushPromises()
 
-    const submitEvent = wrapper.emitted('submit')
+    const submitEvent = wrapper.emitted('submit') as [MateriaPrimaInput][] | undefined
     expect(submitEvent).toBeTruthy()
     expect(submitEvent?.[0]?.[0].costo_por_unidad).toBe(2.5)
   })

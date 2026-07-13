@@ -1,8 +1,8 @@
 // mobile-ux-redesign Phase 4: Inventory intelligence composable.
 // Connects materias_primas + recetas stores to surface stock alerts
 // and production capacity. Pure functions exported for easy testing.
-import { computed, type ComputedRef } from 'vue'
-import type { MateriaPrima, RecetaConIngredientes } from '@/types'
+import { computed } from 'vue'
+import type { MateriaPrima } from '@/types'
 
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useRecipesStore } from '@/stores/recipes.store'

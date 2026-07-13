@@ -26,6 +26,7 @@ const materiaEnEdicion = computed<MateriaPrimaInput | null>(() =>
     ? {
         nombre: dialogo.value.materia.nombre,
         unidad: dialogo.value.materia.unidad,
+        categoria: dialogo.value.materia.categoria,
         costo_por_unidad: dialogo.value.materia.costo_por_unidad,
         notas: dialogo.value.materia.notas,
       }

@@ -117,7 +117,7 @@ watch(
     }
     nombre.value = v.nombre
     unidad.value = v.unidad
-    categoria.value = v.categoria
+    categoria.value = v.categoria ?? 'ingrediente'
     costo_por_unidad.value = v.costo_por_unidad
     costoTexto.value = formatearUSDInput(v.costo_por_unidad)
     notas.value = v.notas

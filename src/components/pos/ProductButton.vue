@@ -1,18 +1,20 @@
 <script setup lang="ts">
-// mobile-ux-redesign Phase 3: ProductButton — large tap target for
-// the simplified POS product grid. Shows name, price, image or icon.
-
+// ProductButton — compact product tile for POS catalog.
+// Clean, scannable: icon, name, price with strong hierarchy.
+// Tonal variant for a softer look than outlined; the catalog
+// should feel dense and operational, not like a tablet kiosk.
 defineProps<{
   product: {
     id: string
     nombre: string
     precio: number
     imagen?: string | null
+    icono?: string | null
   }
 }>()
 
 const emit = defineEmits<{
-  click: [product: { id: string; nombre: string; precio: number; imagen?: string | null }]
+  click: [product: { id: string; nombre: string; precio: number; imagen?: string | null; icono?: string | null }]
 }>()
 
 function formatPrecio(val: number): string {
@@ -24,27 +26,22 @@ function formatPrecio(val: number): string {
   <v-btn
     :aria-label="product.nombre"
     block
-    size="x-large"
     variant="tonal"
-    class="product-button text-body-1 font-weight-medium py-4"
-    :min-height="88"
+    color="surface-variant"
+    class="product-button text-caption font-weight-medium py-2"
+    :min-height="60"
     @click="emit('click', product)"
   >
-    <div class="d-flex flex-column align-center ga-2">
-      <v-img
-        v-if="product.imagen"
-        :src="product.imagen"
-        width="56"
-        height="56"
-        cover
-        class="rounded"
-        :alt="product.nombre"
-      />
-      <v-icon v-else size="48" color="primary">
-        mdi-food
+    <div class="d-flex flex-column align-center ga-0">
+      <v-icon
+        size="28"
+        :color="product.icono ? 'primary' : 'grey-darken-1'"
+        class="mb-1"
+      >
+        {{ product.icono || 'mdi-food' }}
       </v-icon>
-      <span class="text-truncate">{{ product.nombre }}</span>
-      <span class="text-caption font-weight-bold">S/ {{ formatPrecio(product.precio) }}</span>
+      <span class="text-truncate text-body-2 font-weight-regular">{{ product.nombre }}</span>
+      <span class="text-body-1 font-weight-bold mt-0">S/ {{ formatPrecio(product.precio) }}</span>
     </div>
   </v-btn>
 </template>

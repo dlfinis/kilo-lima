@@ -1,11 +1,13 @@
 <script setup lang="ts">
-// mobile-ux-redesign Phase 3: CheckoutButton — prominent green "Cobrar"
-// button for the simplified POS flow. Shows total amount, respects
-// disabled state, emits checkout.
+// CheckoutButton — prominent "Cobrar" button for the POS flow.
+// Shows total amount, respects disabled state, emits checkout.
+// Uses accent (#FF6B35) — the brief's designated "color de ventas"
+// — for visual distinction from the rest of the POS surface.
 
 defineProps<{
   disabled: boolean
   total: number
+  disabledHint?: string
 }>()
 
 const emit = defineEmits<{
@@ -18,18 +20,28 @@ function formatTotal(val: number): string {
 </script>
 
 <template>
-  <v-btn
-    color="success"
-    block
-    size="x-large"
-    :disabled="disabled"
-    class="checkout-btn py-4"
-    data-testid="checkout-btn"
-    @click="emit('checkout')"
-  >
-    Cobrar
-    <template v-if="total > 0">
-      &nbsp;S/ {{ formatTotal(total) }}
-    </template>
-  </v-btn>
+  <div>
+    <v-btn
+      color="accent"
+      block
+      size="large"
+      :disabled="disabled"
+      prepend-icon="mdi-cart-check"
+      class="checkout-btn py-3"
+      data-testid="checkout-btn"
+      @click="emit('checkout')"
+    >
+      Cobrar
+      <template v-if="total > 0">
+        &nbsp;S/ {{ formatTotal(total) }}
+      </template>
+    </v-btn>
+    <div
+      v-if="disabled && disabledHint"
+      class="text-caption text-disabled text-center mt-1"
+      data-testid="checkout-disabled-hint"
+    >
+      {{ disabledHint }}
+    </div>
+  </div>
 </template>

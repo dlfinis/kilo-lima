@@ -3,7 +3,6 @@
 // nombre, formatted fecha, EventoStatusChip. Emits `click` (open
 // detail) and `eliminar` so the parent view owns the navigation +
 // delete confirmation dialog (REQ-EVENTS-39).
-import { formatearUSD } from '@/utils/format'
 import EventoStatusChip from './EventoStatusChip.vue'
 import type { Evento } from '@/types'
 

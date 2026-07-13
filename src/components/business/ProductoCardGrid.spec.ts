@@ -18,11 +18,15 @@ const vuetify = createVuetify({ components, directives })
 const mkProducto = (id: string, overrides: Partial<Producto> = {}): Producto => ({
   id,
   receta_id: `r-${id}`,
-  precio_venta: 5,
+  // catalog-domain-refactor / Slice 1
+  nombre: `Producto ${id}`,
+  categoria: null,
+  precio_venta: null,
   disponible: true,
   orden: 0,
   descripcion: null,
   icono: 'mdi-food',
+  color: null,
   created_at: '2026-06-19T00:00:00Z',
   updated_at: '2026-06-19T00:00:00Z',
   ...overrides,
@@ -77,14 +81,19 @@ describe('ProductoCardGrid', () => {
     expect(wrapper.find('[data-testid="producto-grid-empty"]').exists()).toBe(true)
   })
 
-  it('filters by busqueda substring (REQ-POS-23)', () => {
+  // catalog-domain-refactor / Slice 2: search/filter now uses
+  // producto.nombre (commercial name) instead of receta.nombre.
+  it('filters by busqueda substring matching producto.nombre (REQ-POS-23)', () => {
     const wrapper = mountGrid({
-      productos: [mkProducto('p-1'), mkProducto('p-2')],
-      recetas: [mkReceta('r-p-1', 'Brownies'), mkReceta('r-p-2', 'Galletas')],
+      productos: [
+        mkProducto('p-1', { nombre: 'Brownies de chocolate' }),
+        mkProducto('p-2', { nombre: 'Galletas' }),
+      ],
+      recetas: [mkReceta('r-p-1', 'Receta Brownies'), mkReceta('r-p-2', 'Receta Galletas')],
       busqueda: 'brow',
     })
     expect(wrapper.findAll('[data-testid="producto-card-active"]').length).toBe(1)
-    expect(wrapper.text()).toContain('Brownies')
+    expect(wrapper.text()).toContain('Brownies de chocolate')
   })
 
   it('shows the no-results state when the busqueda matches nothing (REQ-POS-23)', () => {
