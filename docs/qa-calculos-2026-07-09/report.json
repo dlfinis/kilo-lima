@@ -1,0 +1,164 @@
+{
+  "summary": {
+    "ok": 20,
+    "warn": 6,
+    "fail": 0
+  },
+  "findings": [
+    {
+      "level": "INFO",
+      "ctx": "db",
+      "msg": "12 recetas, 12 productos, 3 eventos, 5 ventas"
+    },
+    {
+      "level": "OK",
+      "ctx": "home",
+      "msg": "contador recetas = 12"
+    },
+    {
+      "level": "OK",
+      "ctx": "home",
+      "msg": "contador productos = 12"
+    },
+    {
+      "level": "OK",
+      "ctx": "home",
+      "msg": "contador eventos = 3"
+    },
+    {
+      "level": "OK",
+      "ctx": "inventario",
+      "msg": "materias primas en store = 28"
+    },
+    {
+      "level": "OK",
+      "ctx": "productos",
+      "msg": "productos en store = 12"
+    },
+    {
+      "level": "INFO",
+      "ctx": "productos",
+      "msg": "modo catálogo — precios no se muestran en card (REQ-FIN-29)"
+    },
+    {
+      "level": "OK",
+      "ctx": "recetas-list",
+      "msg": "recetas en store = 12"
+    },
+    {
+      "level": "INFO",
+      "ctx": "receta",
+      "msg": "\"Galleta de chocolate\": total=$25.72 per-unit=$1.07"
+    },
+    {
+      "level": "OK",
+      "ctx": "receta",
+      "msg": "costo total $25.72 matches DB"
+    },
+    {
+      "level": "OK",
+      "ctx": "receta",
+      "msg": "costo por unidad $1.07 matches DB"
+    },
+    {
+      "level": "INFO",
+      "ctx": "evento-prod",
+      "msg": "3 rows en la tabla"
+    },
+    {
+      "level": "OK",
+      "ctx": "evento-prod",
+      "msg": "\"Pan básico\" costo $2.06 visible"
+    },
+    {
+      "level": "OK",
+      "ctx": "evento-prod",
+      "msg": "\"Pan básico\" precio 2.7 matches"
+    },
+    {
+      "level": "WARN",
+      "ctx": "evento-prod",
+      "msg": "\"Pan básico\" ganancia NOT in row"
+    },
+    {
+      "level": "WARN",
+      "ctx": "evento-prod",
+      "msg": "\"Pan básico\" contrib.plan NOT in row"
+    },
+    {
+      "level": "OK",
+      "ctx": "evento-prod",
+      "msg": "\"Galleta de chocolate\" costo $1.07 visible"
+    },
+    {
+      "level": "OK",
+      "ctx": "evento-prod",
+      "msg": "\"Galleta de chocolate\" precio 2.2 matches"
+    },
+    {
+      "level": "WARN",
+      "ctx": "evento-prod",
+      "msg": "\"Galleta de chocolate\" ganancia NOT in row"
+    },
+    {
+      "level": "WARN",
+      "ctx": "evento-prod",
+      "msg": "\"Galleta de chocolate\" contrib.plan NOT in row"
+    },
+    {
+      "level": "OK",
+      "ctx": "evento-prod",
+      "msg": "\"Quimbolito\" costo $0.44 visible"
+    },
+    {
+      "level": "OK",
+      "ctx": "evento-prod",
+      "msg": "\"Quimbolito\" precio 0.82 matches"
+    },
+    {
+      "level": "WARN",
+      "ctx": "evento-prod",
+      "msg": "\"Quimbolito\" ganancia NOT in row"
+    },
+    {
+      "level": "OK",
+      "ctx": "evento-prod",
+      "msg": "\"Quimbolito\" contrib.plan $0.00 matches"
+    },
+    {
+      "level": "OK",
+      "ctx": "evento-detalle",
+      "msg": "título = \"Mercado Navideño 2025\""
+    },
+    {
+      "level": "INFO",
+      "ctx": "evento-detalle",
+      "msg": "cierre utilidad_bruta=-1980 esperado=-280 (ventas=320 - gf=600 - gi=0)"
+    },
+    {
+      "level": "WARN",
+      "ctx": "evento-detalle",
+      "msg": "drift: cierre=-1980 vs esperado=-280 (gastos pueden haber cambiado post-cierre)"
+    },
+    {
+      "level": "OK",
+      "ctx": "pos",
+      "msg": "evento en_curso presente en events store: \"Festival Primavera 2026\""
+    },
+    {
+      "level": "OK",
+      "ctx": "pos",
+      "msg": "margen badge \"30%\""
+    },
+    {
+      "level": "OK",
+      "ctx": "errors",
+      "msg": "ninguna page error (uncaught exception)"
+    },
+    {
+      "level": "OK",
+      "ctx": "errors",
+      "msg": "ningún console.error"
+    }
+  ]
+}
