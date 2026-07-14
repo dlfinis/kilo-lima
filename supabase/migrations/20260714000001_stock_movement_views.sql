@@ -22,6 +22,22 @@
 -- Idempotent: every CREATE / REPLACE / INSERT is guarded. Safe to re-run.
 -- ============================================================================
 
+-- 0) Self-healing guard: add cantidad_disponible when it was lost to migration
+--    drift (20260710000000 tracked as applied but column missing on some remotes).
+do $$
+begin
+  perform 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name   = 'materias_primas'
+      and column_name  = 'cantidad_disponible';
+  if not found then
+    alter table public.materias_primas
+      add column cantidad_disponible numeric(10,2) not null default 0;
+  end if;
+end;
+$$;
+
 -- 1) Derived-stock view — source of truth for on-hand inventory.
 create or replace view public.v_stock_actual as
 select
