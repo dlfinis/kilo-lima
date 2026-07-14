@@ -18,7 +18,7 @@
 //     operator can't sell them (REQ-FIN-30).
 //   - The empty state for "no productos configured for this evento"
 //     surfaces a `Configurar productos` button that routes to
-//     `/eventos/:id/productos` (REQ-FIN-30).
+//     `/eventos/:id/gestion` (REQ-FIN-30, event-product-management-refactor).
 //   - `agregarAlCarrito` calls the store with (productoId, 1) — the
 //     store derives precio + costo + margen via usePreciosEvento.
 //   - The PR-2b event-cerrado guard is the existing EVENTO_CERRADO
@@ -70,6 +70,7 @@ import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { estadoEsEditable } from '@/utils/estado'
 import { logInfo } from '@/utils/logger'
 import type {
+  CategoriaProducto,
   GastoImprevistoInput,
   MetodoPago,
   Producto,
@@ -185,10 +186,41 @@ const productosParaGrid = computed(() =>
   productosDelEvento.value.filter((ep) => ep.costo_unitario > 0),
 )
 
+// Filter + sort products by category and ordering. The grid receives
+// already-filtered products (no child-side search logic).
+const productosParaGridFiltrados = computed(() => {
+  let result = productosParaGrid.value
+
+  if (categoriaFiltro.value !== null) {
+    result = result.filter((ep) => ep.producto_categoria === categoriaFiltro.value)
+  }
+
+  if (ordenamiento.value) {
+    const sorted = [...result]
+    switch (ordenamiento.value) {
+      case 'precio_asc':
+        sorted.sort((a, b) => a.precio_final - b.precio_final)
+        break
+      case 'precio_desc':
+        sorted.sort((a, b) => b.precio_final - a.precio_final)
+        break
+      case 'nombre_asc':
+        sorted.sort((a, b) => a.producto_nombre.localeCompare(b.producto_nombre))
+        break
+      case 'nombre_desc':
+        sorted.sort((a, b) => b.producto_nombre.localeCompare(a.producto_nombre))
+        break
+    }
+    result = sorted
+  }
+
+  return result
+})
+
 // mobile-ux-redesign Phase 3: simplified POS grid uses ProductGrid
 // which expects { id, nombre, precio, imagen } shape.
 const productosSimplificados = computed(() =>
-  productosParaGrid.value.map((ep) => ({
+  productosParaGridFiltrados.value.map((ep) => ({
     id: ep.producto_id,
     nombre: ep.producto_nombre,
     precio: ep.precio_final,
@@ -202,7 +234,7 @@ const productosSimplificados = computed(() =>
 // the legacy types so we keep the existing card surface without a
 // breaking change to ProductoCardGrid (REQ-FIN-29).
 const productosMapeados = computed<Producto[]>(() =>
-  productosParaGrid.value.map((ep) => ({
+  productosParaGridFiltrados.value.map((ep) => ({
     id: ep.producto_id,
     receta_id: ep.receta_id,
     // catalog-domain-refactor / Slice 3: commercial product identity
@@ -220,7 +252,7 @@ const productosMapeados = computed<Producto[]>(() =>
   })),
 )
 const recetasParaGrid = computed<RecetaConIngredientes[]>(() =>
-  productosParaGrid.value.map((ep) => ({
+  productosParaGridFiltrados.value.map((ep) => ({
     id: ep.receta_id,
     nombre: ep.producto_nombre,
     descripcion: null,
@@ -265,7 +297,39 @@ const mostrarSinProductos = computed(
 
 const dialogoCrearImprevisto = ref(false)
 
-const busqueda = ref('')
+// Category + sort filter state (replaces text search bar)
+const categoriaFiltro = ref<CategoriaProducto | null>(null)
+type Ordenamiento = 'precio_asc' | 'precio_desc' | 'nombre_asc' | 'nombre_desc'
+const ordenamiento = ref<Ordenamiento | null>(null)
+
+const CATEGORIAS: { value: CategoriaProducto; label: string }[] = [
+  { value: 'dulce', label: 'Dulce' },
+  { value: 'salado', label: 'Salado' },
+  { value: 'helado', label: 'Helado' },
+  { value: 'bebida', label: 'Bebida' },
+]
+
+const OPCIONES_ORDENAMIENTO: { value: Ordenamiento; label: string }[] = [
+  { value: 'precio_asc', label: 'Precio ↑' },
+  { value: 'precio_desc', label: 'Precio ↓' },
+  { value: 'nombre_asc', label: 'Alfabético A-Z' },
+  { value: 'nombre_desc', label: 'Alfabético Z-A' },
+]
+
+const ordenamientoLabel = computed(() => {
+  if (!ordenamiento.value) return 'Ordenar'
+  return OPCIONES_ORDENAMIENTO.find((o) => o.value === ordenamiento.value)?.label ?? 'Ordenar'
+})
+
+const hayFiltrosActivos = computed(
+  () => categoriaFiltro.value !== null || ordenamiento.value !== null,
+)
+
+function limpiarFiltros() {
+  categoriaFiltro.value = null
+  ordenamiento.value = null
+}
+
 const dialogoRegistrarAbierto = ref(false)
 
 // pos-redesign (REQ-POS-COMPROBANTE-1, REQ-POS-14): the just-registered
@@ -413,7 +477,7 @@ function manejarAgregar(productoId: string) {
 
 function irAConfigurarProductos() {
   if (!eventoEnCurso.value) return
-  router.push(`/eventos/${eventoEnCurso.value.id}/productos`)
+  router.push(`/eventos/${eventoEnCurso.value.id}/gestion`)
 }
 
 // UX: inline quick-init — bulk-add all catalog products to the
@@ -970,12 +1034,5 @@ async function reintentarHistorial() {
   background: rgba(var(--v-theme-surface-variant), 0.4);
   border-radius: 6px;
   min-height: 36px;
-}
-
-.pos-search :deep(.v-field__outline) {
-  --v-field-border-opacity: 0.25;
-}
-.pos-search :deep(.v-field) {
-  border-radius: 8px;
 }
 </style>
