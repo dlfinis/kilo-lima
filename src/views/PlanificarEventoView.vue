@@ -19,6 +19,7 @@ import { usePlans } from '@/composables/usePlans'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useProyeccionCostos } from '@/composables/useProyeccionCostos'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
+import { useGastosFijosStore } from '@/stores/gastosFijos.store'
 import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { estadoEsEditable } from '@/utils/estado'
@@ -76,6 +77,7 @@ onMounted(async () => {
     recipesStore.cargarTodas(),
     productosStore.cargarTodas(),
     epStore.cargarPorEvento(eventoId.value),
+    useGastosFijosStore().cargarPorEvento(eventoId.value),
   ])
 })
 

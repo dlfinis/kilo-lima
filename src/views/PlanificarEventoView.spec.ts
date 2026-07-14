@@ -19,7 +19,8 @@ import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import { __pushSupabaseResponse, __resetSupabaseMock } from '../../tests/setup'
 
 import PlanificarEventoView from './PlanificarEventoView.vue'
-import type { Evento, PlanProduccion } from '@/types'
+import { useGastosFijosStore } from '@/stores/gastosFijos.store'
+import type { Evento, GastoFijo, PlanProduccion } from '@/types'
 
 const vuetify = createVuetify({ components, directives })
 
@@ -157,5 +158,48 @@ describe('PlanificarEventoView', () => {
 
     expect(wrapper.text()).toContain('Error al cargar')
     expect(wrapper.text()).toContain('Reintentar')
+  })
+
+  it('loads gastos fijos so the projection has break-even context', async () => {
+    const evento = mkEvento('e-1')
+    await prepararStores(evento, [mkPlan('p-1')])
+    // Queue responses for every supabase call driven by the view's
+    // onMounted Promise.all: plans, recipes, productos, epStore,
+    // and gastosFijos. The gastosFijos entry carries real data so
+    // we can assert the store was populated correctly.
+    __pushSupabaseResponse<PlanProduccion[]>({ data: [mkPlan('p-1')], error: null })
+    __pushSupabaseResponse<unknown[]>({ data: [], error: null })       // recipes
+    __pushSupabaseResponse<unknown[]>({ data: [], error: null })       // productos
+    __pushSupabaseResponse<unknown[]>({ data: [], error: null })       // epStore
+    __pushSupabaseResponse<GastoFijo[]>(({
+      data: [{
+        id: 'gf-1',
+        evento_id: 'e-1',
+        categoria: 'renta',
+        monto: 800,
+        descripcion: 'Local',
+        created_at: '2026-07-01T00:00:00Z',
+        updated_at: '2026-07-01T00:00:00Z',
+      }],
+      error: null,
+    }))
+
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+
+    // Prove the store was populated — the projection composable reads
+    // gastosStore.gastosPorEvento.get(id), so this proves break-even
+    // will see the fixed costs instead of an empty/undefined map entry.
+    await aplicacion.runWithContext(() => {
+      const gfStore = useGastosFijosStore()
+      const gastos = gfStore.gastosPorEvento.get('e-1')
+      expect(gastos).toBeDefined()
+      expect(gastos!.length).toBe(1)
+      expect(gastos![0]!.categoria).toBe('renta')
+      expect(gastos![0]!.monto).toBe(800)
+    })
+
+    // Sanity: the view still renders correctly with gastos fijos loaded.
+    expect(wrapper.find('[data-testid="planificar-grid-card"]').exists()).toBe(true)
   })
 })
