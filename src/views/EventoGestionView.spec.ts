@@ -313,7 +313,8 @@ describe('EventoGestionView', () => {
     const bodyExpanded = document.body.textContent ?? ''
     expect(bodyExpanded).toContain('MP mp-1')
     expect(bodyExpanded).toContain('10.00')
-    expect(bodyExpanded).toContain('3.00')
+    // Costo compra: faltante(7) × costo_por_unidad(10) = $70.00
+    expect(bodyExpanded).toContain('$70.00')
     expect(bodyExpanded).toContain('7.00')
   })
 

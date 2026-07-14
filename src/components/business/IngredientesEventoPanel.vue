@@ -34,10 +34,13 @@ const compraHeaders = [
   { title: 'Ingrediente', key: 'nombre' },
   { title: 'Tipo', key: 'unidadTipo', align: 'start' as const, width: 55 },
   { title: 'Cantidad', key: 'cantidadDisplay', align: 'end' as const, width: 90 },
-  { title: 'Requerido', key: 'requeridoDisplay', align: 'end' as const, width: 120 },
-  { title: 'Disponible', key: 'disponibleDisplay', align: 'end' as const, width: 120 },
+  { title: 'Costo compra', key: 'costoCompra', align: 'end' as const, width: 110 },
   { title: 'A comprar', key: 'faltanteDisplay', align: 'end' as const, width: 120 },
 ]
+
+const costoCopraTotal = computed<number>(() =>
+  consolidado.value.reduce((sum, ing) => sum + ing.faltante * ing.costoUnitario, 0),
+)
 
 const productoHeaders = [
   { title: 'Ingrediente', key: 'nombre' },
@@ -49,14 +52,6 @@ const productoHeaders = [
 // -----------------------------------------------------------------------
 // Helpers
 // -----------------------------------------------------------------------
-
-function requeridoFmt(v: number): string {
-  return v.toFixed(2)
-}
-
-function disponibleFmt(v: number): string {
-  return v.toFixed(2)
-}
 
 function faltanteFmt(v: number): string {
   return v > 0 ? v.toFixed(2) : '—'
@@ -143,13 +138,11 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
             <template #[`item.cantidadDisplay`]="{ item }">
               {{ item.requerido.toFixed(2) }}
             </template>
-            <!-- requeridoDisplay -->
-            <template #[`item.requeridoDisplay`]="{ item }">
-              <span class="font-weight-medium">{{ requeridoFmt(item.requerido) }}</span>
-            </template>
-            <!-- disponibleDisplay -->
-            <template #[`item.disponibleDisplay`]="{ item }">
-              {{ disponibleFmt(item.disponible) }}
+            <!-- costoCompra: unit cost × faltante -->
+            <template #[`item.costoCompra`]="{ item }">
+              <span :class="{ 'text-medium-emphasis': item.faltante === 0 }">
+                ${{ (item.faltante * item.costoUnitario).toFixed(2) }}
+              </span>
             </template>
             <!-- faltanteDisplay: colour-coded: red when gap > 0, green when 0 -->
             <template #[`item.faltanteDisplay`]="{ item }">
@@ -160,6 +153,14 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
               <span v-else class="text-success">—</span>
             </template>
           </v-data-table>
+
+          <div
+            v-if="consolidado.length > 0"
+            class="d-flex justify-end pa-2 text-body-2 font-weight-medium"
+            data-testid="ingredientes-consolidado-total"
+          >
+            Total compra: ${{ costoCopraTotal.toFixed(2) }}
+          </div>
         </v-expansion-panel-text>
       </v-expansion-panel>
 
@@ -199,7 +200,7 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
               {{ item.requerido.toFixed(2) }}
             </template>
             <template #[`item.requeridoDisplay`]="{ item }">
-              {{ requeridoFmt(item.requerido) }}
+              {{ item.requerido.toFixed(2) }}
             </template>
           </v-data-table>
         </v-expansion-panel-text>

@@ -502,17 +502,51 @@ const inversionTotal = computed<number>(() => {
           <v-data-table
             :items="filasGestion"
             :headers="[
-              { title: '', key: 'incluido', sortable: false, width: 56 },
+              { title: '', key: 'incluido', sortable: false, width: 40 },
               { title: 'Producto', key: 'producto_nombre' },
-              { title: 'U.P.', key: 'unidades_a_producir', width: 80, align: 'center' },
-              { title: 'Costo prod.', key: 'costo_total_prod', width: 110, align: 'end' },
-              { title: 'Precio venta', key: 'precio_final', width: 145, align: 'center' },
+              { title: 'U.P.', key: 'unidades_a_producir', width: 100, align: 'center' },
+              { title: 'C.P.', key: 'costo_total_prod', width: 110, align: 'start' },
+              { title: 'P.V.', key: 'precio_final', width: 145, align: 'center' },
               { title: 'Márgenes', key: 'margenes', minWidth: 260 },
               { title: 'Contb.T.', key: 'contribucion_unit', width: 110, align: 'end' },
             ]"
             density="compact"
             data-testid="evento-gestion-tabla"
           >
+            <!-- Column header tooltips for abbreviated labels -->
+            <template #header.unidades_a_producir="{ column }">
+              <v-tooltip bottom>
+                <template #activator="{ props: tooltipProps }">
+                  <span v-bind="tooltipProps">{{ column.title }}</span>
+                </template>
+                <span>Unidades planificadas a producir</span>
+              </v-tooltip>
+            </template>
+            <template #header.costo_total_prod="{ column }">
+              <v-tooltip bottom>
+                <template #activator="{ props: tooltipProps }">
+                  <span v-bind="tooltipProps">{{ column.title }}</span>
+                </template>
+                <span>Costo de producción: costo unitario × unidades planificadas</span>
+              </v-tooltip>
+            </template>
+            <template #header.precio_final="{ column }">
+              <v-tooltip bottom>
+                <template #activator="{ props: tooltipProps }">
+                  <span v-bind="tooltipProps">{{ column.title }}</span>
+                </template>
+                <span>Precio de venta final</span>
+              </v-tooltip>
+            </template>
+            <template #header.contribucion_unit="{ column }">
+              <v-tooltip bottom>
+                <template #activator="{ props: tooltipProps }">
+                  <span v-bind="tooltipProps">{{ column.title }}</span>
+                </template>
+                <span>Contribución total: costo × contb.% × unidades</span>
+              </v-tooltip>
+            </template>
+
             <!-- Include toggle -->
             <template #[`item.incluido`]="{ item }">
               <v-checkbox-btn
@@ -553,8 +587,8 @@ const inversionTotal = computed<number>(() => {
                 hide-details
                 :disabled="!editable"
                 :data-testid="`evento-gestion-unidades-${item.producto_id}`"
-                class="text-center mx-auto"
-                style="max-width: 65px"
+                class="text-center mx-auto up-thin-input"
+                style="max-width: 85px"
                 @update:model-value="(v) => onUnidadesInput(item.producto_id, v)"
                 @blur="() => alGuardarUnidades(item)"
                 @keydown.enter="() => alGuardarUnidades(item)"
@@ -691,14 +725,21 @@ const inversionTotal = computed<number>(() => {
 .margenes-cell :deep(.margen-slider-input) {
   max-width: 150px;
 }
-.margenes-cell :deep([data-testid="margen-slider-precio"]) {
-  display: none;
-}
 
 /* Fixed-width slider label so "Gan." / "Cont." don't jitter
    between rows when one slider has a wider % value. */
 .slider-label {
   display: inline-block;
   min-width: 36px;
+}
+
+/* U.P. input: tightened internal padding so ~4 digits fit comfortably
+   in the allocated 85 px while keeping the compact Vuetify density. */
+:deep(.up-thin-input .v-field) {
+  padding-inline: 4px;
+}
+:deep(.up-thin-input .v-field__input) {
+  padding-block: 2px;
+  min-height: unset;
 }
 </style>

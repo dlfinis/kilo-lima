@@ -52,7 +52,7 @@ describe('IngredientesEventoPanel', () => {
   // Consolidated summary table
   // -----------------------------------------------------------------------
 
-  it('renders consolidated "to buy" summary table with available, required, and faltante', async () => {
+  it('renders consolidated "to buy" summary table with cost and faltante', async () => {
     const wrapper = mountPanel(
       mkResultado({
         consolidado: [
@@ -63,6 +63,7 @@ describe('IngredientesEventoPanel', () => {
             requerido: 50,
             disponible: 30,
             faltante: 20,
+            costoUnitario: 5,
           },
           {
             materiaPrimaId: 'mp-2',
@@ -71,6 +72,7 @@ describe('IngredientesEventoPanel', () => {
             requerido: 10,
             disponible: 15,
             faltante: 0,
+            costoUnitario: 3,
           },
         ],
       }),
@@ -88,13 +90,15 @@ describe('IngredientesEventoPanel', () => {
     await wrapper.vm.$nextTick()
 
     const text = wrapper.text()
-    // Harina: requerido 50, disponible 30, faltante 20
+    // Harina: cantidad = requerido 50, faltante 20, costo compra = 20 × 5 = $100.00
     expect(text).toContain('50.00')
-    expect(text).toContain('30.00')
+    expect(text).toContain('$100.00')
     expect(text).toContain('20.00')
 
-    // Azúcar: faltante = 0 → "—", disponible still visible
-    expect(text).toContain('15.00')
+    // Azúcar: faltante = 0 → "—", costo compra = $0.00
+    expect(text).toContain('$0.00')
+    // Total compra row
+    expect(text).toContain('Total compra: $100.00')
   })
 
   // -----------------------------------------------------------------------
@@ -112,6 +116,7 @@ describe('IngredientesEventoPanel', () => {
             requerido: 40,
             disponible: 10,
             faltante: 30,
+            costoUnitario: 4,
           },
         ],
       }),
@@ -140,6 +145,7 @@ describe('IngredientesEventoPanel', () => {
             requerido: 10,
             disponible: 20,
             faltante: 0,
+            costoUnitario: 2,
           },
         ],
       }),
@@ -248,7 +254,7 @@ describe('IngredientesEventoPanel', () => {
   // Warning badges
   // -----------------------------------------------------------------------
 
-  it('shows yellow v-alert with advertencia details when warnings exist', () => {
+    it('shows yellow v-alert with advertencia details when warnings exist', () => {
     const wrapper = mountPanel(
       mkResultado({
         consolidado: [
@@ -259,6 +265,7 @@ describe('IngredientesEventoPanel', () => {
             requerido: 10,
             disponible: 5,
             faltante: 5,
+            costoUnitario: 4,
           },
         ],
         advertencias: [
@@ -280,7 +287,7 @@ describe('IngredientesEventoPanel', () => {
     expect(alertText).toContain('receta-ausente')
   })
 
-  it('does not render alert when no advertencias exist', () => {
+    it('does not render alert when no advertencias exist', () => {
     const wrapper = mountPanel(
       mkResultado({
         consolidado: [
@@ -291,6 +298,7 @@ describe('IngredientesEventoPanel', () => {
             requerido: 10,
             disponible: 5,
             faltante: 5,
+            costoUnitario: 5,
           },
         ],
         advertencias: [],
@@ -324,6 +332,7 @@ describe('IngredientesEventoPanel', () => {
             requerido: 10,
             disponible: 0,
             faltante: 10,
+            costoUnitario: 8,
           },
         ],
         advertencias: [{ codigo: 'MATERIA_PRIMA_FALTANTE', referenciaId: 'mp-orphan' }],
@@ -357,6 +366,7 @@ describe('IngredientesEventoPanel', () => {
             requerido: 0,
             disponible: 0,
             faltante: 0,
+            costoUnitario: 2,
           },
         ],
         advertencias: [],

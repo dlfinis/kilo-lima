@@ -46,6 +46,8 @@ export interface IngredienteCompra extends IngredienteRequerido {
   disponible: number
   /** Remaining quantity to purchase (`max(requerido - disponible, 0)`). */
   faltante: number
+  /** Unit cost from the materia prima catalog (`costo_por_unidad`). */
+  costoUnitario: number
 }
 
 /** Per-product ingredient breakdown entry. */
@@ -225,6 +227,7 @@ export function calcularIngredientesEvento(
       requerido: acc.requerido,
       disponible: acc.disponible,
       faltante: Math.max(acc.requerido - acc.disponible, 0),
+      costoUnitario: mpMap.get(id)?.costo_por_unidad ?? 0,
     }),
   )
 
