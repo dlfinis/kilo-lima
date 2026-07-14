@@ -155,7 +155,7 @@ DROP TRIGGER IF EXISTS trigger_opciones_grupo_change ON opciones_grupo;
 CREATE TRIGGER trigger_opciones_grupo_change
 AFTER INSERT OR UPDATE OR DELETE ON opciones_grupo
 FOR EACH ROW
-EXECUTE FUNCTION trigger_recalcalar_grupo();
+EXECUTE FUNCTION trigger_recalcular_grupo();
 
 -- Actualizar updated_at automáticamente
 CREATE OR REPLACE FUNCTION update_updated_at_column()
