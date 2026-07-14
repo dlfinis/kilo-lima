@@ -476,8 +476,8 @@ const inversionTotal = computed<number>(() => {
             </div>
           </div>
 
-          <!-- Summary chips -->
-          <div class="d-flex ga-3 mb-3 flex-wrap">
+          <!-- Summary chips: grouped in a subtle container for faster scanning -->
+          <div class="summary-bar d-flex ga-3 mb-4 flex-wrap bg-grey-lighten-5 rounded pa-2">
             <v-chip size="small" color="primary" variant="tonal"
               data-testid="evento-gestion-total-productos">
               {{ filasGestion.filter(f => f.incluido).length }} incluido(s)
@@ -499,15 +499,15 @@ const inversionTotal = computed<number>(() => {
           <v-data-table
             :items="filasGestion"
             :headers="[
-              { title: '', key: 'incluido', sortable: false, width: 60 },
+              { title: '', key: 'incluido', sortable: false, width: 56 },
               { title: 'Producto', key: 'producto_nombre' },
-              { title: 'Costo', key: 'costo_unitario', width: 100, align: 'end' },
-              { title: 'Und. producir', key: 'unidades_a_producir', width: 130, align: 'center' },
-              { title: 'Márgenes', key: 'margenes', minWidth: 300 },
-              { title: 'Precio', key: 'precio_final', width: 140, align: 'center' },
+              { title: 'Und. a producir', key: 'unidades_a_producir', width: 155, align: 'center' },
+              { title: 'Costo prod.', key: 'costo_total_prod', width: 110, align: 'end' },
+              { title: 'Precio venta', key: 'precio_final', width: 130, align: 'center' },
+              { title: 'Márgenes', key: 'margenes', minWidth: 260 },
               { title: 'Contrib. total', key: 'contribucion_unit', width: 120, align: 'end' },
             ]"
-            density="comfortable"
+            density="compact"
             data-testid="evento-gestion-tabla"
           >
             <!-- Include toggle -->
@@ -520,19 +520,24 @@ const inversionTotal = computed<number>(() => {
               />
             </template>
 
-            <!-- Product name with recipe context -->
+            <!-- Product identity: name + recipe + unit cost (hierarchy priority 1) -->
             <template #[`item.producto_nombre`]="{ item }">
               <div>
                 <span class="font-weight-medium">{{ item.producto_nombre }}</span>
-                <div v-if="item.receta_nombre" class="text-caption text-medium-emphasis">
+                <div class="text-caption text-medium-emphasis">
                   {{ item.receta_nombre }}
+                  <template v-if="item.costo_unitario > 0">
+                    · {{ formatearUSD(item.costo_unitario) }}/und.
+                  </template>
                 </div>
               </div>
             </template>
 
-            <!-- Unit cost -->
-            <template #[`item.costo_unitario`]="{ item }">
-              {{ formatearUSD(item.costo_unitario) }}
+            <!-- Total production cost per product line (hierarchy priority 1) -->
+            <template #[`item.costo_total_prod`]="{ item }">
+              <span :class="{ 'text-medium-emphasis': item.unidades_a_producir === 0 }">
+                {{ formatearUSD(item.costo_unitario * item.unidades_a_producir) }}
+              </span>
             </template>
 
             <!-- Production units: editable input -->
@@ -547,30 +552,37 @@ const inversionTotal = computed<number>(() => {
                 :data-testid="`evento-gestion-unidades-${item.producto_id}`"
                 class="text-center mx-auto"
                 style="width: 100%"
-                suffix="und."
                 @update:model-value="(v) => onUnidadesInput(item.producto_id, v)"
                 @blur="() => alGuardarUnidades(item)"
                 @keydown.enter="() => alGuardarUnidades(item)"
               />
             </template>
 
-            <!-- Two sliders: ganancia (green) + contribución (orange) -->
+            <!-- Two-slider pricing: ganancia (green) + contribución (orange), stacked
+                 vertically with compact labels so the operator can distinguish them
+                 at a glance instead of parsing two identical side-by-side sliders. -->
             <template #[`item.margenes`]="{ item }">
-              <div class="d-flex align-center ga-3">
-                <MargenSlider
-                  :model-value="gananciaPct[item.producto_id] ?? 0"
-                  :costo="item.costo_unitario"
-                  color="green"
-                  :disabled="!editable"
-                  @update:model-value="(m) => alCambiarGanancia(item, m)"
-                />
-                <MargenSlider
-                  :model-value="contribucionPct[item.producto_id] ?? 0"
-                  :costo="item.costo_unitario"
-                  color="orange"
-                  :disabled="!editable"
-                  @update:model-value="(m) => alCambiarContribucion(item, m)"
-                />
+              <div class="margenes-cell">
+                <div class="d-flex align-center ga-1 mb-1">
+                  <span class="text-caption font-weight-medium text-green-darken-2 slider-label">Gan.</span>
+                  <MargenSlider
+                    :model-value="gananciaPct[item.producto_id] ?? 0"
+                    :costo="item.costo_unitario"
+                    color="green"
+                    :disabled="!editable"
+                    @update:model-value="(m) => alCambiarGanancia(item, m)"
+                  />
+                </div>
+                <div class="d-flex align-center ga-1">
+                  <span class="text-caption font-weight-medium text-orange-darken-2 slider-label">Cont.</span>
+                  <MargenSlider
+                    :model-value="contribucionPct[item.producto_id] ?? 0"
+                    :costo="item.costo_unitario"
+                    color="orange"
+                    :disabled="!editable"
+                    @update:model-value="(m) => alCambiarContribucion(item, m)"
+                  />
+                </div>
               </div>
             </template>
 
@@ -657,10 +669,31 @@ const inversionTotal = computed<number>(() => {
 <style scoped>
 /* gestion-grid: same rail pattern as PlanificarEventoView — the
    projection rail is secondary supporting context with reduced
-   visual weight so the product table dominates the layout. */
+   visual weight so the product table dominates the layout.
+   Tightened further for Gestion view: narrower column + zero-grow
+   so it never steals space from the data table. */
 .gestion-rail {
-  min-width: 280px;
-  max-width: 340px;
-  flex: 1 1 280px;
+  min-width: 220px;
+  max-width: 260px;
+  flex: 0 1 240px;
+}
+
+/* Margenes cell: sliders are narrower in table context so the
+   stacked layout stays compact and label/slider alignment is
+   consistent across rows. The per-slider price text is hidden here
+   — it's redundant with the price column and can mislead because it
+   shows only that slider's markup × cost, not the full price. */
+.margenes-cell :deep(.margen-slider-input) {
+  max-width: 150px;
+}
+.margenes-cell :deep([data-testid="margen-slider-precio"]) {
+  display: none;
+}
+
+/* Fixed-width slider label so "Gan." / "Cont." don't jitter
+   between rows when one slider has a wider % value. */
+.slider-label {
+  display: inline-block;
+  min-width: 36px;
 }
 </style>
