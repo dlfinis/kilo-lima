@@ -122,6 +122,15 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/ContabilidadEventoView.vue'),
     meta: { breadcrumb: ['Inicio', 'eventos', 'Contabilidad'] },
   },
+  // inventory-accounting-workflow-refactor / Phase 3: Abastecimiento.
+  // New canonical surface for event supply management. Purchases here
+  // create real stock movements via the registrar_compra_insumo RPC.
+  {
+    path: '/eventos/:id/abastecimiento',
+    name: 'evento-abastecimiento',
+    component: () => import('@/views/AbastecimientoEventoView.vue'),
+    meta: { breadcrumb: ['Inicio', 'eventos', 'Abastecimiento'] },
+  },
   // ---- Redirects: legacy → new routes ----
   {
     path: '/contabilidad',

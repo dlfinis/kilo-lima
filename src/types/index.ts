@@ -92,5 +92,6 @@ export type {
   RegistrarCompraInput,
   RegistrarConsumoInput,
   RegistrarCorreccionInput,
+  RegistrarCompraInsumoInput,
   StockMovementWithMateria,
 } from './stock.types'

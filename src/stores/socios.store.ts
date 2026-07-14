@@ -5,8 +5,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Aporte,
   AporteInput,
-  CompraInsumo,
-  CompraInsumoInput,
   Database,
   EventoSocio,
   EventoSocioInput,
@@ -152,36 +150,6 @@ export const useSociosStore = defineStore('socios', () => {
     return res
   }
 
-  const comprasInsumos = ref<Map<string, CompraInsumo[]>>(new Map())
-
-  async function cargarComprasInsumos(eventoId: string) {
-    const res = await servicio.listarComprasInsumos(eventoId)
-    if (!res.error) {
-      comprasInsumos.value.set(eventoId, res.data ?? [])
-    }
-  }
-
-  async function crearCompraInsumo(input: CompraInsumoInput) {
-    const res = await servicio.crearCompraInsumo(input)
-    if (res.data) {
-      const eventoKey = input.evento_id ?? '__global__'
-      const lista = comprasInsumos.value.get(eventoKey) ?? []
-      lista.unshift(res.data)
-      comprasInsumos.value.set(eventoKey, [...lista])
-    }
-    return res
-  }
-
-  async function eliminarCompraInsumo(eventoId: string | null, id: string) {
-    const res = await servicio.eliminarCompraInsumo(id)
-    if (!res.error) {
-      const key = eventoId ?? '__global__'
-      const lista = (comprasInsumos.value.get(key) ?? []).filter((c) => c.id !== id)
-      comprasInsumos.value.set(key, lista)
-    }
-    return res
-  }
-
   return {
     socios,
     cargando,
@@ -201,9 +169,5 @@ export const useSociosStore = defineStore('socios', () => {
     cargarAportes,
     crearAporte,
     eliminarAporte,
-    comprasInsumos,
-    cargarComprasInsumos,
-    crearCompraInsumo,
-    eliminarCompraInsumo,
   }
 })

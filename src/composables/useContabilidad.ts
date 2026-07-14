@@ -1,6 +1,7 @@
 import { computed, type ComputedRef, ref } from 'vue'
 
 import { useSociosStore } from '@/stores/socios.store'
+import { useAbastecimientoStore } from '@/stores/abastecimiento.store'
 import { useGastosFijosStore } from '@/stores/gastosFijos.store'
 import { useGastosImprevistosStore } from '@/stores/gastosImprevistos.store'
 import { useVentasStore } from '@/stores/ventas.store'
@@ -64,7 +65,7 @@ export function useContabilidad(eventoId: ComputedRef<string | null>) {
   const compras = computed<CompraInsumo[]>(() => {
     const id = eventoId.value
     if (!id) return []
-    return useSociosStore().comprasInsumos.get(id) ?? []
+    return useAbastecimientoStore().comprasInsumos.get(id) ?? []
   })
 
   const resumen = computed<ResumenContabilidad>(() => {
@@ -264,10 +265,11 @@ export function useContabilidad(eventoId: ComputedRef<string | null>) {
     error.value = null
 
     const sociosStore = useSociosStore()
+    const abastecimientoStore = useAbastecimientoStore()
     await Promise.all([
       sociosStore.cargarSociosEvento(id),
       sociosStore.cargarAportes(id),
-      sociosStore.cargarComprasInsumos(id),
+      abastecimientoStore.cargarComprasInsumos(id),
     ])
 
     cargando.value = false

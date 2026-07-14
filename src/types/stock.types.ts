@@ -76,3 +76,14 @@ export interface StockMovementWithMateria extends StockMovement {
     unidad: string
   }
 }
+
+export interface RegistrarCompraInsumoInput {
+  socio_id: string
+  materia_prima_id: string
+  cantidad: number
+  costo_unitario: number
+  costo_total: number
+  evento_id?: string | null
+  descripcion?: string | null
+  fecha?: string
+}

@@ -3,8 +3,6 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Aporte,
   AporteInput,
-  CompraInsumo,
-  CompraInsumoInput,
   Database,
   EventoSocio,
   EventoSocioInput,
@@ -27,11 +25,6 @@ export interface SociosService {
   listarAportes(eventoId: string): Promise<{ data: Aporte[] | null; error: ServiceError | null }>
   crearAporte(input: AporteInput): Promise<{ data: Aporte | null; error: ServiceError | null }>
   eliminarAporte(id: string): Promise<{ data: null; error: ServiceError | null }>
-
-  listarComprasInsumos(eventoId: string): Promise<{ data: CompraInsumo[] | null; error: ServiceError | null }>
-  listarComprasInsumosGlobales(): Promise<{ data: CompraInsumo[] | null; error: ServiceError | null }>
-  crearCompraInsumo(input: CompraInsumoInput): Promise<{ data: CompraInsumo | null; error: ServiceError | null }>
-  eliminarCompraInsumo(id: string): Promise<{ data: null; error: ServiceError | null }>
 }
 
 export function crearSociosService(supabase: SupabaseClient<Database>): SociosService {
@@ -88,26 +81,6 @@ export function crearSociosService(supabase: SupabaseClient<Database>): SociosSe
 
     async eliminarAporte(id) {
       const res = await supabase.from('aportes').delete().eq('id', id)
-      return { data: null, error: res.error }
-    },
-
-    async listarComprasInsumos(eventoId) {
-      const res = await supabase.from('compras_insumos').select('*').eq('evento_id', eventoId).order('fecha', { ascending: false })
-      return { data: (res.data as CompraInsumo[] | null) ?? null, error: res.error }
-    },
-
-    async listarComprasInsumosGlobales() {
-      const res = await supabase.from('compras_insumos').select('*').is('evento_id', null).order('fecha', { ascending: false })
-      return { data: (res.data as CompraInsumo[] | null) ?? null, error: res.error }
-    },
-
-    async crearCompraInsumo(input) {
-      const res = await supabase.from('compras_insumos').insert(input as Database['public']['Tables']['compras_insumos']['Insert']).select().single()
-      return { data: (res.data as CompraInsumo | null) ?? null, error: res.error }
-    },
-
-    async eliminarCompraInsumo(id) {
-      const res = await supabase.from('compras_insumos').delete().eq('id', id)
       return { data: null, error: res.error }
     },
   }

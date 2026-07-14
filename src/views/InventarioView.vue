@@ -10,9 +10,24 @@ import FabNuevo from '@/components/business/FabNuevo.vue'
 import MateriaPrimaForm from '@/components/business/MateriaPrimaForm.vue'
 import MateriaPrimaListItem from '@/components/business/MateriaPrimaListItem.vue'
 import { useIngredients } from '@/composables/useIngredients'
+import { useStockMovementsStore } from '@/stores/stockMovements.store'
 import type { MateriaPrima, MateriaPrimaInput, CategoriaMateriaPrima } from '@/types'
 
 const { materiasPrimas, cargando, error, cargarTodas, crear, actualizar, eliminar } = useIngredients()
+const stockMovementsStore = useStockMovementsStore()
+
+const stockDerivadoMap = computed<Map<string, number>>(() => {
+  const map = new Map<string, number>()
+  for (const entry of stockMovementsStore.stockActual) {
+    map.set(entry.materia_prima_id, entry.stock_actual)
+  }
+  return map
+})
+
+function stockDerivadoDisplay(id: string): string {
+  const val = stockDerivadoMap.value.get(id)
+  return val !== undefined ? `${val}` : '—'
+}
 
 const filtroCategoria = ref<CategoriaMateriaPrima | 'todos'>('todos')
 const ordenAlfabetico = ref<'asc' | 'desc'>('asc')
@@ -55,6 +70,7 @@ const materiaEnEdicion = computed<MateriaPrimaInput | null>(() =>
 
 onMounted(() => {
   cargarTodas()
+  void stockMovementsStore.cargarStockActual()
 })
 
 async function manejarSubmit(input: MateriaPrimaInput) {
@@ -192,6 +208,7 @@ function cerrarDialogo() {
         v-for="m in materiasPrimasFiltradas"
         :key="m.id"
         :materia="m"
+        :stock-actual="stockDerivadoMap.get(m.id) ?? null"
         @edit="abrirEditar"
         @delete="abrirEliminar"
       />

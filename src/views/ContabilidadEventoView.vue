@@ -8,6 +8,7 @@ import AporteForm from '@/components/business/AporteForm.vue'
 import ContabilidadResumenCard from '@/components/business/ContabilidadResumenCard.vue'
 import DistribucionCard from '@/components/business/DistribucionCard.vue'
 import TimelineMovimientos from '@/components/business/TimelineMovimientos.vue'
+import { useAbastecimientoStore } from '@/stores/abastecimiento.store'
 import { useSociosStore } from '@/stores/socios.store'
 import { useGastosFijosStore } from '@/stores/gastosFijos.store'
 import { useGastosImprevistosStore } from '@/stores/gastosImprevistos.store'
@@ -24,6 +25,7 @@ const eventoId = computed<string | null>(() => {
 })
 
 const sociosStore = useSociosStore()
+const abastecimientoStore = useAbastecimientoStore()
 const {
   resumen,
   distribucion,
@@ -57,7 +59,7 @@ onMounted(() => {
 
 async function manejarCompraSubmit(input: CompraInsumoInput) {
   if (!eventoId.value) return
-  await sociosStore.crearCompraInsumo({
+  await abastecimientoStore.crearCompraInsumo({
     ...input,
     evento_id: eventoId.value,
   })

@@ -5,7 +5,10 @@
 import { formatearUSD } from '@/utils/format'
 import type { MateriaPrima } from '@/types'
 
-defineProps<{ materia: MateriaPrima }>()
+defineProps<{
+  materia: MateriaPrima
+  stockActual?: number | null
+}>()
 
 const emit = defineEmits<{
   edit: [id: string]
@@ -23,6 +26,9 @@ const emit = defineEmits<{
     </v-list-item-title>
     <v-list-item-subtitle>
       {{ materia.unidad }} · {{ formatearUSD(materia.costo_por_unidad) }} / {{ materia.unidad }}
+      <template v-if="stockActual !== undefined && stockActual !== null">
+        · Stock: <span :class="stockActual <= 0 ? 'text-error' : 'text-success'">{{ stockActual }}</span> {{ materia.unidad }}
+      </template>
     </v-list-item-subtitle>
     <template #append>
       <v-btn icon="mdi-pencil" variant="text" size="small" :data-testid="`mp-edit-${materia.id}`" @click="emit('edit', materia.id)" />

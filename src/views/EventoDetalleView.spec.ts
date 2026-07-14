@@ -62,6 +62,7 @@ let router: Router
         { path: '/eventos', name: 'eventos', component: { template: '<div/>' } },
         { path: '/eventos/:id', name: 'evento-detalle', component: EventoDetalleView },
         { path: '/eventos/:id/contabilidad', name: 'contabilidad-evento', component: { template: '<div/>' } },
+        { path: '/eventos/:id/abastecimiento', name: 'evento-abastecimiento', component: { template: '<div/>' } },
         { path: '/eventos/:id/productos', name: 'evento-productos', component: { template: '<div/>' } },
       ],
     })
@@ -180,6 +181,18 @@ describe('EventoDetalleView', () => {
 
     expect(wrapper.find('[data-testid="evento-detalle-contabilidad"]').attributes('href'))
       .toContain('/eventos/e-1/contabilidad')
+  })
+
+  it('renders the Abastecimiento nav button linking to /eventos/:id/abastecimiento', async () => {
+    const evento = mkEvento('e-1', { estado: 'planificacion' })
+    await prepararStore(evento)
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
+    const wrapper = await montarVista('e-1')
+    await flushPromises()
+
+    const btn = wrapper.find('[data-testid="evento-detalle-abastecimiento"]')
+    expect(btn.exists()).toBe(true)
+    expect(btn.attributes('href')).toContain('/eventos/e-1/abastecimiento')
   })
 
   it('saves fecha_fin + margen_ganancia via the store (REQ-FIN-2, REQ-FIN)', async () => {

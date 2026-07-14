@@ -303,6 +303,11 @@ function irAReporte() {
           @click="irAReporte">
           Ver reporte
         </v-btn>
+        <v-btn color="success" variant="flat"
+          prepend-icon="mdi-cart-variant" data-testid="evento-detalle-abastecimiento"
+          :href="eventoId ? `/eventos/${eventoId}/abastecimiento` : undefined">
+          Abastecimiento
+        </v-btn>
         <v-btn color="info" variant="flat"
           prepend-icon="mdi-account-cash" data-testid="evento-detalle-contabilidad"
           :href="eventoId ? `/eventos/${eventoId}/contabilidad` : undefined">

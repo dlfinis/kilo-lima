@@ -215,3 +215,14 @@ describe('Event product management routes', () => {
     expect(router.currentRoute.value.path).toBe('/eventos/e-42/gestion')
   })
 })
+
+// inventory-accounting-workflow-refactor / Phase 3: Abastecimiento route.
+describe('Abastecimiento route', () => {
+  it('/eventos/:id/abastecimiento resolves with name + breadcrumb', async () => {
+    await setupRouter()
+    await router.push('/eventos/e-99/abastecimiento')
+    expect(router.currentRoute.value.path).toBe('/eventos/e-99/abastecimiento')
+    expect(router.currentRoute.value.name).toBe('evento-abastecimiento')
+    expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'eventos', 'Abastecimiento'])
+  })
+})
