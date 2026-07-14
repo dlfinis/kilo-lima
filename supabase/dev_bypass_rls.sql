@@ -17,3 +17,4 @@ grant select, insert, update, delete on public.ventas to anon;
 grant select, insert, update, delete on public.venta_items to anon;
 grant select, insert, update, delete on public.gastos_imprevistos to anon;
 grant select, insert, update, delete on public.cierres_caja to anon;
+grant select, insert, update, delete on public.producto_produccion to anon;
