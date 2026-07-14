@@ -32,6 +32,7 @@ import { useProductoProduccionStore } from '@/stores/productoProduccion.store'
 import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
+import { useGastosFijosStore } from '@/stores/gastosFijos.store'
 import { calcularCostoReceta } from '@/composables/useCalculoReceta'
 import { estadoEsEditable } from '@/utils/estado'
 import { formatearUSD, formatearUSDInput, parsearUSDInput } from '@/utils/format'
@@ -233,6 +234,7 @@ async function cargar() {
         ? ingredientsStore.cargarTodas()
         : Promise.resolve(),
       productosStore.productos.length === 0 ? productosStore.cargarTodas() : Promise.resolve(),
+      useGastosFijosStore().cargarPorEvento(eventoId.value),
     ])
     await nextTick()
     initSliderPcts()

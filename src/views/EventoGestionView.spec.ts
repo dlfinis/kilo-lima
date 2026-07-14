@@ -22,6 +22,7 @@ import { __pushSupabaseResponse, __resetSupabaseMock } from '../../tests/setup'
 import type {
   Evento,
   EventoProducto,
+  GastoFijo,
   MateriaPrima,
   ProductoProduccion,
   RecetaConIngredientes,
@@ -32,6 +33,7 @@ import { useProductoProduccionStore } from '@/stores/productoProduccion.store'
 import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
+import { useGastosFijosStore } from '@/stores/gastosFijos.store'
 
 const vuetify = createVuetify({ components, directives })
 
@@ -165,8 +167,9 @@ async function mountView(id: string) {
 describe('EventoGestionView', () => {
   // cargar() flow: cargarPorId (cached, no supabase call) → Promise.all:
   //   epStore.cargarPorEvento (1 call) + ppStore.cargarPorEvento (1 call)
-  //   + catalogs (skipped because prepararCatalogo seeds them).
-  // Response queue: exactly 2 — ep store, pp store.
+  //   + catalogs (skipped because prepararCatalogo seeds them)
+  //   + useGastosFijosStore().cargarPorEvento (1 call).
+  // Response queue: exactly 3 — ep store, pp store, gastos fijos store.
 
   it('renders the empty state when no products are configured', async () => {
     await conContexto(async () => {
@@ -176,6 +179,7 @@ describe('EventoGestionView', () => {
     await prepararCatalogo()
     __pushSupabaseResponse<EventoProducto[]>({ data: [], error: null })
     __pushSupabaseResponse<ProductoProduccion[]>({ data: [], error: null })
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
 
     const wrapper = await mountView('e-1')
     await flushPromises()
@@ -195,6 +199,7 @@ describe('EventoGestionView', () => {
       error: null,
     })
     __pushSupabaseResponse<ProductoProduccion[]>({ data: [], error: null })
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
 
     const wrapper = await mountView('e-1')
     await flushPromises()
@@ -212,6 +217,7 @@ describe('EventoGestionView', () => {
     await prepararCatalogo()
     __pushSupabaseResponse<EventoProducto[]>({ data: [], error: null })
     __pushSupabaseResponse<ProductoProduccion[]>({ data: [], error: null })
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
 
     const wrapper = await mountView('e-1')
     await flushPromises()
@@ -229,6 +235,7 @@ describe('EventoGestionView', () => {
     await prepararCatalogo()
     __pushSupabaseResponse<EventoProducto[]>({ data: [], error: null })
     __pushSupabaseResponse<ProductoProduccion[]>({ data: [], error: null })
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
 
     const wrapper = await mountView('e-1')
     await flushPromises()
@@ -252,6 +259,7 @@ describe('EventoGestionView', () => {
       data: [mkPP({ evento_producto_id: 'ep-1', unidades_a_producir: 30 })],
       error: null,
     })
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
 
     const wrapper = await mountView('e-1')
     await flushPromises()
@@ -288,6 +296,7 @@ describe('EventoGestionView', () => {
       data: [mkPP({ evento_producto_id: 'ep-1', unidades_a_producir: 10 })],
       error: null,
     })
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
 
     const wrapper = await mountView('e-1')
     await flushPromises()
@@ -330,6 +339,7 @@ describe('EventoGestionView', () => {
       error: null,
     })
     __pushSupabaseResponse<ProductoProduccion[]>({ data: [], error: null })
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
 
     const wrapper = await mountView('e-1')
     await flushPromises()
@@ -351,6 +361,7 @@ describe('EventoGestionView', () => {
       data: [mkPP({ evento_producto_id: 'ep-1', unidades_a_producir: 5 })],
       error: null,
     })
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
 
     const wrapper = await mountView('e-1')
     await flushPromises()
@@ -384,5 +395,37 @@ describe('EventoGestionView', () => {
     // After reactivity: 30 units → 30 required.
     body = document.body.textContent ?? ''
     expect(body).toContain('30.00')
+  })
+
+  it('loads gastos fijos so the projection has break-even context', async () => {
+    await conContexto(async () => {
+      const evStore = useEventsStore()
+      evStore.eventos.push(mkEvento('e-1'))
+    })
+    await prepararCatalogo()
+    __pushSupabaseResponse<EventoProducto[]>({ data: [], error: null })
+    __pushSupabaseResponse<ProductoProduccion[]>({ data: [], error: null })
+    __pushSupabaseResponse<GastoFijo[]>({
+      data: [{ id: 'gf-1', evento_id: 'e-1', concepto: 'Alquiler', monto: 500, created_at: '2026-07-01T00:00:00Z' }],
+      error: null,
+    })
+
+    const wrapper = await mountView('e-1')
+    await flushPromises()
+
+    // Prove the store was populated — the projection composable reads
+    // gastosStore.gastosPorEvento.get(id), so this proves break-even
+    // will see the fixed costs instead of an empty/undefined map entry.
+    await conContexto(() => {
+      const gfStore = useGastosFijosStore()
+      const gastos = gfStore.gastosPorEvento.get('e-1')
+      expect(gastos).toBeDefined()
+      expect(gastos!.length).toBe(1)
+      expect(gastos![0]!.concepto).toBe('Alquiler')
+      expect(gastos![0]!.monto).toBe(500)
+    })
+
+    // Sanity: the view still renders correctly with gastos fijos loaded.
+    expect(wrapper.find('[data-testid="evento-gestion-titulo"]').exists()).toBe(true)
   })
 })
