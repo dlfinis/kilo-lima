@@ -252,11 +252,6 @@ function reintentar() {
     void cargarPlan(eventoId.value)
   }
 }
-function irAPlanificar() {
-  if (eventoId.value) {
-    router.push({ name: 'planificar-evento', params: { id: eventoId.value } })
-  }
-}
 function irAReporte() {
   if (eventoId.value) {
     router.push({ name: 'evento-reporte', params: { id: eventoId.value } })
@@ -298,10 +293,10 @@ function irAReporte() {
           :color="t.color" :variant="t.variant" :data-testid="t.testid" @click="transicionar(t)">
           {{ t.etiqueta }}
         </v-btn>
-        <v-btn v-if="editable" color="primary" variant="flat"
-          prepend-icon="mdi-clipboard-list" data-testid="evento-detalle-planificar"
-          @click="irAPlanificar">
-          Planificar producción
+        <v-btn color="primary" variant="flat"
+          prepend-icon="mdi-package-variant-closed" data-testid="evento-detalle-gestion"
+          :href="eventoId ? `/eventos/${eventoId}/gestion` : undefined">
+          Gestión productos
         </v-btn>
         <v-btn v-if="eventoActual.estado === 'cerrado'" color="success" variant="flat"
           prepend-icon="mdi-chart-line" data-testid="evento-detalle-ver-reporte"
@@ -368,7 +363,7 @@ function irAReporte() {
         <ProyeccionCostosCard :proyeccion="proyeccion" :unidades-vendidas="unidadesVendidas" />
       </div>
 
-      <!-- Productos del evento (REQ-FIN-20): badge + link a EventoProductosView -->
+      <!-- Productos del evento: badge + link a Gestión productos -->
       <v-card class="pa-4 mb-4" data-testid="evento-detalle-productos">
         <div class="d-flex align-center justify-space-between">
           <div>
@@ -382,9 +377,9 @@ function irAReporte() {
             variant="flat"
             prepend-icon="mdi-package-variant"
             data-testid="evento-detalle-ir-productos"
-            :href="eventoId ? `/eventos/${eventoId}/productos` : undefined"
+            :href="eventoId ? `/eventos/${eventoId}/gestion` : undefined"
           >
-            {{ productosCount > 0 ? 'Configurar productos' : 'Inicializar desde catálogo' }}
+            {{ productosCount > 0 ? 'Gestionar productos' : 'Inicializar desde catálogo' }}
           </v-btn>
         </div>
       </v-card>

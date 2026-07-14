@@ -88,17 +88,27 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/EventoDetalleView.vue'),
     meta: { breadcrumb: ['Inicio', 'eventos', 'Detalle'] },
   },
+  // event-product-management-refactor: unified Gestión productos surface.
+  // /eventos/:id/gestion is the canonical event-product workflow. Legacy
+  // /productos and /planificar redirect here so existing bookmarks/links
+  // keep working (spec: Compatibilidad de rutas heredadas).
+  {
+    path: '/eventos/:id/gestion',
+    name: 'evento-gestion',
+    component: () => import('@/views/EventoGestionView.vue'),
+    meta: { breadcrumb: ['Inicio', 'eventos', 'Gestión productos'] },
+  },
+  // Legacy redirects: /eventos/:id/productos and /eventos/:id/planificar
+  // → /eventos/:id/gestion. Path-level redirects so existing bookmarks
+  // and links keep working. Named routes removed — production code uses
+  // href-based navigation to /gestion.
   {
     path: '/eventos/:id/planificar',
-    name: 'planificar-evento',
-    component: () => import('@/views/PlanificarEventoView.vue'),
-    meta: { breadcrumb: ['Inicio', 'eventos', 'Planificar'] },
+    redirect: (to) => `/eventos/${to.params.id as string}/gestion`,
   },
   {
     path: '/eventos/:id/productos',
-    name: 'evento-productos',
-    component: () => import('@/views/EventoProductosView.vue'),
-    meta: { breadcrumb: ['Inicio', 'eventos', 'Productos'] },
+    redirect: (to) => `/eventos/${to.params.id as string}/gestion`,
   },
   {
     path: '/eventos/:id/reporte',
