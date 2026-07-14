@@ -214,10 +214,9 @@ describe('Navigation Integration (Phase 6)', () => {
       expect(router.currentRoute.value.name).toBe('gastos')
     })
 
-    it('navigates to /costos via WebSidebar click-through', async () => {
+    it('/costos redirects to / (deprecated route removed)', async () => {
       await router.push('/costos')
-      expect(router.currentRoute.value.path).toBe('/costos')
-      expect(router.currentRoute.value.name).toBe('costos')
+      expect(router.currentRoute.value.path).toBe('/')
     })
 
     it('navigates to /ajustes via WebSidebar click-through', async () => {

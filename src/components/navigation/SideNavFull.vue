@@ -123,15 +123,6 @@ function isActive(itemRoute: string): boolean {
         @click="navigate"
       />
 
-      <v-list-item
-        prepend-icon="mdi-calculator"
-        title="Costos"
-        to="/costos"
-        :active="isActive('/costos')"
-        active-class="v-list-item--active"
-        @click="navigate"
-      />
-
       <v-list-subheader v-if="showSectionHeaders" class="text-overline">Análisis</v-list-subheader>
 
       <v-list-group value="reportes" prepend-icon="mdi-chart-bar" fluid>

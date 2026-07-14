@@ -47,7 +47,6 @@ const routes = [
   { path: '/productos/preparaciones', name: 'recetas', component: { template: '<div/>' } },
   { path: '/inventario', name: 'inventario', component: { template: '<div/>' } },
   { path: '/eventos', name: 'eventos', component: { template: '<div/>' } },
-  { path: '/costos', name: 'costos', component: { template: '<div/>' } },
   { path: '/reportes', name: 'reportes-resumen', component: { template: '<div/>' } },
   { path: '/reportes/rentabilidad', name: 'reportes-rentabilidad', component: { template: '<div/>' } },
   { path: '/ajustes', name: 'ajustes', component: { template: '<div/>' } },
@@ -96,10 +95,17 @@ describe('SideNavFull (polymorphic permanent/temporary sidebar)', () => {
     const router = await mkRouter('/')
     const wrapper = mountSideNavFull(router)
     const text = wrapper.text()
-    const items = ['Inicio', 'Caja', 'Ventas', 'Gastos', 'Productos', 'Preparaciones', 'Materia prima', 'Eventos', 'Costos', 'Reportes', 'Rentabilidad', 'Ajustes', 'Equipo']
+    const items = ['Inicio', 'Caja', 'Ventas', 'Gastos', 'Productos', 'Preparaciones', 'Materia prima', 'Eventos', 'Reportes', 'Rentabilidad', 'Ajustes', 'Equipo']
     for (const item of items) {
       expect(text).toContain(item)
     }
+  })
+
+  it('does not render deprecated Costos nav item', async () => {
+    const router = await mkRouter('/')
+    const wrapper = mountSideNavFull(router)
+    const text = wrapper.text()
+    expect(text).not.toContain('Costos')
   })
 
   it('highlights active route at /', async () => {
@@ -175,7 +181,7 @@ describe('SideNavFull (polymorphic permanent/temporary sidebar)', () => {
     const router = await mkRouter('/')
     const wrapper = mountSideNavFull(router)
     const listItems = wrapper.findAll('.v-list-item')
-    expect(listItems.length).toBeGreaterThanOrEqual(13)
+    expect(listItems.length).toBeGreaterThanOrEqual(12)
     for (const item of listItems) {
       expect(item.find('.v-icon').exists() || item.find('.mdi').exists()).toBe(true)
     }
@@ -215,7 +221,7 @@ describe('SideNavFull (polymorphic permanent/temporary sidebar)', () => {
     const router = await mkRouter('/')
     const wrapper = mountSideNavFull(router)
     const listItems = wrapper.findAll('.v-list-item')
-    expect(listItems.length).toBeGreaterThanOrEqual(13)
+    expect(listItems.length).toBeGreaterThanOrEqual(12)
     for (const item of listItems) {
       expect(item.find('.v-icon').exists() || item.find('.mdi').exists()).toBe(true)
     }

@@ -161,12 +161,10 @@ describe('New feature routes (Wave 1)', () => {
     expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Operación', 'Gastos'])
   })
 
-  it('/costos resolves with correct name and breadcrumb', async () => {
+  it('/costos redirects to /', async () => {
     await setupRouter()
     await router.push('/costos')
-    expect(router.currentRoute.value.path).toBe('/costos')
-    expect(router.currentRoute.value.name).toBe('costos')
-    expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Planificación', 'Costos'])
+    expect(router.currentRoute.value.path).toBe('/')
   })
 
   it('/ajustes resolves with correct name and breadcrumb', async () => {

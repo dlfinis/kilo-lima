@@ -183,13 +183,6 @@ const routes: RouteRecordRaw[] = [
     meta: { breadcrumb: ['Inicio', 'Operación', 'Gastos'] },
   },
   {
-    path: '/costos',
-    name: 'costos',
-    component: () => import('@/views/FeatureComingSoonView.vue'),
-    props: { title: 'Costos', icon: 'mdi-calculator', section: 'Planificación' },
-    meta: { breadcrumb: ['Inicio', 'Planificación', 'Costos'] },
-  },
-  {
     path: '/ajustes',
     name: 'ajustes',
     component: () => import('@/views/FeatureComingSoonView.vue'),
