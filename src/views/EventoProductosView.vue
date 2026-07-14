@@ -30,8 +30,6 @@ import RecetaCostoDesglose from '@/components/business/RecetaCostoDesglose.vue'
 import { useEvents } from '@/composables/useEvents'
 import { usePlans } from '@/composables/usePlans'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
-import { useGastosFijos } from '@/composables/useGastosFijos'
-import { useGastosImprevistos } from '@/composables/useGastosImprevistos'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
@@ -57,8 +55,6 @@ const productosStore = useProductosStore()
 const recipesStore = useRecipesStore()
 const ingredientsStore = useIngredientsStore()
 const ventasStore = useVentasStore()
-const { gastosPorEvento, cargarPorEvento: cargarGastosFijos } = useGastosFijos()
-const { gastosPorEvento: imprevistosPorEvento, cargarPorEvento: cargarImprevistos } = useGastosImprevistos()
 const { productosDelEvento, precioMinimoParaProducto } = usePreciosEvento(eventoId)
 const { planesPorEvento, cargarPorEvento: cargarPlan } = usePlans()
 
@@ -71,15 +67,6 @@ const { planesPorEvento, cargarPorEvento: cargarPlan } = usePlans()
 // ganancia absorbs the remainder (can go to 0 or negative → warning).
 const gananciaPct = ref<Record<string, number>>({})
 const contribucionPct = ref<Record<string, number>>({})
-
-// Total fixed + imprevistos costs for the active evento — used for
-// the per-product break-even (P.E) column.
-const gastosFijosEvento = computed<number>(() => {
-  if (!eventoId.value) return 0
-  const gf = (gastosPorEvento.value.get(eventoId.value) ?? []).reduce((a, g) => a + (g.monto ?? 0), 0)
-  const gi = (imprevistosPorEvento.value.get(eventoId.value) ?? []).reduce((a, g) => a + (g.monto ?? 0), 0)
-  return gf + gi
-})
 
 const editable = computed(() =>
   eventoActual.value ? estadoEsEditable(eventoActual.value.estado) : false,
@@ -152,19 +139,10 @@ async function cargar() {
       ventasStore.ventas.length === 0 && ventasStore.cargarPorEvento
         ? ventasStore.cargarPorEvento(eventoId.value)
         : Promise.resolve(),
-      // REQ-CON-8: the planned-contribution column reads
-      // `planesPorEvento`. Load it here so the column doesn't render
-      // as 0 on first paint when the operator navigates directly.
+      // Aporte equilibrio: requires planned production data.
       planesPorEvento.value.has(eventoId.value)
         ? Promise.resolve()
         : cargarPlan(eventoId.value),
-      // REQ-CON-8: P.E column needs gastos fijos + imprevistos.
-      gastosPorEvento.value.has(eventoId.value)
-        ? Promise.resolve()
-        : cargarGastosFijos(eventoId.value),
-      imprevistosPorEvento.value.has(eventoId.value)
-        ? Promise.resolve()
-        : cargarImprevistos(eventoId.value),
     ])
     // Initialize slider percentages from the loaded data. Each
     // producto's ganancia% defaults to the event's margen_ganancia
@@ -419,15 +397,29 @@ const initPrecioTexto = () => {
   precioTexto.value = next
 }
 
-// REQ-CON-8: break-even units for THIS producto. Returns 0 when there
-// are no fixed costs to cover (nothing to break even against) or when
-// contribución ≤ 0 (impossible). Caller renders "—" for non-positive.
-function pEquilibrioFor(item: EventoProductoConDetalle): number {
-  const costosFijos = gastosFijosEvento.value ?? 0
-  if (costosFijos <= 0) return 0
+// Aporte al equilibrio: percentage of the total planned contribution
+// pool that THIS producto provides. Avoids the misleading "per-product
+// break-even" (P.E.) concept that implied one producto alone covers
+// all event fixed costs. Shows the operator which productos are pulling
+// the most weight toward covering fixed costs.
+//
+// Formula: (contribUnit × unidadesPlanificadas) / totalMix × 100
+// Returns 0 when there is no contribution pool or the producto has
+// nothing planned. Caller renders "—" for 0.
+function aporteEquilibrioPct(item: EventoProductoConDetalle): number {
   const contribUnit = (item.costo_unitario ?? 0) * (contribucionPct.value[item.producto_id] ?? 0)
-  if (contribUnit <= 0) return 0
-  return Math.ceil(costosFijos / contribUnit)
+  const unidadesPlan = unidadesPlanificadasPorProducto.value.get(item.producto_id) ?? 0
+  const contribTotalItem = contribUnit * unidadesPlan
+  if (contribTotalItem <= 0) return 0
+
+  const totalMix = productosDelEvento.value.reduce((sum, ep) => {
+    const cu = (ep.costo_unitario ?? 0) * (contribucionPct.value[ep.producto_id] ?? 0)
+    const up = unidadesPlanificadasPorProducto.value.get(ep.producto_id) ?? 0
+    return sum + cu * up
+  }, 0)
+
+  if (totalMix <= 0) return 0
+  return Math.round((contribTotalItem / totalMix) * 100)
 }
 
 // REQ-UX-27: state for the formulas popover. Toggled by the compact
@@ -448,7 +440,17 @@ const ejemploFormulas = computed(() => {
   const gananciaUnit = Number((precio - costo).toFixed(2))
   const unidadesPlan = unidadesPlanificadasPorProducto.value.get(ep.producto_id) ?? 0
   const contribPlan = Number((gananciaUnit * unidadesPlan).toFixed(2))
-  const pEquilibrio = gananciaUnit > 0 ? Math.ceil((gastosFijosEvento.value) / gananciaUnit) : null
+  // Aporte al equilibrio: % of total contribution mix this producto represents.
+  const contribUnitSlider = costo * (contribucionPct.value[ep.producto_id] ?? 0)
+  const contribTotalItem = contribUnitSlider * unidadesPlan
+  const totalMix = productosDelEvento.value.reduce((sum, p) => {
+    const cu = (p.costo_unitario ?? 0) * (contribucionPct.value[p.producto_id] ?? 0)
+    const up = unidadesPlanificadasPorProducto.value.get(p.producto_id) ?? 0
+    return sum + cu * up
+  }, 0)
+  const aporteEquilibrio = totalMix > 0 && contribTotalItem > 0
+    ? Math.round((contribTotalItem / totalMix) * 100)
+    : null
   const gananciaPctVal = costo > 0 ? Number(((precio - costo) / costo).toFixed(3)) : 0
   const contribPctVal = costo > 0 ? Number(((precio - costo) / costo).toFixed(3)) : 0
   return {
@@ -461,7 +463,8 @@ const ejemploFormulas = computed(() => {
     contribPct: (contribPctVal * 100).toFixed(0),
     unidadesPlan,
     contribPlan: contribPlan.toFixed(2),
-    pEquilibrio,
+    aporteEquilibrio,
+    contribTotalMix: Number(totalMix.toFixed(2)),
     inversion: (costo * unidadesPlan).toFixed(2),
     ventaTotal: (precio * unidadesPlan).toFixed(2),
   }
@@ -614,21 +617,21 @@ const calculoPorProducto = computed(() => {
                 <strong class="text-orange-darken-2">${{ ejemploFormulas.contribPlan }}</strong>
               </div>
             </div>
-            <!-- Punto de Equilibrio -->
+            <!-- Aporte al equilibrio -->
             <div>
               <div class="d-flex align-center ga-2 mb-1">
-                <v-chip size="x-small" color="primary" variant="flat">P.E</v-chip>
-                <span class="text-caption text-medium-emphasis">unidades de este producto para cubrir todos los operativos del evento</span>
+                <v-chip size="x-small" color="primary" variant="flat">Aporte eq.</v-chip>
+                <span class="text-caption text-medium-emphasis">% de la contribución total que aporta este producto para cubrir los gastos fijos del evento</span>
               </div>
               <div class="text-body-2">
-                <code class="text-primary">Gastos fijos / Contribución unit.</code>
+                <code class="text-primary">(Contribución unit. × Und.P) / Total contribución mix</code>
               </div>
-              <div v-if="ejemploFormulas && ejemploFormulas.pEquilibrio !== null" class="text-caption text-medium-emphasis mt-1">
-                Ej: ${{ ejemploFormulas.inversion }} operativos / ${{ ejemploFormulas.gananciaUnit }} =
-                <strong class="text-primary">{{ ejemploFormulas.pEquilibrio }} und.</strong>
+              <div v-if="ejemploFormulas && ejemploFormulas.aporteEquilibrio !== null" class="text-caption text-medium-emphasis mt-1">
+                Ej: (${{ ejemploFormulas.gananciaUnit }} × {{ ejemploFormulas.unidadesPlan }} = ${{ ejemploFormulas.contribPlan }}) / ${{ ejemploFormulas.contribTotalMix }} total =
+                <strong class="text-primary">{{ ejemploFormulas.aporteEquilibrio }}%</strong>
               </div>
               <div v-else-if="ejemploFormulas" class="text-caption text-error mt-1">
-                Contribución ≤ 0 → no hay punto de equilibrio posible
+                Sin contribución planificada — asigná precios y unidades para ver el aporte
               </div>
             </div>
           </v-card-text>
@@ -671,7 +674,7 @@ const calculoPorProducto = computed(() => {
           { title: 'Márgenes', key: 'margenes', minWidth: 340 },
           { title: 'Precio', key: 'precio_final', width: 140, align: 'center' },
           { title: 'Contrib. plan', key: 'contribucion_plan', align: 'end' },
-          { title: 'P.E', key: 'p_equilibrio', align: 'end', width: 80 },
+          { title: 'Aporte eq.', key: 'p_equilibrio', align: 'end', width: 100 },
         ]"
         density="comfortable"
         show-expand
@@ -759,16 +762,24 @@ const calculoPorProducto = computed(() => {
             ${{ ((item.costo_unitario ?? 0) * (contribucionPct[item.producto_id] ?? 0) * (unidadesPlanificadasPorProducto.get(item.producto_id) ?? 0)).toFixed(2) }}
           </span>
         </template>
-        <!-- REQ-CON-8: P.E from local contribución unitaria so it
-             reacts to slider movement without store latency. Shows "—"
-             when there are no fixed costs to cover (gastos=0) or when
-             contribución ≤ 0 (impossible to break even). -->
+        <!-- Aporte al equilibrio: percentage of the total contribution
+             pool this producto represents. Reacts to slider movement
+             without store latency. Shows "—" when contribution is zero
+             or no units are planned. -->
         <template #[`item.p_equilibrio`]="{ item }">
-          <span
-            :class="pEquilibrioFor(item) > 0 ? 'text-primary' : 'text-medium-emphasis'"
-          >
-            {{ pEquilibrioFor(item) > 0 ? pEquilibrioFor(item) : '—' }}
-          </span>
+          <v-tooltip location="top">
+            <template #activator="{ props: tooltipProps }">
+              <span
+                v-bind="tooltipProps"
+                :class="aporteEquilibrioPct(item) > 0 ? 'text-primary' : 'text-medium-emphasis'"
+              >
+                {{ aporteEquilibrioPct(item) > 0 ? `${aporteEquilibrioPct(item)}%` : '—' }}
+              </span>
+            </template>
+            <span v-if="aporteEquilibrioPct(item) > 0">
+              Este producto cubre el {{ aporteEquilibrioPct(item) }}% de la contribución total necesaria para los gastos fijos
+            </span>
+          </v-tooltip>
         </template>
         <!-- productos-mejoras / cost breakdown: expandable row showing
              the per-producto ingredient breakdown via RecetaCostoDesglose.
