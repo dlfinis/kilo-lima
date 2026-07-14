@@ -62,39 +62,34 @@ const rangoRapidoActivo = ref<string | null>(null)
 
 // Quick date range options
 function setRangoRapido(rango: string) {
-  const hoy = new Date()
-  hoy.setHours(23, 59, 59, 999)
+  const ahora = new Date()
   rangoRapidoActivo.value = rango
   
   switch (rango) {
     case 'hoy':
-      const inicioHoy = new Date()
-      inicioHoy.setHours(0, 0, 0, 0)
-      fechaInicio.value = inicioHoy.toISOString().split('T')[0]
-      fechaFin.value = hoy.toISOString().split('T')[0]
+      // Hoy desde medianoche hasta ahora
+      fechaInicio.value = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0).toISOString().split('T')[0]
+      fechaFin.value = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59).toISOString().split('T')[0]
       break
     case 'ayer':
-      const ayer = new Date()
+      // Ayer completo
+      const ayer = new Date(ahora)
       ayer.setDate(ayer.getDate() - 1)
-      ayer.setHours(0, 0, 0, 0)
-      const ayerFin = new Date(ayer)
-      ayerFin.setHours(23, 59, 59, 999)
-      fechaInicio.value = ayer.toISOString().split('T')[0]
-      fechaFin.value = ayerFin.toISOString().split('T')[0]
+      fechaInicio.value = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 0, 0, 0).toISOString().split('T')[0]
+      fechaFin.value = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 23, 59, 59).toISOString().split('T')[0]
       break
     case 'semana':
-      const inicioSemana = new Date()
-      inicioSemana.setDate(inicioSemana.getDate() - 7)
-      inicioSemana.setHours(0, 0, 0, 0)
-      fechaInicio.value = inicioSemana.toISOString().split('T')[0]
-      fechaFin.value = hoy.toISOString().split('T')[0]
+      // Últimos 7 días incluyendo hoy
+      const hace7Dias = new Date(ahora)
+      hace7Dias.setDate(hace7Dias.getDate() - 6) // -6 porque incluimos hoy
+      fechaInicio.value = new Date(hace7Dias.getFullYear(), hace7Dias.getMonth(), hace7Dias.getDate(), 0, 0, 0).toISOString().split('T')[0]
+      fechaFin.value = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59).toISOString().split('T')[0]
       break
     case 'mes':
-      const inicioMes = new Date()
-      inicioMes.setDate(1)
-      inicioMes.setHours(0, 0, 0, 0)
-      fechaInicio.value = inicioMes.toISOString().split('T')[0]
-      fechaFin.value = hoy.toISOString().split('T')[0]
+      // Desde el primer día del mes hasta hoy
+      const primerDiaMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1, 0, 0, 0)
+      fechaInicio.value = primerDiaMes.toISOString().split('T')[0]
+      fechaFin.value = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59).toISOString().split('T')[0]
       break
     case 'personalizado':
       mostrarFechasPersonalizadas.value = true
@@ -133,22 +128,72 @@ const ventasFiltradas = computed(() => {
   return result.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
 })
 
-// Product sales analysis
+// Tabs
+const tabActiva = ref<'ventas' | 'analisis'>('ventas')
+
+// Analysis filters (independent from sales list filters)
+const analisisFiltroFechaInicio = ref<string | null>(null)
+const analisisFiltroFechaFin = ref<string | null>(null)
+const analisisFiltroCategoria = ref<string | null>(null)
+
+const CATEGORIAS_PRODUCTO = [
+  { value: 'dulce', label: 'Dulce' },
+  { value: 'salado', label: 'Salado' },
+  { value: 'helado', label: 'Helado' },
+  { value: 'bebida', label: 'Bebida' },
+]
+
+// Product sales analysis (with independent filters)
 const analisisProductos = computed(() => {
-  const productoMap = new Map<string, { nombre: string; cantidad: number; total: number }>()
+  let ventasParaAnalisis = ventasDelEvento.value
   
-  ventasFiltradas.value.forEach((venta) => {
+  // Apply analysis date filter
+  if (analisisFiltroFechaInicio.value) {
+    const inicio = new Date(analisisFiltroFechaInicio.value)
+    inicio.setHours(0, 0, 0, 0)
+    ventasParaAnalisis = ventasParaAnalisis.filter((v) => new Date(v.fecha) >= inicio)
+  }
+  
+  if (analisisFiltroFechaFin.value) {
+    const fin = new Date(analisisFiltroFechaFin.value)
+    fin.setHours(23, 59, 59, 999)
+    ventasParaAnalisis = ventasParaAnalisis.filter((v) => new Date(v.fecha) <= fin)
+  }
+  
+  const productoMap = new Map<string, { nombre: string; cantidad: number; total: number; categoria: string | null }>()
+  
+  ventasParaAnalisis.forEach((venta) => {
     venta.items.forEach((item) => {
-      const nombre = obtenerNombreProducto(item.producto_id)
-      const actual = productoMap.get(item.producto_id) || { nombre, cantidad: 0, total: 0 }
+      const producto = productosStore.productos.find((p) => p.id === item.producto_id)
+      if (!producto) return
+      
+      const actual = productoMap.get(item.producto_id) || { 
+        nombre: producto.nombre, 
+        cantidad: 0, 
+        total: 0,
+        categoria: producto.categoria 
+      }
       actual.cantidad += item.cantidad
       actual.total += item.subtotal
       productoMap.set(item.producto_id, actual)
     })
   })
   
-  return Array.from(productoMap.values()).sort((a, b) => b.total - a.total)
+  let result = Array.from(productoMap.values())
+  
+  // Filter by category
+  if (analisisFiltroCategoria.value) {
+    result = result.filter((p) => p.categoria === analisisFiltroCategoria.value)
+  }
+  
+  return result.sort((a, b) => b.total - a.total)
 })
+
+function limpiarFiltrosAnalisis() {
+  analisisFiltroFechaInicio.value = null
+  analisisFiltroFechaFin.value = null
+  analisisFiltroCategoria.value = null
+}
 
 // Get unique products from filtered sales
 const productosEnVentas = computed(() => {
@@ -377,6 +422,22 @@ async function confirmarEliminar() {
         </v-col>
       </v-row>
 
+      <!-- Tabs -->
+      <v-tabs v-model="tabActiva" class="mb-4">
+        <v-tab value="ventas">
+          <v-icon start>mdi-receipt</v-icon>
+          Ventas
+        </v-tab>
+        <v-tab value="analisis">
+          <v-icon start>mdi-chart-bar</v-icon>
+          Análisis
+        </v-tab>
+      </v-tabs>
+
+      <v-window v-model="tabActiva">
+        <!-- Ventas Tab -->
+        <v-window-item value="ventas">
+
       <!-- Filters -->
       <v-card class="mb-4" data-testid="ventas-filtros">
         <v-card-text>
@@ -573,9 +634,80 @@ async function confirmarEliminar() {
           </p>
         </div>
       </v-card>
+        </v-window-item>
 
-      <!-- Product analysis -->
-      <v-card v-if="analisisProductos.length > 0" class="mt-4" data-testid="ventas-analisis-productos">
+        <!-- Analysis Tab -->
+        <v-window-item value="analisis">
+      <!-- Analysis Filters -->
+      <v-card class="mb-4" data-testid="ventas-analisis-filtros">
+        <v-card-text>
+          <div class="d-flex align-center ga-2 flex-wrap mb-3">
+            <span class="text-body-2 font-weight-medium">Rango de fechas:</span>
+            <v-text-field
+              v-model="analisisFiltroFechaInicio"
+              type="date"
+              label="Desde"
+              variant="outlined"
+              density="compact"
+              hide-details
+              style="max-width: 180px"
+              data-testid="ventas-analisis-fecha-inicio"
+            />
+            <span>—</span>
+            <v-text-field
+              v-model="analisisFiltroFechaFin"
+              type="date"
+              label="Hasta"
+              variant="outlined"
+              density="compact"
+              hide-details
+              style="max-width: 180px"
+              data-testid="ventas-analisis-fecha-fin"
+            />
+          </div>
+          
+          <div class="d-flex align-center ga-2 flex-wrap">
+            <span class="text-body-2 font-weight-medium">Categoría:</span>
+            <v-chip
+              :color="analisisFiltroCategoria === null ? 'primary' : undefined"
+              :variant="analisisFiltroCategoria === null ? 'flat' : 'tonal'"
+              size="small"
+              data-testid="ventas-analisis-categoria-todas"
+              @click="analisisFiltroCategoria = null"
+            >
+              Todas
+            </v-chip>
+            <v-chip
+              v-for="cat in CATEGORIAS_PRODUCTO"
+              :key="cat.value"
+              :color="analisisFiltroCategoria === cat.value ? 'primary' : undefined"
+              :variant="analisisFiltroCategoria === cat.value ? 'flat' : 'tonal'"
+              size="small"
+              :data-testid="`ventas-analisis-categoria-${cat.value}`"
+              @click="analisisFiltroCategoria = analisisFiltroCategoria === cat.value ? null : cat.value"
+            >
+              {{ cat.label }}
+            </v-chip>
+            
+            <v-spacer />
+            
+            <v-btn
+              v-if="analisisFiltroFechaInicio || analisisFiltroFechaFin || analisisFiltroCategoria"
+              size="small"
+              variant="text"
+              color="error"
+              prepend-icon="mdi-filter-remove"
+              data-testid="ventas-analisis-limpiar"
+              @click="limpiarFiltrosAnalisis"
+            >
+              Limpiar
+            </v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+
+      <!-- Analysis Table -->
+      <v-card v-if="analisisProductos.length > 0" data-testid="ventas-analisis-productos">
         <v-card-title class="d-flex align-center">
           <v-icon class="mr-2">mdi-chart-bar</v-icon>
           Análisis por producto
@@ -585,6 +717,7 @@ async function confirmarEliminar() {
           <thead>
             <tr>
               <th>Producto</th>
+              <th class="text-right">Categoría</th>
               <th class="text-right">Cantidad vendida</th>
               <th class="text-right">Total vendido</th>
             </tr>
@@ -592,12 +725,20 @@ async function confirmarEliminar() {
           <tbody>
             <tr v-for="producto in analisisProductos" :key="producto.nombre">
               <td>{{ producto.nombre }}</td>
+              <td class="text-right text-caption">{{ producto.categoria || '—' }}</td>
               <td class="text-right">{{ producto.cantidad }}</td>
               <td class="text-right font-weight-medium">{{ formatearUSD(producto.total) }}</td>
             </tr>
           </tbody>
         </v-table>
       </v-card>
+
+      <v-card v-else class="text-center py-8">
+        <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-chart-bar</v-icon>
+        <p class="text-medium-emphasis mb-0">No hay datos para mostrar con los filtros seleccionados</p>
+      </v-card>
+        </v-window-item>
+      </v-window>
     </template>
 
     <!-- Sale detail dialog -->

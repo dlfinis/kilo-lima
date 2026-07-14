@@ -84,3 +84,13 @@ export type {
   DistribucionResultado,
   MovimientoTimeline,
 } from './socios.types'
+export type {
+  TipoMovimiento,
+  StockMovement,
+  StockMovementInput,
+  DerivedStock,
+  RegistrarCompraInput,
+  RegistrarConsumoInput,
+  RegistrarCorreccionInput,
+  StockMovementWithMateria,
+} from './stock.types'
