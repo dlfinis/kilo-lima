@@ -64,35 +64,40 @@ const rangoRapidoActivo = ref<string | null>(null)
 function setRangoRapido(rango: string) {
   const ahora = new Date()
   rangoRapidoActivo.value = rango
+  mostrarFechasPersonalizadas.value = false
+  
+  // Use local date methods to avoid timezone issues (UTC-5)
+  const year = ahora.getFullYear()
+  const month = ahora.getMonth()
+  const day = ahora.getDate()
   
   switch (rango) {
     case 'hoy':
-      // Hoy desde medianoche hasta ahora
-      fechaInicio.value = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 0, 0, 0).toISOString().split('T')[0]
-      fechaFin.value = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59).toISOString().split('T')[0]
+      // Hoy completo (00:00:00 a 23:59:59) en hora local
+      fechaInicio.value = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      fechaFin.value = fechaInicio.value
       break
     case 'ayer':
-      // Ayer completo
-      const ayer = new Date(ahora)
-      ayer.setDate(ayer.getDate() - 1)
-      fechaInicio.value = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 0, 0, 0).toISOString().split('T')[0]
-      fechaFin.value = new Date(ayer.getFullYear(), ayer.getMonth(), ayer.getDate(), 23, 59, 59).toISOString().split('T')[0]
+      // Ayer completo en hora local
+      const ayer = new Date(year, month, day - 1)
+      fechaInicio.value = `${ayer.getFullYear()}-${String(ayer.getMonth() + 1).padStart(2, '0')}-${String(ayer.getDate()).padStart(2, '0')}`
+      fechaFin.value = fechaInicio.value
       break
     case 'semana':
       // Últimos 7 días incluyendo hoy
-      const hace7Dias = new Date(ahora)
-      hace7Dias.setDate(hace7Dias.getDate() - 6) // -6 porque incluimos hoy
-      fechaInicio.value = new Date(hace7Dias.getFullYear(), hace7Dias.getMonth(), hace7Dias.getDate(), 0, 0, 0).toISOString().split('T')[0]
-      fechaFin.value = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59).toISOString().split('T')[0]
+      const hace7Dias = new Date(year, month, day - 6)
+      fechaInicio.value = `${hace7Dias.getFullYear()}-${String(hace7Dias.getMonth() + 1).padStart(2, '0')}-${String(hace7Dias.getDate()).padStart(2, '0')}`
+      fechaFin.value = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
       break
     case 'mes':
-      // Desde el primer día del mes hasta hoy
-      const primerDiaMes = new Date(ahora.getFullYear(), ahora.getMonth(), 1, 0, 0, 0)
-      fechaInicio.value = primerDiaMes.toISOString().split('T')[0]
-      fechaFin.value = new Date(ahora.getFullYear(), ahora.getMonth(), ahora.getDate(), 23, 59, 59).toISOString().split('T')[0]
+      // Desde el día 1 del mes hasta hoy
+      fechaInicio.value = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      fechaFin.value = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
       break
     case 'personalizado':
       mostrarFechasPersonalizadas.value = true
+      fechaInicio.value = null
+      fechaFin.value = null
       break
   }
 }
@@ -112,17 +117,23 @@ const ventasFiltradas = computed(() => {
     )
   }
   
-  // Filter by date range
+  // Filter by date range (use local date comparison)
   if (fechaInicio.value) {
-    const inicio = new Date(fechaInicio.value)
-    inicio.setHours(0, 0, 0, 0)
-    result = result.filter((v) => new Date(v.fecha) >= inicio)
+    const [year, month, day] = fechaInicio.value.split('-').map(Number)
+    const inicio = new Date(year, month - 1, day, 0, 0, 0, 0)
+    result = result.filter((v) => {
+      const ventaDate = new Date(v.fecha)
+      return ventaDate >= inicio
+    })
   }
   
   if (fechaFin.value) {
-    const fin = new Date(fechaFin.value)
-    fin.setHours(23, 59, 59, 999)
-    result = result.filter((v) => new Date(v.fecha) <= fin)
+    const [year, month, day] = fechaFin.value.split('-').map(Number)
+    const fin = new Date(year, month - 1, day, 23, 59, 59, 999)
+    result = result.filter((v) => {
+      const ventaDate = new Date(v.fecha)
+      return ventaDate <= fin
+    })
   }
   
   return result.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
@@ -465,23 +476,6 @@ async function confirmarEliminar() {
             </v-chip>
           </div>
           
-          <div class="d-flex align-center ga-2 flex-wrap mb-3">
-            <span class="text-body-2 font-weight-medium">Producto:</span>
-            <v-select
-              v-model="filtroProductoId"
-              :items="productosEnVentas"
-              item-title="nombre"
-              item-value="id"
-              label="Todos los productos"
-              variant="outlined"
-              density="compact"
-              hide-details
-              clearable
-              style="max-width: 300px"
-              data-testid="ventas-filtro-producto"
-            />
-          </div>
-          
           <div class="d-flex align-center ga-2 flex-wrap">
             <span class="text-body-2 font-weight-medium">Rango de fechas:</span>
             <v-chip
@@ -534,7 +528,7 @@ async function confirmarEliminar() {
             <v-spacer />
             
             <v-btn
-              v-if="filtroMetodoPago || filtroProductoId || fechaInicio || fechaFin"
+              v-if="filtroMetodoPago || fechaInicio || fechaFin"
               size="small"
               variant="text"
               color="error"
