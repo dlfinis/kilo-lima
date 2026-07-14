@@ -5,16 +5,26 @@
 // Follows the same table-driven pattern as useProyeccionCostos.spec.ts:
 // factory helpers + focused describe/it blocks per design §5.
 
-import { describe, expect, it } from 'vitest'
+import { beforeEach, describe, expect, it } from 'vitest'
+import { createPinia, setActivePinia } from 'pinia'
+import { createApp, type App } from 'vue'
+import { createClient } from '@supabase/supabase-js'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type {
+  Database,
   ProductoProduccion,
   EventoProducto,
   Producto,
   RecetaConIngredientes,
   MateriaPrima,
 } from '@/types'
-import { calcularIngredientesEvento } from './useIngredientesEvento'
+import { useProductoProduccionStore } from '@/stores/productoProduccion.store'
+import { useEventoProductosStore } from '@/stores/eventoProductos.store'
+import { useProductosStore } from '@/stores/productos.store'
+import { useRecipesStore } from '@/stores/recipes.store'
+import { useIngredientsStore } from '@/stores/ingredients.store'
+import { calcularIngredientesEvento, useIngredientesEvento } from './useIngredientesEvento'
 import type { IngredienteCompra } from './useIngredientesEvento'
 
 // ---------------------------------------------------------------------------
@@ -521,5 +531,148 @@ describe('calcularIngredientesEvento', () => {
     expect(r.porProducto).toHaveLength(25)
     expect(r.consolidado).toHaveLength(1)
     expect(r.consolidado[0]!.requerido).toBeCloseTo(250, 10)
+  })
+})
+
+// ---------------------------------------------------------------------------
+// Reactive composable tests
+// ---------------------------------------------------------------------------
+
+let aplicacion: App
+
+beforeEach(() => {
+  setActivePinia(createPinia())
+  aplicacion = createApp({})
+  aplicacion.use(createPinia())
+  aplicacion.provide('supabase', createClient('http://x', 'anon') as SupabaseClient<Database>)
+})
+
+function conContexto<T>(callback: () => T): T {
+  return aplicacion.runWithContext(callback)
+}
+
+describe('useIngredientesEvento', () => {
+  it('returns null when eventoId is null', () => {
+    conContexto(() => {
+      const resultado = useIngredientesEvento(null)
+      expect(resultado.value).toBeNull()
+    })
+  })
+
+  it('returns null when eventoId is undefined', () => {
+    conContexto(() => {
+      const resultado = useIngredientesEvento(undefined)
+      expect(resultado.value).toBeNull()
+    })
+  })
+
+  it('returns null when eventoId is an empty string', () => {
+    conContexto(() => {
+      const resultado = useIngredientesEvento('')
+      expect(resultado.value).toBeNull()
+    })
+  })
+
+  it('reads store data and produces ingredient derivation', () => {
+    conContexto(() => {
+      const ppStore = useProductoProduccionStore()
+      const epStore = useEventoProductosStore()
+      const prodStore = useProductosStore()
+      const recStore = useRecipesStore()
+      const ingStore = useIngredientsStore()
+
+      // Setup: producto prod-1 → receta r-1 (4 units yield, 2 kg mp-1)
+      // → (2/4)*30 = 15 kg required
+      recStore.recetas.push(mkReceta('r-1', 4, [{ materiaPrimaId: 'mp-1', cantidad: 2 }]))
+      ingStore.materiasPrimas.push(mkMateria('mp-1', 'Harina', 10))
+      prodStore.productos.push(mkProducto('prod-1', 'r-1', 'Pan'))
+      epStore.productosPorEvento.set('e-1', [
+        mkEP('ep-1', 'e-1', 'prod-1', true),
+      ])
+      ppStore.produccionPorEvento.set('e-1', [
+        mkPP('pp-1', 'ep-1', 30),
+      ])
+
+      const resultado = useIngredientesEvento('e-1')
+      const val = resultado.value!
+
+      expect(val.porProducto).toHaveLength(1)
+      expect(val.porProducto[0]!.eventoProductoId).toBe('ep-1')
+      expect(val.porProducto[0]!.productoNombre).toBe('Pan')
+      expect(val.porProducto[0]!.ingredientes[0]!.requerido).toBeCloseTo(15, 10)
+      expect(val.consolidado).toHaveLength(1)
+      expect(val.consolidado[0]!.materiaPrimaId).toBe('mp-1')
+      expect(val.consolidado[0]!.requerido).toBeCloseTo(15, 10)
+      expect(val.consolidado[0]!.disponible).toBe(10)
+      expect(val.consolidado[0]!.faltante).toBeCloseTo(5, 10)
+      expect(val.advertencias).toEqual([])
+    })
+  })
+
+  it('re-derives when production units change — store reactivity', () => {
+    conContexto(() => {
+      const ppStore = useProductoProduccionStore()
+      const epStore = useEventoProductosStore()
+      const prodStore = useProductosStore()
+      const recStore = useRecipesStore()
+      const ingStore = useIngredientsStore()
+
+      recStore.recetas.push(mkReceta('r-1', 1, [{ materiaPrimaId: 'mp-1', cantidad: 2 }]))
+      ingStore.materiasPrimas.push(mkMateria('mp-1', 'Harina', 0))
+      prodStore.productos.push(mkProducto('prod-1', 'r-1', 'Pan'))
+      epStore.productosPorEvento.set('e-1', [mkEP('ep-1', 'e-1', 'prod-1', true)])
+      ppStore.produccionPorEvento.set('e-1', [mkPP('pp-1', 'ep-1', 10)])
+
+      const resultado = useIngredientesEvento('e-1')
+
+      // Initial: 10 units × 2 kg/unit = 20 kg required
+      expect(resultado.value!.consolidado[0]!.requerido).toBeCloseTo(20, 10)
+
+      // Mutate: change units via Map set (triggers Vue reactivity)
+      ppStore.produccionPorEvento.set('e-1', [mkPP('pp-1', 'ep-1', 50)])
+
+      // After mutation: 50 units × 2 kg/unit = 100 kg required
+      expect(resultado.value!.consolidado[0]!.requerido).toBeCloseTo(100, 10)
+    })
+  })
+
+  it('re-derives when an ingredient stock changes', () => {
+    conContexto(() => {
+      const ppStore = useProductoProduccionStore()
+      const epStore = useEventoProductosStore()
+      const prodStore = useProductosStore()
+      const recStore = useRecipesStore()
+      const ingStore = useIngredientsStore()
+
+      recStore.recetas.push(mkReceta('r-1', 1, [{ materiaPrimaId: 'mp-1', cantidad: 1 }]))
+      ingStore.materiasPrimas.push(mkMateria('mp-1', 'Harina', 5))
+      prodStore.productos.push(mkProducto('prod-1', 'r-1', 'Pan'))
+      epStore.productosPorEvento.set('e-1', [mkEP('ep-1', 'e-1', 'prod-1', true)])
+      ppStore.produccionPorEvento.set('e-1', [mkPP('pp-1', 'ep-1', 10)])
+
+      const resultado = useIngredientesEvento('e-1')
+
+      // Initial: required=10, available=5, faltante=5
+      expect(resultado.value!.consolidado[0]!.disponible).toBe(5)
+      expect(resultado.value!.consolidado[0]!.faltante).toBeCloseTo(5, 10)
+
+      // Mutate: update stock on the ref array
+      ingStore.materiasPrimas[0]!.cantidad_disponible = 20
+
+      // After mutation: required=10, available=20, faltante=0
+      expect(resultado.value!.consolidado[0]!.disponible).toBe(20)
+      expect(resultado.value!.consolidado[0]!.faltante).toBe(0)
+    })
+  })
+
+  it('returns empty arrays when event has no data in any store', () => {
+    conContexto(() => {
+      const resultado = useIngredientesEvento('e-empty')
+      const val = resultado.value!
+
+      expect(val.porProducto).toEqual([])
+      expect(val.consolidado).toEqual([])
+      expect(val.advertencias).toEqual([])
+    })
   })
 })

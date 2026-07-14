@@ -10,6 +10,8 @@
 //   required = (ingredient.cantidad / receta.rendimiento_unidades) * unidades_a_producir
 //   group by materia_prima_id → toBuy = max(totalRequired – (cantidad_disponible ?? 0), 0)
 
+import { computed, type ComputedRef, type MaybeRefOrGetter, toValue } from 'vue'
+
 import type {
   ProductoProduccion,
   EventoProducto,
@@ -18,6 +20,11 @@ import type {
   MateriaPrima,
   UnidadMedida,
 } from '@/types'
+import { useProductoProduccionStore } from '@/stores/productoProduccion.store'
+import { useEventoProductosStore } from '@/stores/eventoProductos.store'
+import { useProductosStore } from '@/stores/productos.store'
+import { useRecipesStore } from '@/stores/recipes.store'
+import { useIngredientsStore } from '@/stores/ingredients.store'
 
 // ---------------------------------------------------------------------------
 // Result contracts
@@ -222,4 +229,45 @@ export function calcularIngredientesEvento(
   )
 
   return { porProducto, consolidado, advertencias }
+}
+
+// ---------------------------------------------------------------------------
+// Reactive composable
+// ---------------------------------------------------------------------------
+
+/**
+ * Reactive seam for ingredient purchasing planning inside Gestión productos.
+ * Reads the five existing Pinia stores inside a `computed()` — Vue's
+ * dependency tracking propagates any change in production units, event
+ * products, catalog products, recipes, or raw materials automatically.
+ *
+ * Returns `null` when `eventoId` is null / undefined (component gates
+ * rendering on this).
+ *
+ * Follows the `calcularProyeccion`/`useProyeccionCostos` pattern.
+ */
+export function useIngredientesEvento(
+  eventoId: MaybeRefOrGetter<string | null>,
+): ComputedRef<IngredientesEventoResultado | null> {
+  const ppStore = useProductoProduccionStore()
+  const epStore = useEventoProductosStore()
+  const productosStore = useProductosStore()
+  const recipesStore = useRecipesStore()
+  const ingredientsStore = useIngredientsStore()
+
+  return computed<IngredientesEventoResultado | null>(() => {
+    const id = toValue(eventoId)
+    if (!id) return null
+
+    const produccion = ppStore.produccionPorEvento.get(id) ?? []
+    const eventoProductos = epStore.productosPorEvento.get(id) ?? []
+
+    return calcularIngredientesEvento(
+      produccion,
+      eventoProductos,
+      productosStore.productos,
+      recipesStore.recetas,
+      ingredientsStore.materiasPrimas,
+    )
+  })
 }
