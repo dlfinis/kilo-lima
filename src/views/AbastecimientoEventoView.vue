@@ -10,7 +10,6 @@ import { useAbastecimientoStore } from '@/stores/abastecimiento.store'
 import { useStockMovementsStore } from '@/stores/stockMovements.store'
 import { useIngredients } from '@/composables/useIngredients'
 import { useSociosStore } from '@/stores/socios.store'
-import { formatearUSD } from '@/utils/format'
 import type {
   CompraInsumo,
   MateriaPrima,

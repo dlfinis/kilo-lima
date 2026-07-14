@@ -24,11 +24,6 @@ const stockDerivadoMap = computed<Map<string, number>>(() => {
   return map
 })
 
-function stockDerivadoDisplay(id: string): string {
-  const val = stockDerivadoMap.value.get(id)
-  return val !== undefined ? `${val}` : '—'
-}
-
 const filtroCategoria = ref<CategoriaMateriaPrima | 'todos'>('todos')
 const ordenAlfabetico = ref<'asc' | 'desc'>('asc')
 

@@ -7,7 +7,6 @@ import { crearProductosConfigurablesService, type ProductosConfigurablesService 
 import type {
   AdicionalDisponibleConMateriaPrima,
   Database,
-  GrupoOpcionesConOpciones,
   GrupoOpcionesInput,
   OpcionGrupoInput,
   ProductoConfigurable,

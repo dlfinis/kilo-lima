@@ -259,6 +259,7 @@ describe('pos.types surface', () => {
       costo_unitario: 2.5,
       margen_aplicado: 0.4,
       evento_producto_id: null,
+      personalizaciones: [],
     }
     expect(linea.subtotal).toBe(10)
     const resumen: ResumenCarrito = {

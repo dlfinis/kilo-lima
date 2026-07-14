@@ -63,7 +63,8 @@ export interface VentaItemPersonalizacion {
   created_at: string
 }
 
-export type VentaItemPersonalizacionInput = Omit<VentaItemPersonalizacion, 'id' | 'created_at'>
+// Input for creating personalizations (venta_item_id is assigned by the service after insert)
+export type VentaItemPersonalizacionInput = Omit<VentaItemPersonalizacion, 'id' | 'created_at' | 'venta_item_id'>
 
 // Shapes joined para UI
 export interface GrupoOpcionesConOpciones extends GrupoOpciones {

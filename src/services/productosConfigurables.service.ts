@@ -1,5 +1,5 @@
 // Servicio para productos configurables: CRUD + cálculo automático de costos
-import type { SupabaseClient } from '@supabase/supabase'
+import type { SupabaseClient } from '@supabase/supabase-js'
 
 import type {
   AdicionalDisponible,
@@ -157,7 +157,7 @@ export function crearProductosConfigurablesService(
     },
 
     async recalcularCosto(id) {
-      const respuesta = await supabase.rpc('calcular_costo_base_configurable', {
+      const respuesta = await (supabase as any).rpc('calcular_costo_base_configurable', {
         p_producto_configurable_id: id,
       })
 
@@ -218,7 +218,7 @@ export function crearProductosConfigurablesService(
       }
 
       // Recalcular costo base del producto configurable
-      await supabase.rpc('calcular_costo_base_configurable', {
+      await (supabase as any).rpc('calcular_costo_base_configurable', {
         p_producto_configurable_id: input.producto_configurable_id,
       })
 
@@ -228,7 +228,7 @@ export function crearProductosConfigurablesService(
     async actualizarGrupo(id, input) {
       const respuesta = await supabase
         .from('grupos_opciones')
-        .update(input as any)
+        .update(input as Database['public']['Tables']['grupos_opciones']['Update'])
         .eq('id', id)
         .select()
         .single()
@@ -239,7 +239,7 @@ export function crearProductosConfigurablesService(
 
       // Recalcular costo base
       const grupo = respuesta.data as unknown as GrupoOpciones
-      await supabase.rpc('calcular_costo_base_configurable', {
+      await (supabase as any).rpc('calcular_costo_base_configurable', {
         p_producto_configurable_id: grupo.producto_configurable_id,
       })
 
@@ -265,7 +265,7 @@ export function crearProductosConfigurablesService(
       }
 
       // Recalcular costo base
-      await supabase.rpc('calcular_costo_base_configurable', {
+      await (supabase as any).rpc('calcular_costo_base_configurable', {
         p_producto_configurable_id: (grupoResp.data as any).producto_configurable_id,
       })
 
@@ -275,7 +275,7 @@ export function crearProductosConfigurablesService(
     async agregarOpcion(input) {
       const respuesta = await supabase
         .from('opciones_grupo')
-        .insert([input as any])
+        .insert([input as Database['public']['Tables']['opciones_grupo']['Insert']])
         .select()
         .single()
 
@@ -291,7 +291,7 @@ export function crearProductosConfigurablesService(
         .single()
 
       if (!grupoResp.error) {
-        await supabase.rpc('calcular_costo_base_configurable', {
+        await (supabase as any).rpc('calcular_costo_base_configurable', {
           p_producto_configurable_id: (grupoResp.data as any).producto_configurable_id,
         })
       }
@@ -325,7 +325,7 @@ export function crearProductosConfigurablesService(
         .single()
 
       if (!grupoResp.error) {
-        await supabase.rpc('calcular_costo_base_configurable', {
+        await (supabase as any).rpc('calcular_costo_base_configurable', {
           p_producto_configurable_id: (grupoResp.data as any).producto_configurable_id,
         })
       }

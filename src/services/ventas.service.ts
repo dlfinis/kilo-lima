@@ -229,7 +229,7 @@ export function crearVentasService(supabase: SupabaseClient<Database>): VentasSe
           
           // productos-configurables: insert personalizations for this item
           const itemInput = input.items[index]
-          if (itemInput.personalizaciones && itemInput.personalizaciones.length > 0) {
+          if (itemInput && itemInput.personalizaciones && itemInput.personalizaciones.length > 0) {
             const ventaItemId = (insercion.data[0] as any).id
             const personalizacionesInsert = itemInput.personalizaciones.map((p) => ({
               venta_item_id: ventaItemId,

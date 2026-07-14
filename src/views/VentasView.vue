@@ -2,7 +2,6 @@
 // Histórico de ventas por evento. Permite consultar y analizar ventas
 // pasadas con filtros básicos y vista detallada por venta.
 import { computed, onMounted, ref, watch } from 'vue'
-import { useRouter } from 'vue-router'
 
 import { useEventsStore } from '@/stores/events.store'
 import { useVentasStore } from '@/stores/ventas.store'
@@ -10,7 +9,6 @@ import { useProductosStore } from '@/stores/productos.store'
 import { formatearUSD } from '@/utils/format'
 import type { VentaConItems, MetodoPago } from '@/types'
 
-const router = useRouter()
 const eventsStore = useEventsStore()
 const ventasStore = useVentasStore()
 const productosStore = useProductosStore()
@@ -120,20 +118,24 @@ const ventasFiltradas = computed(() => {
   // Filter by date range (use local date comparison)
   if (fechaInicio.value) {
     const [year, month, day] = fechaInicio.value.split('-').map(Number)
-    const inicio = new Date(year, month - 1, day, 0, 0, 0, 0)
-    result = result.filter((v) => {
-      const ventaDate = new Date(v.fecha)
-      return ventaDate >= inicio
-    })
+    if (year && month && day) {
+      const inicio = new Date(year, month - 1, day, 0, 0, 0, 0)
+      result = result.filter((v) => {
+        const ventaDate = new Date(v.fecha)
+        return ventaDate >= inicio
+      })
+    }
   }
   
   if (fechaFin.value) {
     const [year, month, day] = fechaFin.value.split('-').map(Number)
-    const fin = new Date(year, month - 1, day, 23, 59, 59, 999)
-    result = result.filter((v) => {
-      const ventaDate = new Date(v.fecha)
-      return ventaDate <= fin
-    })
+    if (year && month && day) {
+      const fin = new Date(year, month - 1, day, 23, 59, 59, 999)
+      result = result.filter((v) => {
+        const ventaDate = new Date(v.fecha)
+        return ventaDate <= fin
+      })
+    }
   }
   
   return result.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
@@ -201,20 +203,24 @@ const analisisProductos = computed(() => {
   // Apply analysis date filter (use local date comparison like ventasFiltradas)
   if (analisisFiltroFechaInicio.value) {
     const [year, month, day] = analisisFiltroFechaInicio.value.split('-').map(Number)
-    const inicio = new Date(year, month - 1, day, 0, 0, 0, 0)
-    ventasParaAnalisis = ventasParaAnalisis.filter((v) => {
-      const ventaDate = new Date(v.fecha)
-      return ventaDate >= inicio
-    })
+    if (year && month && day) {
+      const inicio = new Date(year, month - 1, day, 0, 0, 0, 0)
+      ventasParaAnalisis = ventasParaAnalisis.filter((v) => {
+        const ventaDate = new Date(v.fecha)
+        return ventaDate >= inicio
+      })
+    }
   }
   
   if (analisisFiltroFechaFin.value) {
     const [year, month, day] = analisisFiltroFechaFin.value.split('-').map(Number)
-    const fin = new Date(year, month - 1, day, 23, 59, 59, 999)
-    ventasParaAnalisis = ventasParaAnalisis.filter((v) => {
-      const ventaDate = new Date(v.fecha)
-      return ventaDate <= fin
-    })
+    if (year && month && day) {
+      const fin = new Date(year, month - 1, day, 23, 59, 59, 999)
+      ventasParaAnalisis = ventasParaAnalisis.filter((v) => {
+        const ventaDate = new Date(v.fecha)
+        return ventaDate <= fin
+      })
+    }
   }
   
   const productoMap = new Map<string, { nombre: string; cantidad: number; total: number; categoria: string | null }>()
@@ -263,17 +269,7 @@ function limpiarFiltrosAnalisis() {
   analisisMostrarFechasPersonalizadas.value = false
 }
 
-// Get unique products from filtered sales
-const productosEnVentas = computed(() => {
-  const productoIds = new Set<string>()
-  ventasFiltradas.value.forEach((venta) => {
-    venta.items.forEach((item) => productoIds.add(item.producto_id))
-  })
-  return Array.from(productoIds).map((id) => ({
-    id,
-    nombre: obtenerNombreProducto(id),
-  }))
-})
+
 
 // Dialog for sale detail
 const ventaSeleccionada = ref<VentaConItems | null>(null)

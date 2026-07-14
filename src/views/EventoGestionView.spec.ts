@@ -406,7 +406,7 @@ describe('EventoGestionView', () => {
     __pushSupabaseResponse<EventoProducto[]>({ data: [], error: null })
     __pushSupabaseResponse<ProductoProduccion[]>({ data: [], error: null })
     __pushSupabaseResponse<GastoFijo[]>({
-      data: [{ id: 'gf-1', evento_id: 'e-1', concepto: 'Alquiler', monto: 500, created_at: '2026-07-01T00:00:00Z' }],
+      data: [{ id: 'gf-1', evento_id: 'e-1', categoria: 'renta', monto: 500, descripcion: 'Alquiler', created_at: '2026-07-01T00:00:00Z' }],
       error: null,
     })
 
@@ -421,7 +421,7 @@ describe('EventoGestionView', () => {
       const gastos = gfStore.gastosPorEvento.get('e-1')
       expect(gastos).toBeDefined()
       expect(gastos!.length).toBe(1)
-      expect(gastos![0]!.concepto).toBe('Alquiler')
+      expect(gastos![0]!.descripcion).toBe('Alquiler')
       expect(gastos![0]!.monto).toBe(500)
     })
 

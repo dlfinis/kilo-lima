@@ -86,7 +86,7 @@ const router = useRouter()
 // Default off — operators opt in per environment via .env.local.
 const FLAG_POS_REDESIGN = import.meta.env.VITE_FLAG_POS_REDESIGN === 'true'
 
-const { cargando: cargandoProductos, error: errorProductos, cargarTodas } = useProductos()
+const { cargando: cargandoProductos, error: errorProductos, cargarTodas, productos } = useProductos()
 const epStore = useEventoProductosStore()
 const productosConfigurablesStore = useProductosConfigurablesStore()
 const { recetas, cargarTodas: cargarRecetas } = useRecipes()
@@ -183,9 +183,16 @@ async function manejarCheckoutSimplificado() {
 //
 // NOTE: cost/contribution display has been REMOVED from POS cards per
 // corrective pass — the POS catalog should be clean (no financial noise).
-const { productosDelEvento } = usePreciosEvento(
+const { productosDelEvento, precioParaProducto, margenParaProducto } = usePreciosEvento(
   () => eventoEnCurso.value?.id ?? null,
 )
+
+// productos-configurables: helper to get cost for a product
+function costoParaProducto(productoId: string): number {
+  const ep = productosDelEvento.value.find((e) => e.producto_id === productoId)
+  return ep?.costo_unitario ?? 0
+}
+
 const productosParaGrid = computed(() =>
   productosDelEvento.value.filter((ep) => ep.costo_unitario > 0),
 )
@@ -492,7 +499,7 @@ function manejarAgregar(productoId: string) {
       productoId,
       nombre: producto.nombre,
       precioBase: precioInfo,
-      costoBase: costoParaProducto.value(productoId) || 0,
+      costoBase: costoParaProducto(productoId) || 0,
       margenBase: margenParaProducto.value(productoId),
     }
     dialogoPersonalizacionAbierto.value = true

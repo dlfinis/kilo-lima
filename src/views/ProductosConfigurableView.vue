@@ -1,6 +1,5 @@
 <script setup lang="ts">
 import { computed, onMounted, ref } from 'vue'
-import { useRouter } from 'vue-router'
 
 import { useProductosConfigurablesStore } from '@/stores/productosConfigurables.store'
 import { useProductosStore } from '@/stores/productos.store'
@@ -14,7 +13,6 @@ import type {
   AdicionalDisponibleInput,
 } from '@/types'
 
-const router = useRouter()
 const configurablesStore = useProductosConfigurablesStore()
 const productosStore = useProductosStore()
 const ingredientsStore = useIngredientsStore()
@@ -27,7 +25,6 @@ const productosDisponibles = computed(() => {
 
 // Dialogs
 const dialogoCrearAbierto = ref(false)
-const dialogoEditarAbierto = ref(false)
 const dialogoGrupoAbierto = ref(false)
 const dialogoOpcionAbierto = ref(false)
 const dialogoAdicionalAbierto = ref(false)
@@ -112,7 +109,7 @@ async function eliminarGrupo(id: string) {
 
 function abrirDialogoOpcion(grupoId: string) {
   if (!configurableEditando.value) return
-  nuevoOpcion.value = { grupo_id: grupoId, materia_prima_id: '' }
+  nuevaOpcion.value = { grupo_id: grupoId, materia_prima_id: '' }
   dialogoOpcionAbierto.value = true
 }
 
@@ -173,7 +170,7 @@ function obtenerNombreProducto(productoId: string): string {
 onMounted(async () => {
   await Promise.all([
     configurablesStore.cargar(),
-    productosStore.cargarTodos(),
+    productosStore.cargarTodas(),
     ingredientsStore.cargarTodas(),
   ])
 })

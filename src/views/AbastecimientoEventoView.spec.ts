@@ -14,8 +14,6 @@ import { createRouter, createMemoryHistory, type Router } from 'vue-router'
 import { __pushSupabaseResponse, __resetSupabaseMock } from '../../tests/setup'
 
 import AbastecimientoEventoView from './AbastecimientoEventoView.vue'
-import { useAbastecimientoStore } from '@/stores/abastecimiento.store'
-import { useStockMovementsStore } from '@/stores/stockMovements.store'
 import { useSociosStore } from '@/stores/socios.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import type { CompraInsumo, StockMovement } from '@/types'

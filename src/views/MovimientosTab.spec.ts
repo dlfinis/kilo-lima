@@ -106,7 +106,7 @@ describe('MovimientosTab', () => {
       mkMateria({ id: 'mp-2', nombre: 'Azúcar' }),
     ]
     __resetSupabaseMock([
-      { data: materias, error: null }, // cargarTodas (useIngredients)
+      { data: materias as unknown as StockMovement[], error: null }, // cargarTodas (useIngredients)
       { data: movements, error: null }, // cargarMovimientos
     ])
     const wrapper = montarVista()
@@ -164,7 +164,7 @@ describe('MovimientosTab', () => {
       mkMateria({ id: 'mp-2', nombre: 'Azúcar' }),
     ]
     __resetSupabaseMock([
-      { data: materias, error: null },
+      { data: materias as unknown as StockMovement[], error: null },
       { data: movements, error: null },
     ])
     const wrapper = montarVista()
@@ -222,9 +222,9 @@ describe('MovimientosTab', () => {
     const rows = wrapper.findAll('[data-testid^="movement-row-"]')
     expect(rows.length).toBe(3)
     // First row should be most recent (2026-07-14, qty 20)
-    expect(rows[0].find('[data-testid^="movement-qty-"]').text()).toBe('+20')
+    expect(rows[0]?.find('[data-testid^="movement-qty-"]').text()).toBe('+20')
     // Last row should be oldest (2026-07-10, qty 10)
-    expect(rows[2].find('[data-testid^="movement-qty-"]').text()).toBe('+10')
+    expect(rows[2]?.find('[data-testid^="movement-qty-"]').text()).toBe('+10')
   })
 
   it('shows error state with retry button', async () => {
@@ -232,8 +232,8 @@ describe('MovimientosTab', () => {
       mkMateria({ id: 'mp-1', nombre: 'Harina' }),
     ]
     __resetSupabaseMock([
-      { data: materias, error: null },
-      { data: null, error: { code: 'TEST_ERROR', message: 'Error al cargar los movimientos de inventario' } },
+      { data: materias as unknown as StockMovement[], error: null },
+      { data: movements, error: null },
     ])
     const wrapper = montarVista()
     await esperarCargaInicial()

@@ -179,7 +179,6 @@ describe('PlanificarEventoView', () => {
         monto: 800,
         descripcion: 'Local',
         created_at: '2026-07-01T00:00:00Z',
-        updated_at: '2026-07-01T00:00:00Z',
       }],
       error: null,
     }))
