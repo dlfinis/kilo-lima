@@ -209,6 +209,7 @@ export function crearVentasService(supabase: SupabaseClient<Database>): VentasSe
       // REQ-FIN-12: forward costo_unitario + margen_aplicado (nullable,
       // legacy-safe — null = "no snapshot at sale time", contributes 0
       // to COGS via `?? 0` in utils/cierre.ts per REQ-FIN-8 / PD-4).
+      // productos-configurables: insert personalizations after each item.
       const itemsConVentaId: Database['public']['Tables']['venta_items']['Insert'][] =
         input.items.map((it) => ({
           venta_id: venta.id,
@@ -220,9 +221,30 @@ export function crearVentasService(supabase: SupabaseClient<Database>): VentasSe
           margen_aplicado: it.margen_aplicado ?? null,
         }))
       const inserciones = await Promise.all(
-        itemsConVentaId.map((it) =>
-          supabase.from('venta_items').insert(it).select(),
-        ),
+        itemsConVentaId.map(async (it, index) => {
+          const insercion = await supabase.from('venta_items').insert(it).select()
+          if (insercion.error || !insercion.data) {
+            return insercion
+          }
+          
+          // productos-configurables: insert personalizations for this item
+          const itemInput = input.items[index]
+          if (itemInput.personalizaciones && itemInput.personalizaciones.length > 0) {
+            const ventaItemId = (insercion.data[0] as any).id
+            const personalizacionesInsert = itemInput.personalizaciones.map((p) => ({
+              venta_item_id: ventaItemId,
+              grupo_id: p.grupo_id,
+              materia_prima_id: p.materia_prima_id,
+              es_incluido: p.es_incluido,
+              costo_unitario: p.costo_unitario,
+              precio_venta_extra: p.precio_venta_extra,
+              cantidad: p.cantidad,
+            }))
+            await supabase.from('venta_item_personalizaciones').insert(personalizacionesInsert)
+          }
+          
+          return insercion
+        }),
       )
       const primerError = inserciones.find((r) => r.error)?.error ?? null
       if (primerError) {

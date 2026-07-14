@@ -142,16 +142,24 @@ export const useVentasStore = defineStore('ventas', () => {
   // precio + costo + margen from the catalogo + recetas + evento_producto
   // via usePreciosEvento. If the producto is unknown the line is
   // silently skipped (no orphan cart lines).
-  function snapshotLinea(productoId: string, cantidad: number): LineaCarrito | null {
+  // productos-configurables: accepts optional personalizaciones and
+  // precio/costo overrides for configurable products.
+  function snapshotLinea(
+    productoId: string,
+    cantidad: number,
+    personalizaciones: import('@/types').PersonalizacionCarrito[] = [],
+    precioOverride?: number,
+    costoOverride?: number
+  ): LineaCarrito | null {
     if (cantidad <= 0) return null
     const producto = productosStore.productos.find((p) => p.id === productoId)
     if (!producto) return null
     const receta = recipesStore.recetas.find((r) => r.id === producto.receta_id)
-    const nombre = receta?.nombre ?? 'Receta'
-    const precio_unitario = precioParaProducto.value(productoId)
+    const nombre = receta?.nombre ?? producto.nombre ?? 'Producto'
+    const precio_unitario = precioOverride ?? precioParaProducto.value(productoId)
     const margen_aplicado = margenParaProducto.value(productoId)
     const ep = productosDelEvento.value.find((e) => e.producto_id === productoId)
-    const costo_unitario = ep?.costo_unitario ?? 0
+    const costo_unitario = costoOverride ?? ep?.costo_unitario ?? 0
     return {
       producto_id: productoId,
       nombre,
@@ -164,10 +172,19 @@ export const useVentasStore = defineStore('ventas', () => {
       // cierre backfill (REQ-FIN-9) can match venta_items to their
       // evento_productos row. Null when the producto has no config.
       evento_producto_id: ep?.id ?? null,
+      // productos-configurables: selected personalizations (options/add-ons).
+      // Empty array for non-configurable products.
+      personalizaciones,
     }
   }
 
-  function agregarAlCarrito(productoId: string, cantidad: number): void {
+  function agregarAlCarrito(
+    productoId: string,
+    cantidad: number,
+    personalizaciones: import('@/types').PersonalizacionCarrito[] = [],
+    precioOverride?: number,
+    costoOverride?: number
+  ): void {
     const existente = carrito.value.find((l) => l.producto_id === productoId)
     if (existente) {
       if (existente.cantidad >= LIMITE_CANTIDAD_MAX) return
@@ -178,7 +195,7 @@ export const useVentasStore = defineStore('ventas', () => {
       existente.subtotal = redondear2(nuevaCantidad * existente.precio_unitario)
       return
     }
-    const linea = snapshotLinea(productoId, cantidad)
+    const linea = snapshotLinea(productoId, cantidad, personalizaciones, precioOverride, costoOverride)
     if (!linea) return
     carrito.value = [...carrito.value, linea]
   }
@@ -357,6 +374,7 @@ export const useVentasStore = defineStore('ventas', () => {
     // 5) Call service. On failure: restore snapshot + swap toast.
     // REQ-FIN-31: forward the snapshotted COGS columns so the
     // cierre-time aggregation never depends on receta cost changes.
+    // productos-configurables: forward personalizations for each item.
     const res = await servicio.registrarVenta({
       evento_id: evento.id,
       metodo_pago: metodoPago,
@@ -372,6 +390,15 @@ export const useVentasStore = defineStore('ventas', () => {
         costo_unitario: l.costo_unitario,
         margen_aplicado: l.margen_aplicado,
         evento_producto_id: l.evento_producto_id,
+        // productos-configurables: convert PersonalizacionCarrito to VentaItemPersonalizacionInput
+        personalizaciones: l.personalizaciones?.map((p) => ({
+          grupo_id: p.grupo_id,
+          materia_prima_id: p.materia_prima_id,
+          es_incluido: p.es_incluido,
+          costo_unitario: p.costo_unitario,
+          precio_venta_extra: p.precio_venta_extra,
+          cantidad: p.cantidad,
+        })),
       })),
     })
     if (res.error || !res.data) {

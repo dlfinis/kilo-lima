@@ -2,15 +2,17 @@
 // inventory-tabs-redesign / Work Unit 1: extracted from InventarioView.vue.
 // Preserves all CRUD, filter/sort, and stock display. Adds StockAlertsList
 // for alert visibility (ledger-backed alert calculation arrives in WU 4).
+// WU 2: adds direct global stock movement action per inventory row.
 import { computed, onMounted, ref } from 'vue'
 
 import FabNuevo from '@/components/business/FabNuevo.vue'
 import MateriaPrimaForm from '@/components/business/MateriaPrimaForm.vue'
 import MateriaPrimaListItem from '@/components/business/MateriaPrimaListItem.vue'
 import StockAlertsList from '@/components/inventario/StockAlertsList.vue'
+import StockMovementModal from '@/components/inventario/StockMovementModal.vue'
 import { useIngredients } from '@/composables/useIngredients'
 import { useStockMovementsStore } from '@/stores/stockMovements.store'
-import type { MateriaPrima, MateriaPrimaInput, CategoriaMateriaPrima } from '@/types'
+import type { MateriaPrima, MateriaPrimaInput, CategoriaMateriaPrima, RegistrarAjusteInput, RegistrarCompraInput } from '@/types'
 
 const { materiasPrimas, cargando, error, cargarTodas, crear, actualizar, eliminar } = useIngredients()
 const stockMovementsStore = useStockMovementsStore()
@@ -55,6 +57,14 @@ type Dialogo =
   | { tipo: 'eliminar'; materia: MateriaPrima }
 
 const dialogo = ref<Dialogo>({ tipo: 'cerrado' })
+
+// ----- movement dialog (WU 2) -----
+const dialogoMovimiento = ref(false)
+const movimientoMateriaId = ref<string | null>(null)
+const movimientoMateriaNombre = computed<string>(() => {
+  if (!movimientoMateriaId.value) return ''
+  return materiasPrimas.value.find((m) => m.id === movimientoMateriaId.value)?.nombre ?? ''
+})
 const materiaEnEdicion = computed<MateriaPrimaInput | null>(() =>
   dialogo.value.tipo === 'editar'
     ? {
@@ -104,6 +114,31 @@ function abrirEliminar(id: string) {
 
 function cerrarDialogo() {
   dialogo.value = { tipo: 'cerrado' }
+}
+
+// ----- movement handlers (WU 2) -----
+function abrirMovimiento(id: string) {
+  movimientoMateriaId.value = id
+  dialogoMovimiento.value = true
+}
+
+function cerrarDialogoMovimiento() {
+  dialogoMovimiento.value = false
+  movimientoMateriaId.value = null
+}
+
+async function manejarMovimientoSubmit(
+  payload:
+    | { rpc: 'registrarCompra'; input: RegistrarCompraInput }
+    | { rpc: 'registrarAjuste'; input: RegistrarAjusteInput },
+) {
+  if (payload.rpc === 'registrarCompra') {
+    await stockMovementsStore.registrarCompra(payload.input)
+  } else {
+    await stockMovementsStore.registrarAjuste(payload.input)
+  }
+  await stockMovementsStore.cargarStockActual()
+  cerrarDialogoMovimiento()
 }
 </script>
 
@@ -213,6 +248,7 @@ function cerrarDialogo() {
         :stock-actual="stockDerivadoMap.get(m.id) ?? null"
         @edit="abrirEditar"
         @delete="abrirEliminar"
+        @movement="abrirMovimiento"
       />
     </v-list>
 
@@ -239,5 +275,15 @@ function cerrarDialogo() {
         </v-card-actions>
       </v-card>
     </v-dialog>
+
+    <!-- Stock movement modal (WU 2) -->
+    <StockMovementModal
+      v-if="movimientoMateriaId"
+      :model-value="dialogoMovimiento"
+      :materia-prima-id="movimientoMateriaId"
+      :materia-prima-nombre="movimientoMateriaNombre"
+      @update:model-value="(v) => { if (!v) cerrarDialogoMovimiento() }"
+      @submit="manejarMovimientoSubmit"
+    />
   </v-container>
 </template>

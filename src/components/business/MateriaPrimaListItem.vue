@@ -13,6 +13,7 @@ defineProps<{
 const emit = defineEmits<{
   edit: [id: string]
   delete: [id: string]
+  'movement': [id: string]
 }>()
 </script>
 
@@ -31,6 +32,7 @@ const emit = defineEmits<{
       </template>
     </v-list-item-subtitle>
     <template #append>
+      <v-btn icon="mdi-swap-horizontal" variant="text" size="small" color="info" :data-testid="`mp-movement-${materia.id}`" @click="emit('movement', materia.id)" />
       <v-btn icon="mdi-pencil" variant="text" size="small" :data-testid="`mp-edit-${materia.id}`" @click="emit('edit', materia.id)" />
       <v-btn icon="mdi-delete" variant="text" size="small" color="error" :data-testid="`mp-delete-${materia.id}`" @click="emit('delete', materia.id)" />
     </template>

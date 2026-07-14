@@ -47,6 +47,7 @@ import { useRouter } from 'vue-router'
 import CheckoutButton from '@/components/pos/CheckoutButton.vue'
 import PaymentSelector from '@/components/pos/PaymentSelector.vue'
 import ProductGrid from '@/components/pos/ProductGrid.vue'
+import PersonalizacionProductoDialog from '@/components/pos/PersonalizacionProductoDialog.vue'
 import ComprobanteVentaDialog from '@/components/business/ComprobanteVentaDialog.vue'
 import CarritoPanel from '@/components/business/CarritoPanel.vue'
 import EditarVentaDialog from '@/components/business/EditarVentaDialog.vue'
@@ -61,6 +62,7 @@ import { useGastosImprevistos } from '@/composables/useGastosImprevistos'
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
+import { useProductosConfigurablesStore } from '@/stores/productosConfigurables.store'
 import { usePosMode } from '@/composables/usePosMode'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useProductos } from '@/composables/useProductos'
@@ -73,6 +75,7 @@ import type {
   CategoriaProducto,
   GastoImprevistoInput,
   MetodoPago,
+  PersonalizacionCarrito,
   Producto,
   RecetaConIngredientes,
   VentaConItems,
@@ -85,6 +88,7 @@ const FLAG_POS_REDESIGN = import.meta.env.VITE_FLAG_POS_REDESIGN === 'true'
 
 const { cargando: cargandoProductos, error: errorProductos, cargarTodas } = useProductos()
 const epStore = useEventoProductosStore()
+const productosConfigurablesStore = useProductosConfigurablesStore()
 const { recetas, cargarTodas: cargarRecetas } = useRecipes()
 const {
   carrito,
@@ -471,8 +475,66 @@ async function manejarEliminarImprevisto(id: string) {
 // REQ-FIN-31 (PR-2b): delegate everything to the store. The store
 // snapshots precio + costo + margen from usePreciosEvento so we don't
 // re-read the catalogo or evento_productos here.
+// productos-configurables: check if product is configurable and open
+// personalization dialog if so.
 function manejarAgregar(productoId: string) {
-  agregarAlCarrito(productoId, 1)
+  const configurable = productosConfigurablesStore.configurables.find(
+    (c) => c.producto_id === productoId
+  )
+  
+  if (configurable) {
+    // Get product details for the dialog
+    const producto = productos.value.find((p) => p.id === productoId)
+    if (!producto) return
+    
+    const precioInfo = precioParaProducto.value(productoId)
+    productoEnPersonalizacion.value = {
+      productoId,
+      nombre: producto.nombre,
+      precioBase: precioInfo,
+      costoBase: costoParaProducto.value(productoId) || 0,
+      margenBase: margenParaProducto.value(productoId),
+    }
+    dialogoPersonalizacionAbierto.value = true
+  } else {
+    // Non-configurable product: add directly to cart
+    agregarAlCarrito(productoId, 1, [])
+  }
+}
+
+// productos-configurables: personalization dialog state
+const productoEnPersonalizacion = ref<{
+  productoId: string
+  nombre: string
+  precioBase: number
+  costoBase: number
+  margenBase: number | null
+} | null>(null)
+const dialogoPersonalizacionAbierto = ref(false)
+
+function confirmarPersonalizacion(
+  personalizaciones: PersonalizacionCarrito[],
+  precioTotal: number,
+  costoTotal: number
+) {
+  if (!productoEnPersonalizacion.value) return
+  
+  // Add to cart with personalizations
+  agregarAlCarrito(
+    productoEnPersonalizacion.value.productoId,
+    1,
+    personalizaciones,
+    precioTotal,
+    costoTotal
+  )
+  
+  dialogoPersonalizacionAbierto.value = false
+  productoEnPersonalizacion.value = null
+}
+
+function cancelarPersonalizacion() {
+  dialogoPersonalizacionAbierto.value = false
+  productoEnPersonalizacion.value = null
 }
 
 function irAConfigurarProductos() {
@@ -1034,8 +1096,25 @@ async function reintentarHistorial() {
       @confirmar="confirmarRegistrar"
     />
 
+    <!-- productos-configurables: personalization dialog -->
+    <v-dialog
+      v-if="productoEnPersonalizacion"
+      v-model="dialogoPersonalizacionAbierto"
+      max-width="600"
+    >
+      <PersonalizacionProductoDialog
+        :producto-id="productoEnPersonalizacion.productoId"
+        :nombre-producto="productoEnPersonalizacion.nombre"
+        :precio-base="productoEnPersonalizacion.precioBase"
+        :costo-base="productoEnPersonalizacion.costoBase"
+        :margen-base="productoEnPersonalizacion.margenBase"
+        @confirmar="confirmarPersonalizacion"
+        @cancelar="cancelarPersonalizacion"
+      />
+    </v-dialog>
+
     <!-- pos-redesign (REQ-POS-COMPROBANTE-1): receipt dialog opens
-         after a successful sale (gated by the feature flag). -->
+          after a successful sale (gated by the feature flag). -->
     <ComprobanteVentaDialog
       v-if="FLAG_POS_REDESIGN && comprobanteVenta && comprobanteAbierto"
       :model-value="comprobanteAbierto"

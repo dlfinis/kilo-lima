@@ -125,6 +125,9 @@ export interface VentaItemConPersonalizaciones extends VentaItem {
 //
 // evento_producto_id links back to the pricing config active at sale
 // time (REQ-FIN-9 follow-up). Optional — legacy paths omit it.
+//
+// productos-configurables: personalizations is optional — empty array
+// for non-configurable products.
 export interface VentaItemInput {
   producto_id: string
   cantidad: number
@@ -133,6 +136,7 @@ export interface VentaItemInput {
   costo_unitario?: number | null
   margen_aplicado?: number | null
   evento_producto_id?: string | null
+  personalizaciones?: import('./configurable.types').VentaItemPersonalizacionInput[]
 }
 
 export interface VentaConItems extends Venta {
