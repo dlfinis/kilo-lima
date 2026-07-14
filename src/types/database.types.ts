@@ -623,8 +623,86 @@ export interface Database {
           },
         ]
       }
+      // inventory-accounting-workflow-refactor / Phase 2: append-only
+      // stock movement ledger. Immutable — corrections add a referencing
+      // row, they never update or delete history. RLS policies enforce
+      // this at the schema level.
+      stock_movements: {
+        Row: {
+          id: string
+          materia_prima_id: string
+          cantidad: number
+          tipo: 'compra' | 'consumo' | 'correccion' | 'ajuste'
+          evento_id: string | null
+          compra_insumo_id: string | null
+          venta_id: string | null
+          movimiento_corregido_id: string | null
+          costo_unitario_snapshot: number | null
+          motivo: string | null
+          fecha: string
+          created_at: string
+          created_by: string | null
+        }
+        Insert: {
+          id?: string
+          materia_prima_id: string
+          cantidad: number
+          tipo: 'compra' | 'consumo' | 'correccion' | 'ajuste'
+          evento_id?: string | null
+          compra_insumo_id?: string | null
+          venta_id?: string | null
+          movimiento_corregido_id?: string | null
+          costo_unitario_snapshot?: number | null
+          motivo?: string | null
+          fecha?: string
+          created_at?: string
+          created_by?: string | null
+        }
+        Update: Partial<Database['public']['Tables']['stock_movements']['Insert']>
+        Relationships: [
+          {
+            foreignKeyName: 'stock_movements_materia_prima_id_fkey'
+            columns: ['materia_prima_id']
+            referencedRelation: 'materias_primas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'stock_movements_evento_id_fkey'
+            columns: ['evento_id']
+            referencedRelation: 'eventos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'stock_movements_compra_insumo_id_fkey'
+            columns: ['compra_insumo_id']
+            referencedRelation: 'compras_insumos'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'stock_movements_venta_id_fkey'
+            columns: ['venta_id']
+            referencedRelation: 'ventas'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'stock_movements_movimiento_corregido_id_fkey'
+            columns: ['movimiento_corregido_id']
+            referencedRelation: 'stock_movements'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
-    Views: Record<string, never>
+    Views: {
+      v_stock_actual: {
+        Row: {
+          materia_prima_id: string
+          nombre: string
+          unidad: string
+          stock_actual: number
+        }
+      }
+    }
     Functions: Record<string, never>
     Enums: Record<string, never>
   }

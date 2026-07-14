@@ -51,6 +51,9 @@ const promedioVenta = computed(() => {
 // Filter by payment method
 const filtroMetodoPago = ref<MetodoPago | null>(null)
 
+// Filter by product
+const filtroProductoId = ref<string | null>(null)
+
 // Filter by date range
 const fechaInicio = ref<string | null>(null)
 const fechaFin = ref<string | null>(null)
@@ -107,6 +110,13 @@ const ventasFiltradas = computed(() => {
     result = result.filter((v) => v.metodo_pago === filtroMetodoPago.value)
   }
   
+  // Filter by product
+  if (filtroProductoId.value) {
+    result = result.filter((v) => 
+      v.items.some((item) => item.producto_id === filtroProductoId.value)
+    )
+  }
+  
   // Filter by date range
   if (fechaInicio.value) {
     const inicio = new Date(fechaInicio.value)
@@ -121,6 +131,35 @@ const ventasFiltradas = computed(() => {
   }
   
   return result.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
+})
+
+// Product sales analysis
+const analisisProductos = computed(() => {
+  const productoMap = new Map<string, { nombre: string; cantidad: number; total: number }>()
+  
+  ventasFiltradas.value.forEach((venta) => {
+    venta.items.forEach((item) => {
+      const nombre = obtenerNombreProducto(item.producto_id)
+      const actual = productoMap.get(item.producto_id) || { nombre, cantidad: 0, total: 0 }
+      actual.cantidad += item.cantidad
+      actual.total += item.subtotal
+      productoMap.set(item.producto_id, actual)
+    })
+  })
+  
+  return Array.from(productoMap.values()).sort((a, b) => b.total - a.total)
+})
+
+// Get unique products from filtered sales
+const productosEnVentas = computed(() => {
+  const productoIds = new Set<string>()
+  ventasFiltradas.value.forEach((venta) => {
+    venta.items.forEach((item) => productoIds.add(item.producto_id))
+  })
+  return Array.from(productoIds).map((id) => ({
+    id,
+    nombre: obtenerNombreProducto(id),
+  }))
 })
 
 // Dialog for sale detail
@@ -139,6 +178,7 @@ function cerrarDetalleVenta() {
 
 function limpiarFiltros() {
   filtroMetodoPago.value = null
+  filtroProductoId.value = null
   fechaInicio.value = null
   fechaFin.value = null
   mostrarFechasPersonalizadas.value = false
@@ -364,6 +404,23 @@ async function confirmarEliminar() {
             </v-chip>
           </div>
           
+          <div class="d-flex align-center ga-2 flex-wrap mb-3">
+            <span class="text-body-2 font-weight-medium">Producto:</span>
+            <v-select
+              v-model="filtroProductoId"
+              :items="productosEnVentas"
+              item-title="nombre"
+              item-value="id"
+              label="Todos los productos"
+              variant="outlined"
+              density="compact"
+              hide-details
+              clearable
+              style="max-width: 300px"
+              data-testid="ventas-filtro-producto"
+            />
+          </div>
+          
           <div class="d-flex align-center ga-2 flex-wrap">
             <span class="text-body-2 font-weight-medium">Rango de fechas:</span>
             <v-chip
@@ -416,7 +473,7 @@ async function confirmarEliminar() {
             <v-spacer />
             
             <v-btn
-              v-if="filtroMetodoPago || fechaInicio || fechaFin"
+              v-if="filtroMetodoPago || filtroProductoId || fechaInicio || fechaFin"
               size="small"
               variant="text"
               color="error"
@@ -512,9 +569,34 @@ async function confirmarEliminar() {
         >
           <v-icon size="48" color="grey-lighten-1" class="mb-2">mdi-receipt-text-outline</v-icon>
           <p class="mb-0">
-            {{ filtroMetodoPago ? 'No hay ventas con este filtro' : 'Sin ventas registradas' }}
+            {{ filtroMetodoPago || filtroProductoId ? 'No hay ventas con este filtro' : 'Sin ventas registradas' }}
           </p>
         </div>
+      </v-card>
+
+      <!-- Product analysis -->
+      <v-card v-if="analisisProductos.length > 0" class="mt-4" data-testid="ventas-analisis-productos">
+        <v-card-title class="d-flex align-center">
+          <v-icon class="mr-2">mdi-chart-bar</v-icon>
+          Análisis por producto
+        </v-card-title>
+        <v-divider />
+        <v-table density="compact">
+          <thead>
+            <tr>
+              <th>Producto</th>
+              <th class="text-right">Cantidad vendida</th>
+              <th class="text-right">Total vendido</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="producto in analisisProductos" :key="producto.nombre">
+              <td>{{ producto.nombre }}</td>
+              <td class="text-right">{{ producto.cantidad }}</td>
+              <td class="text-right font-weight-medium">{{ formatearUSD(producto.total) }}</td>
+            </tr>
+          </tbody>
+        </v-table>
       </v-card>
     </template>
 
