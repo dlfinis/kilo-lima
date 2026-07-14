@@ -55,6 +55,44 @@ const filtroMetodoPago = ref<MetodoPago | null>(null)
 const fechaInicio = ref<string | null>(null)
 const fechaFin = ref<string | null>(null)
 
+// Quick date range options
+function setRangoRapido(rango: string) {
+  const hoy = new Date()
+  hoy.setHours(23, 59, 59, 999)
+  
+  switch (rango) {
+    case 'hoy':
+      const inicioHoy = new Date()
+      inicioHoy.setHours(0, 0, 0, 0)
+      fechaInicio.value = inicioHoy.toISOString().split('T')[0]
+      fechaFin.value = hoy.toISOString().split('T')[0]
+      break
+    case 'ayer':
+      const ayer = new Date()
+      ayer.setDate(ayer.getDate() - 1)
+      ayer.setHours(0, 0, 0, 0)
+      const ayerFin = new Date(ayer)
+      ayerFin.setHours(23, 59, 59, 999)
+      fechaInicio.value = ayer.toISOString().split('T')[0]
+      fechaFin.value = ayerFin.toISOString().split('T')[0]
+      break
+    case 'semana':
+      const inicioSemana = new Date()
+      inicioSemana.setDate(inicioSemana.getDate() - 7)
+      inicioSemana.setHours(0, 0, 0, 0)
+      fechaInicio.value = inicioSemana.toISOString().split('T')[0]
+      fechaFin.value = hoy.toISOString().split('T')[0]
+      break
+    case 'mes':
+      const inicioMes = new Date()
+      inicioMes.setDate(1)
+      inicioMes.setHours(0, 0, 0, 0)
+      fechaInicio.value = inicioMes.toISOString().split('T')[0]
+      fechaFin.value = hoy.toISOString().split('T')[0]
+      break
+  }
+}
+
 const ventasFiltradas = computed(() => {
   let result = ventasDelEvento.value
   
@@ -113,7 +151,7 @@ onMounted(async () => {
   
   // Load products for name lookup in sale details
   if (productosStore.productos.length === 0) {
-    await productosStore.cargarTodos()
+    await productosStore.cargarTodas()
   }
   
   // Auto-select active event if available
@@ -121,6 +159,8 @@ onMounted(async () => {
   if (eventoActivo) {
     eventoSeleccionadoId.value = eventoActivo.id
     await cargarDatos()
+    // Default to today's sales
+    setRangoRapido('hoy')
   }
 })
 
@@ -273,8 +313,44 @@ function formatearFecha(fecha: string): string {
             </v-chip>
           </div>
           
+          <div class="d-flex align-center ga-2 flex-wrap mb-3">
+            <span class="text-body-2 font-weight-medium">Rango rápido:</span>
+            <v-chip
+              variant="tonal"
+              size="small"
+              data-testid="ventas-rango-hoy"
+              @click="setRangoRapido('hoy')"
+            >
+              Hoy
+            </v-chip>
+            <v-chip
+              variant="tonal"
+              size="small"
+              data-testid="ventas-rango-ayer"
+              @click="setRangoRapido('ayer')"
+            >
+              Ayer
+            </v-chip>
+            <v-chip
+              variant="tonal"
+              size="small"
+              data-testid="ventas-rango-semana"
+              @click="setRangoRapido('semana')"
+            >
+              Última semana
+            </v-chip>
+            <v-chip
+              variant="tonal"
+              size="small"
+              data-testid="ventas-rango-mes"
+              @click="setRangoRapido('mes')"
+            >
+              Este mes
+            </v-chip>
+          </div>
+          
           <div class="d-flex align-center ga-2 flex-wrap">
-            <span class="text-body-2 font-weight-medium">Rango de fechas:</span>
+            <span class="text-body-2 font-weight-medium">Personalizado:</span>
             <v-text-field
               v-model="fechaInicio"
               type="date"
