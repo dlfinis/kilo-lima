@@ -12,7 +12,6 @@
 // production‑unit edits without navigation or route state.
 import { computed } from 'vue'
 
-import { formatearUnidad } from '@/utils/format'
 import type {
   IngredientesEventoResultado,
   IngredienteCompra,
@@ -33,7 +32,8 @@ const hayDatos = computed(
 
 const compraHeaders = [
   { title: 'Ingrediente', key: 'nombre' },
-  { title: 'Unidad', key: 'unidadDisplay', align: 'start' as const, width: 100 },
+  { title: 'Tipo', key: 'unidadTipo', align: 'start' as const, width: 55 },
+  { title: 'Cantidad', key: 'cantidadDisplay', align: 'end' as const, width: 90 },
   { title: 'Requerido', key: 'requeridoDisplay', align: 'end' as const, width: 120 },
   { title: 'Disponible', key: 'disponibleDisplay', align: 'end' as const, width: 120 },
   { title: 'A comprar', key: 'faltanteDisplay', align: 'end' as const, width: 120 },
@@ -41,7 +41,8 @@ const compraHeaders = [
 
 const productoHeaders = [
   { title: 'Ingrediente', key: 'nombre' },
-  { title: 'Unidad', key: 'unidadDisplay', align: 'start' as const, width: 100 },
+  { title: 'Tipo', key: 'unidadTipo', align: 'start' as const, width: 55 },
+  { title: 'Cantidad', key: 'cantidadDisplay', align: 'end' as const, width: 90 },
   { title: 'Requerido', key: 'requeridoDisplay', align: 'end' as const, width: 120 },
 ]
 
@@ -59,6 +60,13 @@ function disponibleFmt(v: number): string {
 
 function faltanteFmt(v: number): string {
   return v > 0 ? v.toFixed(2) : '—'
+}
+
+/** Abbreviated unit label matching `formatearUnidad` conventions. */
+function unidadTipoLabel(u: string): string {
+  if (u === 'unidad') return 'u'
+  if (u === 'und') return 'unds'
+  return u
 }
 
 const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
@@ -127,9 +135,13 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
             hide-default-footer
             data-testid="ingredientes-consolidado-tabla"
           >
-            <!-- unidadDisplay -->
-            <template #[`item.unidadDisplay`]="{ item }">
-              {{ formatearUnidad(item.requerido, item.unidad) }}
+            <!-- unidadTipo -->
+            <template #[`item.unidadTipo`]="{ item }">
+              {{ unidadTipoLabel(item.unidad) }}
+            </template>
+            <!-- cantidadDisplay -->
+            <template #[`item.cantidadDisplay`]="{ item }">
+              {{ item.requerido.toFixed(2) }}
             </template>
             <!-- requeridoDisplay -->
             <template #[`item.requeridoDisplay`]="{ item }">
@@ -180,8 +192,11 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
             hide-default-footer
             :data-testid="`ingredientes-producto-tabla-${prod.eventoProductoId}`"
           >
-            <template #[`item.unidadDisplay`]="{ item }">
-              {{ formatearUnidad(item.requerido, item.unidad) }}
+            <template #[`item.unidadTipo`]="{ item }">
+              {{ unidadTipoLabel(item.unidad) }}
+            </template>
+            <template #[`item.cantidadDisplay`]="{ item }">
+              {{ item.requerido.toFixed(2) }}
             </template>
             <template #[`item.requeridoDisplay`]="{ item }">
               {{ requeridoFmt(item.requerido) }}

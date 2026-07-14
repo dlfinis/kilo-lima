@@ -504,11 +504,11 @@ const inversionTotal = computed<number>(() => {
             :headers="[
               { title: '', key: 'incluido', sortable: false, width: 56 },
               { title: 'Producto', key: 'producto_nombre' },
-              { title: 'Und. a producir', key: 'unidades_a_producir', width: 155, align: 'center' },
+              { title: 'U.P.', key: 'unidades_a_producir', width: 80, align: 'center' },
               { title: 'Costo prod.', key: 'costo_total_prod', width: 110, align: 'end' },
-              { title: 'Precio venta', key: 'precio_final', width: 130, align: 'center' },
+              { title: 'Precio venta', key: 'precio_final', width: 145, align: 'center' },
               { title: 'Márgenes', key: 'margenes', minWidth: 260 },
-              { title: 'Contrib. total', key: 'contribucion_unit', width: 120, align: 'end' },
+              { title: 'Contb.T.', key: 'contribucion_unit', width: 110, align: 'end' },
             ]"
             density="compact"
             data-testid="evento-gestion-tabla"
@@ -554,7 +554,7 @@ const inversionTotal = computed<number>(() => {
                 :disabled="!editable"
                 :data-testid="`evento-gestion-unidades-${item.producto_id}`"
                 class="text-center mx-auto"
-                style="width: 100%"
+                style="max-width: 65px"
                 @update:model-value="(v) => onUnidadesInput(item.producto_id, v)"
                 @blur="() => alGuardarUnidades(item)"
                 @keydown.enter="() => alGuardarUnidades(item)"
@@ -601,7 +601,7 @@ const inversionTotal = computed<number>(() => {
                 :color="(item.precio_venta ?? 0) < (item.costo_unitario ?? 0) ? 'error' : undefined"
                 :data-testid="`evento-gestion-precio-${item.producto_id}`"
                 class="text-center mx-auto"
-                style="max-width: 140px"
+                style="max-width: 148px"
                 prefix="$"
                 @update:model-value="(v) => onPrecioInput(item.producto_id, v)"
                 @blur="() => onPrecioBlur(item.producto_id)"
