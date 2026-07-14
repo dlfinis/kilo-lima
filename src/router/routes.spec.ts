@@ -191,3 +191,29 @@ describe('New feature routes (Wave 1)', () => {
     expect(router.currentRoute.value.path).toBe('/')
   })
 })
+
+// event-product-management-refactor: unified Gestión productos route
+// + legacy redirects. /eventos/:id/gestion is the canonical surface;
+// /eventos/:id/productos and /eventos/:id/planificar redirect there
+// so existing bookmarks and links keep working.
+describe('Event product management routes', () => {
+  it('/eventos/:id/gestion resolves with name + breadcrumb', async () => {
+    await setupRouter()
+    await router.push('/eventos/e-42/gestion')
+    expect(router.currentRoute.value.path).toBe('/eventos/e-42/gestion')
+    expect(router.currentRoute.value.name).toBe('evento-gestion')
+    expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'eventos', 'Gestión productos'])
+  })
+
+  it('/eventos/:id/productos redirects to /eventos/:id/gestion preserving id', async () => {
+    await setupRouter()
+    await router.push('/eventos/e-42/productos')
+    expect(router.currentRoute.value.path).toBe('/eventos/e-42/gestion')
+  })
+
+  it('/eventos/:id/planificar redirects to /eventos/:id/gestion preserving id', async () => {
+    await setupRouter()
+    await router.push('/eventos/e-42/planificar')
+    expect(router.currentRoute.value.path).toBe('/eventos/e-42/gestion')
+  })
+})
