@@ -172,8 +172,7 @@ const routes: RouteRecordRaw[] = [
   {
     path: '/ventas',
     name: 'ventas',
-    component: () => import('@/views/FeatureComingSoonView.vue'),
-    props: { title: 'Ventas', icon: 'mdi-cash-register', section: 'Operación' },
+    component: () => import('@/views/VentasView.vue'),
     meta: { breadcrumb: ['Inicio', 'Operación', 'Ventas'] },
   },
   {
