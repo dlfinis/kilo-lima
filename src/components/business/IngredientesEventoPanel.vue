@@ -34,11 +34,12 @@ const compraHeaders = [
   { title: 'Ingrediente', key: 'nombre' },
   { title: 'Tipo', key: 'unidadTipo', align: 'start' as const, width: 55 },
   { title: 'Cantidad', key: 'cantidadDisplay', align: 'end' as const, width: 90 },
-  { title: 'Costo compra', key: 'costoCompra', align: 'end' as const, width: 110 },
-  { title: 'A comprar', key: 'faltanteDisplay', align: 'end' as const, width: 120 },
+  { title: 'C.U', key: 'costoUnitario', align: 'end' as const, width: 110 },
+  { title: 'Subtotal', key: 'costoCompra', align: 'end' as const, width: 110 },
+  // { title: 'A comprar', key: 'faltanteDisplay', align: 'end' as const, width: 120 },
 ]
 
-const costoCopraTotal = computed<number>(() =>
+const costoCompraTotal = computed<number>(() =>
   consolidado.value.reduce((sum, ing) => sum + ing.faltante * ing.costoUnitario, 0),
 )
 
@@ -138,20 +139,26 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
             <template #[`item.cantidadDisplay`]="{ item }">
               {{ item.requerido.toFixed(2) }}
             </template>
+            <!-- costoUnitario -->
+            <template #[`item.costoUnitario`]="{ item }">
+              <span :class="{ 'text-medium-emphasis': item.faltante === 0 }">
+                {{ (item.costoUnitario).toFixed(2) }}
+              </span>
+            </template>
             <!-- costoCompra: unit cost × faltante -->
             <template #[`item.costoCompra`]="{ item }">
               <span :class="{ 'text-medium-emphasis': item.faltante === 0 }">
-                ${{ (item.faltante * item.costoUnitario).toFixed(2) }}
+                {{ (item.faltante * item.costoUnitario).toFixed(2) }}
               </span>
             </template>
             <!-- faltanteDisplay: colour-coded: red when gap > 0, green when 0 -->
-            <template #[`item.faltanteDisplay`]="{ item }">
+            <!-- <template #[`item.faltanteDisplay`]="{ item }">
               <span
                 v-if="item.faltante > 0"
                 class="font-weight-bold text-error"
               >{{ faltanteFmt(item.faltante) }}</span>
               <span v-else class="text-success">—</span>
-            </template>
+            </template> -->
           </v-data-table>
 
           <div
@@ -159,7 +166,7 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
             class="d-flex justify-end pa-2 text-body-2 font-weight-medium"
             data-testid="ingredientes-consolidado-total"
           >
-            Total compra: ${{ costoCopraTotal.toFixed(2) }}
+            Total compra: $ {{ costoCompraTotal.toFixed(2) }}
           </div>
         </v-expansion-panel-text>
       </v-expansion-panel>

@@ -502,15 +502,16 @@ const inversionTotal = computed<number>(() => {
           <v-data-table
             :items="filasGestion"
             :headers="[
-              { title: '', key: 'incluido', sortable: false, width: 40 },
-              { title: 'Producto', key: 'producto_nombre' },
+              { title: '', key: 'incluido', sortable: false, width: 20 },
+              { title: 'Producto', key: 'producto_nombre', width: 250 },
               { title: 'U.P.', key: 'unidades_a_producir', width: 100, align: 'center' },
-              { title: 'C.P.', key: 'costo_total_prod', width: 110, align: 'start' },
-              { title: 'P.V.', key: 'precio_final', width: 145, align: 'center' },
-              { title: 'Márgenes', key: 'margenes', minWidth: 260 },
-              { title: 'Contb.T.', key: 'contribucion_unit', width: 110, align: 'end' },
+              { title: 'C.P.', key: 'costo_total_prod', width: 80, align: 'start' },
+              { title: 'P.V.', key: 'precio_final', width: 100, align: 'center' },
+              { title: 'Márgenes', key: 'margenes', minWidth: 120 },
+              { title: 'Contb.T.', key: 'contribucion_unit', width: 100, align: 'end' },
             ]"
             density="compact"
+            class="t-compact"
             data-testid="evento-gestion-tabla"
           >
             <!-- Column header tooltips for abbreviated labels -->
@@ -588,7 +589,6 @@ const inversionTotal = computed<number>(() => {
                 :disabled="!editable"
                 :data-testid="`evento-gestion-unidades-${item.producto_id}`"
                 class="text-center mx-auto up-thin-input"
-                style="max-width: 85px"
                 @update:model-value="(v) => onUnidadesInput(item.producto_id, v)"
                 @blur="() => alGuardarUnidades(item)"
                 @keydown.enter="() => alGuardarUnidades(item)"
@@ -634,8 +634,7 @@ const inversionTotal = computed<number>(() => {
                 :disabled="!editable"
                 :color="(item.precio_venta ?? 0) < (item.costo_unitario ?? 0) ? 'error' : undefined"
                 :data-testid="`evento-gestion-precio-${item.producto_id}`"
-                class="text-center mx-auto"
-                style="max-width: 148px"
+                class="text-center mx-auto up-thin-input"
                 prefix="$"
                 @update:model-value="(v) => onPrecioInput(item.producto_id, v)"
                 @blur="() => onPrecioBlur(item.producto_id)"
@@ -717,6 +716,12 @@ const inversionTotal = computed<number>(() => {
   flex: 0 1 240px;
 }
 
+.t-compact :deep(.v-data-table__td),
+.t-compact :deep(.v-data-table__th) {
+  padding: 0.3rem 0.5rem !important;
+  height: auto !important;
+}
+
 /* Margenes cell: sliders are narrower in table context so the
    stacked layout stays compact and label/slider alignment is
    consistent across rows. The per-slider price text is hidden here
@@ -736,10 +741,13 @@ const inversionTotal = computed<number>(() => {
 /* U.P. input: tightened internal padding so ~4 digits fit comfortably
    in the allocated 85 px while keeping the compact Vuetify density. */
 :deep(.up-thin-input .v-field) {
-  padding-inline: 4px;
+
 }
+
 :deep(.up-thin-input .v-field__input) {
-  padding-block: 2px;
   min-height: unset;
+  padding-inline: 0.5rem;
+  text-align: center;
+  font-size: 0.875rem;
 }
 </style>
