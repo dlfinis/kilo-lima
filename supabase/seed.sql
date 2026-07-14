@@ -887,6 +887,120 @@ on conflict (evento_id) do nothing;
 -- (sin COMMIT explícito — la RPC exec_sql no permite transaction commands)
 
 -- =====================================================================
+-- 15. PRODUCTOS CONFIGURABLES
+-- Ejemplo: Heladería con productos personalizables.
+-- Materias primas adicionales: Helado base, Cono, Barquillo, Salsas, Toppings
+-- =====================================================================
+
+-- Materias primas para helados
+insert into public.materias_primas (nombre, unidad, costo_por_unidad, categoria, notas) values
+  ('Helado base vainilla', 'unidad', 0.50, 'ingrediente', 'Bola de helado de vainilla'),
+  ('Helado base chocolate', 'unidad', 0.55, 'ingrediente', 'Bola de helado de chocolate'),
+  ('Helado base fresa', 'unidad', 0.52, 'ingrediente', 'Bola de helado de fresa'),
+  ('Cono normal', 'unidad', 0.10, 'ingrediente', 'Cono de wafer estándar'),
+  ('Cono premium', 'unidad', 0.20, 'ingrediente', 'Cono de waffle con chocolate'),
+  ('Barquillo', 'unidad', 0.05, 'ingrediente', 'Barquillo extra'),
+  ('Salsa chocolate', 'ml', 0.15, 'ingrediente', 'Salsa de chocolate (30ml)'),
+  ('Salsa fresa', 'ml', 0.18, 'ingrediente', 'Salsa de fresa (30ml)'),
+  ('Salsa caramelo', 'ml', 0.16, 'ingrediente', 'Salsa de caramelo (30ml)'),
+  ('Topping chispas', 'g', 0.08, 'ingrediente', 'Chispas de colores (20g)'),
+  ('Topping coco', 'g', 0.06, 'ingrediente', 'Coco rallado (20g)'),
+  ('Topping nueces', 'g', 0.12, 'ingrediente', 'Nueces picadas (20g)'),
+  ('Topping galleta', 'g', 0.10, 'ingrediente', 'Galleta triturada (20g)'),
+  ('Topping brownie', 'g', 0.15, 'ingrediente', 'Brownie en cubos (20g)')
+on conflict do nothing;
+
+-- Productos base para helados
+insert into public.productos (nombre, receta_id, categoria, disponible, orden, descripcion, icono, color)
+select 'Helado Simple', r.id, 'helado', true, 100, 'Helado con personalización', 'mdi-ice-cream', 'info'
+from public.recetas r
+where r.nombre = 'Helado base'
+on conflict do nothing;
+
+insert into public.productos (nombre, receta_id, categoria, disponible, orden, descripcion, icono, color)
+select 'Helado Doble', r.id, 'helado', true, 101, 'Helado doble con personalización', 'mdi-ice-cream', 'primary'
+from public.recetas r
+where r.nombre = 'Helado base'
+on conflict do nothing;
+
+-- Receta base para helados (si no existe)
+insert into public.recetas (nombre, descripcion, rendimiento_unidades, notas)
+values ('Helado base', 'Receta base para helados personalizables', 1, 'Se usa como referencia para productos configurables')
+on conflict do nothing;
+
+-- Productos configurables
+insert into public.productos_configurables (producto_id, costo_base_calculado)
+select p.id, 0.00
+from public.productos p
+where p.nombre in ('Helado Simple', 'Helado Doble')
+on conflict do nothing;
+
+-- Grupos de opciones para Helado Simple
+insert into public.grupos_opciones (producto_configurable_id, nombre, tipo_calculo, incluidas_gratis, precio_venta_extra)
+select pc.id, 'Salsas', 'promedio_categoria', 1, 0.20
+from public.productos_configurables pc
+join public.productos p on p.id = pc.producto_id
+where p.nombre = 'Helado Simple'
+on conflict do nothing;
+
+insert into public.grupos_opciones (producto_configurable_id, nombre, tipo_calculo, incluidas_gratis, precio_venta_extra)
+select pc.id, 'Toppings', 'promedio_categoria', 0, 0.15
+from public.productos_configurables pc
+join public.productos p on p.id = pc.producto_id
+where p.nombre = 'Helado Simple'
+on conflict do nothing;
+
+-- Grupos de opciones para Helado Doble
+insert into public.grupos_opciones (producto_configurable_id, nombre, tipo_calculo, incluidas_gratis, precio_venta_extra)
+select pc.id, 'Salsas', 'promedio_categoria', 1, 0.20
+from public.productos_configurables pc
+join public.productos p on p.id = pc.producto_id
+where p.nombre = 'Helado Doble'
+on conflict do nothing;
+
+insert into public.grupos_opciones (producto_configurable_id, nombre, tipo_calculo, incluidas_gratis, precio_venta_extra)
+select pc.id, 'Toppings', 'promedio_categoria', 1, 0.15
+from public.productos_configurables pc
+join public.productos p on p.id = pc.producto_id
+where p.nombre = 'Helado Doble'
+on conflict do nothing;
+
+-- Opciones para grupos de salsas
+insert into public.opciones_grupo (grupo_id, materia_prima_id)
+select g.id, mp.id
+from public.grupos_opciones g
+join public.productos_configurables pc on pc.id = g.producto_configurable_id
+join public.productos p on p.id = pc.producto_id
+cross join public.materias_primas mp
+where g.nombre = 'Salsas' and p.nombre in ('Helado Simple', 'Helado Doble')
+  and mp.nombre in ('Salsa chocolate', 'Salsa fresa', 'Salsa caramelo')
+on conflict do nothing;
+
+-- Opciones para grupos de toppings
+insert into public.opciones_grupo (grupo_id, materia_prima_id)
+select g.id, mp.id
+from public.grupos_opciones g
+join public.productos_configurables pc on pc.id = g.producto_configurable_id
+join public.productos p on p.id = pc.producto_id
+cross join public.materias_primas mp
+where g.nombre = 'Toppings' and p.nombre in ('Helado Simple', 'Helado Doble')
+  and mp.nombre in ('Topping chispas', 'Topping coco', 'Topping nueces', 'Topping galleta', 'Topping brownie')
+on conflict do nothing;
+
+-- Adicionales disponibles (se pueden vender por separado)
+insert into public.adicionales_disponibles (materia_prima_id, precio_venta, activo)
+select mp.id, mp.costo_por_unidad * 2.5, true
+from public.materias_primas mp
+where mp.nombre like 'Salsa %' or mp.nombre like 'Topping %'
+on conflict do nothing;
+
+-- Recalcular costos base
+select public.calcular_costo_base_configurable(pc.id)
+from public.productos_configurables pc
+join public.productos p on p.id = pc.producto_id
+where p.nombre in ('Helado Simple', 'Helado Doble');
+
+-- =====================================================================
 -- RESUMEN (corre al final del seed — útil para inspección manual)
 -- =====================================================================
 select 'materias_primas'    as tabla, count(*)::text as filas from public.materias_primas
@@ -904,4 +1018,8 @@ union all select 'ventas',         count(*)::text from public.ventas
 union all select 'venta_items',    count(*)::text from public.venta_items
 union all select 'venta_correcciones', count(*)::text from public.venta_correcciones
 union all select 'cierres_caja',   count(*)::text from public.cierres_caja
+union all select 'productos_configurables', count(*)::text from public.productos_configurables
+union all select 'grupos_opciones', count(*)::text from public.grupos_opciones
+union all select 'opciones_grupo', count(*)::text from public.opciones_grupo
+union all select 'adicionales_disponibles', count(*)::text from public.adicionales_disponibles
 order by tabla;

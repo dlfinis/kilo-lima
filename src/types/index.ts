@@ -92,6 +92,23 @@ export type {
   RegistrarCompraInput,
   RegistrarConsumoInput,
   RegistrarCorreccionInput,
+  RegistrarAjusteInput,
   RegistrarCompraInsumoInput,
   StockMovementWithMateria,
 } from './stock.types'
+export type {
+  ProductoConfigurable,
+  ProductoConfigurableInput,
+  ProductoConfigurableConGrupos,
+  GrupoOpciones,
+  GrupoOpcionesInput,
+  GrupoOpcionesConOpciones,
+  OpcionGrupo,
+  OpcionGrupoInput,
+  AdicionalDisponible,
+  AdicionalDisponibleInput,
+  AdicionalDisponibleConMateriaPrima,
+  VentaItemPersonalizacion,
+  VentaItemPersonalizacionInput,
+  PersonalizacionCarrito,
+} from './configurable.types'

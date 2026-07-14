@@ -101,6 +101,12 @@ const routes: RouteRecordRaw[] = [
         path: 'recetas/:id',
         redirect: (to) => `/productos/preparaciones/${to.params.id as string}`,
       },
+      {
+        path: 'configurables',
+        name: 'productos-configurables',
+        component: () => import('@/views/ProductosConfigurableView.vue'),
+        meta: { breadcrumb: ['Inicio', 'Productos', 'Configurables'] },
+      },
     ],
   },
   {

@@ -34,6 +34,8 @@
     "verify:all": "node scripts/verify-all.mjs",
     "db:reset": "node scripts/db-reset.mjs",
     "db:reset:yes": "node scripts/db-reset.mjs --yes",
+    "db:wipe": "node scripts/db-reset.mjs --wipe",
+    "db:wipe:yes": "node scripts/db-reset.mjs --wipe --yes",
     "db:summary": "node scripts/db-reset.mjs --print",
     "db:health": "node scripts/db-reset.mjs --health"
   },

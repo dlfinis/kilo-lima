@@ -42,6 +42,7 @@ const DEBUG = ARGS.includes('--debug')
 const HEALTH = ARGS.includes('--health')
 const FLAG_SQL = ARGS.indexOf('--sql')
 const SQL_PATH_OVERRIDE = FLAG_SQL >= 0 ? ARGS[FLAG_SQL + 1] : null
+const WIPE = ARGS.includes('--wipe')
 
 // ---------------------------------------------------------------------
 // .env.local parser (sin dependencias externas)
@@ -406,8 +407,9 @@ async function main() {
 
   if (!YES) {
     const rl = readline.createInterface({ input, output })
+    const accion = WIPE ? 'BORRARÁ todos los datos sin sembrar de nuevo' : 'BORRARÁ todos los datos de las tablas de la app y volverá a aplicar el seed'
     const answer = await rl.question(
-      '\nEsto BORRARÁ todos los datos de las tablas de la app y volverá a aplicar el seed.\n¿Continuar? [y/N] ',
+      `\nEsto ${accion}.\n¿Continuar? [y/N] `,
     )
     rl.close()
     if (!/^y(es)?$/i.test(answer.trim())) {
@@ -426,13 +428,17 @@ async function main() {
     await fs.unlink(truncateFile).catch(() => null)
   }
 
-  console.log('→ Aplicando seed.sql…')
-  const archivoSql = SQL_PATH_OVERRIDE
-    ? path.resolve(SQL_PATH_OVERRIDE)
-    : path.join(REPO_ROOT, 'supabase', 'seed.sql')
-  await ejecutarPsql(config.psql, archivoSql)
+  if (WIPE) {
+    console.log('→ Modo --wipe: sin seed, solo truncado.')
+  } else {
+    console.log('→ Aplicando seed.sql…')
+    const archivoSql = SQL_PATH_OVERRIDE
+      ? path.resolve(SQL_PATH_OVERRIDE)
+      : path.join(REPO_ROOT, 'supabase', 'seed.sql')
+    await ejecutarPsql(config.psql, archivoSql)
+  }
 
-  console.log('\nResumen post-seed:')
+  console.log('\nResumen post-truncado:')
   console.log(formatearResumen(await resumen(config)))
   console.log('\nListo. Vuelve a abrir la app para refrescar.')
 }

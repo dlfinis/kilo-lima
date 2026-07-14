@@ -9,6 +9,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Database,
   DerivedStock,
+  RegistrarAjusteInput,
   RegistrarCompraInput,
   RegistrarConsumoInput,
   RegistrarCorreccionInput,
@@ -114,6 +115,18 @@ export const useStockMovementsStore = defineStore('stockMovements', () => {
     return res
   }
 
+  async function registrarAjuste(input: RegistrarAjusteInput) {
+    error.value = null
+    const res = await servicio.registrarAjuste(input)
+    if (res.error) {
+      error.value = res.error.message || MENSAJE_ERROR_OPERACION
+      return res
+    }
+    await cargarMovimientos()
+    await cargarStockActual()
+    return res
+  }
+
   return {
     movements,
     stockActual,
@@ -126,5 +139,6 @@ export const useStockMovementsStore = defineStore('stockMovements', () => {
     registrarCompra,
     registrarConsumo,
     registrarCorreccion,
+    registrarAjuste,
   }
 })

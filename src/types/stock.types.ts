@@ -70,6 +70,14 @@ export interface RegistrarCorreccionInput {
   fecha?: string
 }
 
+export interface RegistrarAjusteInput {
+  materia_prima_id: string
+  cantidad: number // signed: positive = entrada, negative = merma/corrección
+  motivo: string
+  created_by?: string | null
+  fecha?: string
+}
+
 export interface StockMovementWithMateria extends StockMovement {
   materia_prima?: {
     nombre: string

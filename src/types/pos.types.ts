@@ -109,6 +109,13 @@ export interface VentaItem {
   created_at: string
 }
 
+// productos-configurables: joined shape with personalizations.
+// `personalizaciones` is populated by the ventas service when loading
+// VentaConItems. Null for legacy ventas and non-configurable products.
+export interface VentaItemConPersonalizaciones extends VentaItem {
+  personalizaciones?: import('./configurable.types').VentaItemPersonalizacion[]
+}
+
 // VentaItemInput carries the columns the caller wants to insert. The
 // COGS snapshot columns (costo_unitario, margen_aplicado) are optional
 // in the Input shape — the DB row (VentaItem) keeps them as nullable
@@ -232,6 +239,9 @@ export type CierreCajaInput = Omit<CierreCaja, 'id' | 'fecha_cierre' | 'created_
 // line back to the evento_productos row that was active at sale time.
 // Without this, the cierre backfill can't match a venta_item to its
 // pricing config. Nullable — Fase 1 ventas have no link.
+// productos-configurables: extended cart line with personalizations.
+// `personalizaciones` is an array of selected options (included or extra).
+// Null/empty for non-configurable products.
 export interface LineaCarrito {
   producto_id: string
   nombre: string
@@ -246,6 +256,9 @@ export interface LineaCarrito {
   // Link to the evento_productos pricing row active at sale time.
   // Null for legacy ventas and productos without evento_productos config.
   evento_producto_id: string | null
+  // productos-configurables: selected personalizations (options/add-ons).
+  // Empty array for non-configurable products.
+  personalizaciones: import('./configurable.types').PersonalizacionCarrito[]
 }
 
 export interface ResumenCarrito {

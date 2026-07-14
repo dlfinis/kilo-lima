@@ -18,6 +18,7 @@ import type { SupabaseClient } from '@supabase/supabase-js'
 import type {
   Database,
   DerivedStock,
+  RegistrarAjusteInput,
   RegistrarCompraInput,
   RegistrarConsumoInput,
   RegistrarCorreccionInput,
@@ -45,6 +46,9 @@ export interface StockMovementsService {
   ): Promise<{ data: StockMovement | null; error: ServiceError | null }>
   registrarCorreccion(
     input: RegistrarCorreccionInput,
+  ): Promise<{ data: StockMovement | null; error: ServiceError | null }>
+  registrarAjuste(
+    input: RegistrarAjusteInput,
   ): Promise<{ data: StockMovement | null; error: ServiceError | null }>
   finalizarEventoSnapshot(
     eventoId: string,
@@ -195,6 +199,28 @@ export function crearStockMovementsService(
         {
           p_movimiento_id: input.movimiento_id,
           p_cantidad_corregida: input.cantidad_corregida,
+          p_motivo: input.motivo,
+          p_fecha: input.fecha,
+        },
+      )
+      if (rpc.error) {
+        return { data: null, error: mapearErrorRpc(rpc.error) }
+      }
+      return {
+        data: rpc.data as StockMovement | null,
+        error: null,
+      }
+    },
+
+    async registrarAjuste(input) {
+      const rpc = await (supabase.rpc as unknown as (
+        fn: string,
+        args: Record<string, unknown>,
+      ) => Promise<{ data: unknown; error: { message?: string; code?: string } | null }>)(
+        'registrar_ajuste',
+        {
+          p_materia_prima_id: input.materia_prima_id,
+          p_cantidad: input.cantidad,
           p_motivo: input.motivo,
           p_fecha: input.fecha,
         },
