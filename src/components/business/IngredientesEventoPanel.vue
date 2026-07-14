@@ -32,8 +32,8 @@ const hayDatos = computed(
 
 const compraHeaders = [
   { title: 'Ingrediente', key: 'nombre' },
-  { title: 'Tipo', key: 'unidadTipo', align: 'start' as const, width: 55 },
-  { title: 'Cantidad', key: 'cantidadDisplay', align: 'end' as const, width: 90 },
+  { title: 'Cantidad', key: 'cantidadDisplay', align: 'end' as const, width: 100 },
+  { title: 'Tipo', key: 'unidadTipo', align: 'center' as const, width: 40 },
   { title: 'C.U', key: 'costoUnitario', align: 'end' as const, width: 110 },
   { title: 'Subtotal', key: 'costoCompra', align: 'end' as const, width: 110 },
   // { title: 'A comprar', key: 'faltanteDisplay', align: 'end' as const, width: 120 },
@@ -45,8 +45,8 @@ const costoCompraTotal = computed<number>(() =>
 
 const productoHeaders = [
   { title: 'Ingrediente', key: 'nombre' },
-  { title: 'Tipo', key: 'unidadTipo', align: 'start' as const, width: 55 },
-  { title: 'Cantidad', key: 'cantidadDisplay', align: 'end' as const, width: 90 },
+  { title: 'Cantidad', key: 'cantidadDisplay', align: 'end' as const, width: 100 },
+  { title: 'Tipo', key: 'unidadTipo', align: 'center' as const, width: 40 },
   { title: 'Requerido', key: 'requeridoDisplay', align: 'end' as const, width: 120 },
 ]
 
@@ -131,13 +131,13 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
             hide-default-footer
             data-testid="ingredientes-consolidado-tabla"
           >
-            <!-- unidadTipo -->
-            <template #[`item.unidadTipo`]="{ item }">
-              {{ unidadTipoLabel(item.unidad) }}
-            </template>
             <!-- cantidadDisplay -->
             <template #[`item.cantidadDisplay`]="{ item }">
               {{ item.requerido.toFixed(2) }}
+            </template>
+            <!-- unidadTipo -->
+            <template #[`item.unidadTipo`]="{ item }">
+              {{ unidadTipoLabel(item.unidad) }}
             </template>
             <!-- costoUnitario -->
             <template #[`item.costoUnitario`]="{ item }">
@@ -200,11 +200,11 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
             hide-default-footer
             :data-testid="`ingredientes-producto-tabla-${prod.eventoProductoId}`"
           >
-            <template #[`item.unidadTipo`]="{ item }">
-              {{ unidadTipoLabel(item.unidad) }}
-            </template>
             <template #[`item.cantidadDisplay`]="{ item }">
               {{ item.requerido.toFixed(2) }}
+            </template>
+            <template #[`item.unidadTipo`]="{ item }">
+              {{ unidadTipoLabel(item.unidad) }}
             </template>
             <template #[`item.requeridoDisplay`]="{ item }">
               {{ item.requerido.toFixed(2) }}

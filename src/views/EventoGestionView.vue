@@ -505,8 +505,8 @@ const inversionTotal = computed<number>(() => {
               { title: '', key: 'incluido', sortable: false, width: 20 },
               { title: 'Producto', key: 'producto_nombre', width: 250 },
               { title: 'U.P.', key: 'unidades_a_producir', width: 100, align: 'center' },
-              { title: 'C.P.', key: 'costo_total_prod', width: 80, align: 'start' },
-              { title: 'P.V.', key: 'precio_final', width: 100, align: 'center' },
+              { title: 'C.P.', key: 'costo_total_prod', width: 60, align: 'start' },
+              { title: 'P.V.', key: 'precio_final', width: 105, align: 'center' },
               { title: 'Márgenes', key: 'margenes', minWidth: 120 },
               { title: 'Contb.T.', key: 'contribucion_unit', width: 100, align: 'end' },
             ]"
@@ -644,7 +644,7 @@ const inversionTotal = computed<number>(() => {
             <!-- Total planned contribution: unidades × costo × contribución% -->
             <template #[`item.contribucion_unit`]="{ item }">
               <span class="font-weight-medium text-orange-darken-2">
-                ${{ ((item.unidades_a_producir ?? 0) * (item.costo_unitario ?? 0) * (contribucionPct[item.producto_id] ?? 0)).toFixed(2) }}
+                $ {{ ((item.unidades_a_producir ?? 0) * (item.costo_unitario ?? 0) * (contribucionPct[item.producto_id] ?? 0)).toFixed(2) }}
               </span>
             </template>
           </v-data-table>
