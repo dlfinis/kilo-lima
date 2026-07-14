@@ -41,8 +41,8 @@ function decrementar() {
     data-testid="venta-item"
   >
     <div class="flex-grow-1" style="min-width: 0">
-      <div class="text-body-2 font-weight-medium text-truncate">{{ linea.nombre }}</div>
-      <div class="text-caption text-medium-emphasis">
+      <div class="text-body-2 font-weight-medium text-truncate" style="color: #1A1A2E">{{ linea.nombre }}</div>
+      <div class="text-caption font-weight-medium" style="color: #1A1A2E">
         {{ subtotalTexto }}
       </div>
     </div>

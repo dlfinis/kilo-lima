@@ -18,9 +18,7 @@
 //     operator can't sell them (REQ-FIN-30).
 //   - The empty state for "no productos configured for this evento"
 //     surfaces a `Configurar productos` button that routes to
-//     `/eventos/:id/productos` (REQ-FIN-30).
-//   - A `Margen: {evento.margen_ganancia * 100}%` badge reflects the
-//     active evento's default margin (REQ-FIN-29).
+//     `/eventos/:id/gestion` (REQ-FIN-30, event-product-management-refactor).
 //   - `agregarAlCarrito` calls the store with (productoId, 1) — the
 //     store derives precio + costo + margen via usePreciosEvento.
 //   - The PR-2b event-cerrado guard is the existing EVENTO_CERRADO
@@ -72,6 +70,7 @@ import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { estadoEsEditable } from '@/utils/estado'
 import { logInfo } from '@/utils/logger'
 import type {
+  CategoriaProducto,
   GastoImprevistoInput,
   MetodoPago,
   Producto,
@@ -187,10 +186,41 @@ const productosParaGrid = computed(() =>
   productosDelEvento.value.filter((ep) => ep.costo_unitario > 0),
 )
 
+// Filter + sort products by category and ordering. The grid receives
+// already-filtered products (no child-side search logic).
+const productosParaGridFiltrados = computed(() => {
+  let result = productosParaGrid.value
+
+  if (categoriaFiltro.value !== null) {
+    result = result.filter((ep) => ep.producto_categoria === categoriaFiltro.value)
+  }
+
+  if (ordenamiento.value) {
+    const sorted = [...result]
+    switch (ordenamiento.value) {
+      case 'precio_asc':
+        sorted.sort((a, b) => a.precio_final - b.precio_final)
+        break
+      case 'precio_desc':
+        sorted.sort((a, b) => b.precio_final - a.precio_final)
+        break
+      case 'nombre_asc':
+        sorted.sort((a, b) => a.producto_nombre.localeCompare(b.producto_nombre))
+        break
+      case 'nombre_desc':
+        sorted.sort((a, b) => b.producto_nombre.localeCompare(a.producto_nombre))
+        break
+    }
+    result = sorted
+  }
+
+  return result
+})
+
 // mobile-ux-redesign Phase 3: simplified POS grid uses ProductGrid
 // which expects { id, nombre, precio, imagen } shape.
 const productosSimplificados = computed(() =>
-  productosParaGrid.value.map((ep) => ({
+  productosParaGridFiltrados.value.map((ep) => ({
     id: ep.producto_id,
     nombre: ep.producto_nombre,
     precio: ep.precio_final,
@@ -204,7 +234,7 @@ const productosSimplificados = computed(() =>
 // the legacy types so we keep the existing card surface without a
 // breaking change to ProductoCardGrid (REQ-FIN-29).
 const productosMapeados = computed<Producto[]>(() =>
-  productosParaGrid.value.map((ep) => ({
+  productosParaGridFiltrados.value.map((ep) => ({
     id: ep.producto_id,
     receta_id: ep.receta_id,
     // catalog-domain-refactor / Slice 3: commercial product identity
@@ -222,7 +252,7 @@ const productosMapeados = computed<Producto[]>(() =>
   })),
 )
 const recetasParaGrid = computed<RecetaConIngredientes[]>(() =>
-  productosParaGrid.value.map((ep) => ({
+  productosParaGridFiltrados.value.map((ep) => ({
     id: ep.receta_id,
     nombre: ep.producto_nombre,
     descripcion: null,
@@ -265,17 +295,41 @@ const mostrarSinProductos = computed(
   () => !hayProductosParaVender.value && !errorCargaDependencias.value,
 )
 
-// REQ-FIN-29: badge text. evento.margen_ganancia is the default
-// margin (nullable in DB; falls back to "—" when unset).
-const margenBadge = computed(() => {
-  const m = eventoEnCurso.value?.margen_ganancia
-  if (m === null || m === undefined) return null
-  return `${Math.round(m * 100)}%`
-})
-
 const dialogoCrearImprevisto = ref(false)
 
-const busqueda = ref('')
+// Category + sort filter state (replaces text search bar)
+const categoriaFiltro = ref<CategoriaProducto | null>(null)
+type Ordenamiento = 'precio_asc' | 'precio_desc' | 'nombre_asc' | 'nombre_desc'
+const ordenamiento = ref<Ordenamiento | null>(null)
+
+const CATEGORIAS: { value: CategoriaProducto; label: string }[] = [
+  { value: 'dulce', label: 'Dulce' },
+  { value: 'salado', label: 'Salado' },
+  { value: 'helado', label: 'Helado' },
+  { value: 'bebida', label: 'Bebida' },
+]
+
+const OPCIONES_ORDENAMIENTO: { value: Ordenamiento; label: string }[] = [
+  { value: 'precio_asc', label: 'Precio ↑' },
+  { value: 'precio_desc', label: 'Precio ↓' },
+  { value: 'nombre_asc', label: 'Alfabético A-Z' },
+  { value: 'nombre_desc', label: 'Alfabético Z-A' },
+]
+
+const ordenamientoLabel = computed(() => {
+  if (!ordenamiento.value) return 'Ordenar'
+  return OPCIONES_ORDENAMIENTO.find((o) => o.value === ordenamiento.value)?.label ?? 'Ordenar'
+})
+
+const hayFiltrosActivos = computed(
+  () => categoriaFiltro.value !== null || ordenamiento.value !== null,
+)
+
+function limpiarFiltros() {
+  categoriaFiltro.value = null
+  ordenamiento.value = null
+}
+
 const dialogoRegistrarAbierto = ref(false)
 
 // pos-redesign (REQ-POS-COMPROBANTE-1, REQ-POS-14): the just-registered
@@ -423,7 +477,7 @@ function manejarAgregar(productoId: string) {
 
 function irAConfigurarProductos() {
   if (!eventoEnCurso.value) return
-  router.push(`/eventos/${eventoEnCurso.value.id}/productos`)
+  router.push(`/eventos/${eventoEnCurso.value.id}/gestion`)
 }
 
 // UX: inline quick-init — bulk-add all catalog products to the
@@ -558,38 +612,40 @@ async function reintentarHistorial() {
       >
         Historial
       </v-btn>
-      <!-- Margen badge: compact, inline -->
-      <v-chip
-        v-if="margenBadge"
-        size="x-small"
-        color="primary"
-        variant="tonal"
-        data-testid="pos-margen-badge"
-      >
-        {{ margenBadge }}
-      </v-chip>
       <!-- Gastos imprevistos: quick-access menu -->
       <v-menu v-if="eventoEnCurso" :close-on-content-click="false" location="bottom end">
         <template #activator="{ props: menuProps }">
+          <v-badge
+            v-if="totalImprevistos > 0"
+            :content="`$${totalImprevistos.toFixed(0)}`"
+            color="error"
+          >
+            <template #default>
+              <v-btn
+                v-bind="menuProps"
+                size="small"
+                variant="text"
+                color="warning"
+                data-testid="pos-imprevistos-btn"
+              >
+                <v-icon size="22">mdi-receipt-text-plus</v-icon>
+              </v-btn>
+            </template>
+          </v-badge>
           <v-btn
+            v-else
             v-bind="menuProps"
-            icon="mdi-cash-remove"
-            size="x-small"
+            size="small"
             variant="text"
             color="warning"
             data-testid="pos-imprevistos-btn"
           >
-            <v-badge
-              v-if="totalImprevistos > 0"
-              :content="`$${totalImprevistos.toFixed(0)}`"
-              color="error"
-              inline
-            />
+            <v-icon size="22">mdi-receipt-text-plus</v-icon>
           </v-btn>
         </template>
         <v-card min-width="320" max-width="400" data-testid="pos-imprevistos-menu">
           <v-card-title class="d-flex align-center text-body-1">
-            <v-icon class="mr-2">mdi-cash-remove</v-icon>
+            <v-icon class="mr-2">mdi-receipt-text-plus</v-icon>
             Gastos imprevistos
             <v-spacer />
             <v-chip size="x-small" data-testid="pos-imprevistos-total">
@@ -728,19 +784,72 @@ async function reintentarHistorial() {
         :cargando="cargandoVentas"
       />
 
-      <!-- REQ-POS-23: search input. Clean, rounded, light weight. -->
+      <!-- Category filters and sort controls -->
       <div class="mb-4">
-        <v-text-field
-          v-model="busqueda"
-          placeholder="Buscar producto…"
-          prepend-inner-icon="mdi-magnify"
-          variant="outlined"
-          density="compact"
-          hide-details
-          clearable
-          data-testid="pos-buscar"
-          class="pos-search"
-        />
+        <div class="d-flex align-center ga-2 flex-wrap">
+          <!-- Category chips -->
+          <v-chip
+            :color="categoriaFiltro === null ? 'primary' : undefined"
+            :variant="categoriaFiltro === null ? 'flat' : 'tonal'"
+            size="small"
+            data-testid="pos-filter-todos"
+            @click="categoriaFiltro = null"
+          >
+            Todos
+          </v-chip>
+          <v-chip
+            v-for="cat in CATEGORIAS"
+            :key="cat.value"
+            :color="categoriaFiltro === cat.value ? 'primary' : undefined"
+            :variant="categoriaFiltro === cat.value ? 'flat' : 'tonal'"
+            size="small"
+            :data-testid="`pos-filter-${cat.value}`"
+            @click="categoriaFiltro = categoriaFiltro === cat.value ? null : cat.value"
+          >
+            {{ cat.label }}
+          </v-chip>
+
+          <v-spacer />
+
+          <!-- Sort dropdown -->
+          <v-menu>
+            <template #activator="{ props: menuProps }">
+              <v-btn
+                v-bind="menuProps"
+                size="small"
+                variant="tonal"
+                :color="ordenamiento ? 'primary' : undefined"
+                prepend-icon="mdi-sort"
+                data-testid="pos-sort-btn"
+              >
+                {{ ordenamientoLabel }}
+              </v-btn>
+            </template>
+            <v-list density="compact">
+              <v-list-item
+                v-for="opcion in OPCIONES_ORDENAMIENTO"
+                :key="opcion.value"
+                :active="ordenamiento === opcion.value"
+                @click="ordenamiento = ordenamiento === opcion.value ? null : opcion.value"
+              >
+                <v-list-item-title>{{ opcion.label }}</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+
+          <!-- Clear filters button -->
+          <v-btn
+            v-if="hayFiltrosActivos"
+            size="small"
+            variant="text"
+            color="error"
+            prepend-icon="mdi-filter-remove"
+            data-testid="pos-clear-filters"
+            @click="limpiarFiltros"
+          >
+            Limpiar
+          </v-btn>
+        </div>
       </div>
 
       <!-- REQ-POS-49: loading state. -->
@@ -841,7 +950,6 @@ async function reintentarHistorial() {
           <v-col cols="12" sm="12" md="8" lg="9" data-testid="pos-products-col">
             <ProductGrid
               :productos="productosSimplificados"
-              :busqueda="busqueda"
               @add-to-cart="manejarAgregar"
             />
           </v-col>
@@ -884,7 +992,6 @@ async function reintentarHistorial() {
           <ProductoCardGrid
             :productos="productosMapeados"
             :recetas="recetasParaGrid"
-            :busqueda="busqueda"
             @agregar="manejarAgregar"
           />
         </v-col>
@@ -978,12 +1085,5 @@ async function reintentarHistorial() {
   background: rgba(var(--v-theme-surface-variant), 0.4);
   border-radius: 6px;
   min-height: 36px;
-}
-
-.pos-search :deep(.v-field__outline) {
-  --v-field-border-opacity: 0.25;
-}
-.pos-search :deep(.v-field) {
-  border-radius: 8px;
 }
 </style>

@@ -154,7 +154,7 @@ async function mountView() {
     history: createMemoryHistory(),
     routes: [
       { path: '/pos', name: 'pos', component: PosView },
-      { path: '/eventos/:id/productos', name: 'evento-productos', component: { template: '<div/>' } },
+      { path: '/eventos/:id/gestion', name: 'evento-gestion', component: { template: '<div/>' } },
     ],
   })
   await router.push('/pos')
@@ -598,12 +598,10 @@ describe('PosView — PR-2b producto filtering (REQ-FIN-28, REQ-FIN-30)', () => 
     })
   })
 
-  it('"Configurar productos" button click calls router.push with the event products route', async () => {
-    // PR-2b: the operator's path from a "no productos" POS grid is to
-    // /eventos/:id/productos. We verify the wiring by actually clicking
-    // the button and spying on router.push — the real-browser verify
-    // script (scripts/verify-finanzas-pr2b.mjs) covers the full
-    // click→navigate flow against a live dev server.
+  it('"Configurar productos" button click calls router.push with the event gestion route', async () => {
+    // PR-2b + event-product-management-refactor: the operator's path from
+    // a "no productos" POS grid is to /eventos/:id/gestion. We verify the
+    // wiring by actually clicking the button and spying on router.push.
     sembrarEventoEnCurso()
     __pushSupabaseResponse<Producto[]>({ data: [], error: null })
     __pushSupabaseResponse<RecetaConIngredientes[]>({ data: [], error: null })
@@ -615,7 +613,7 @@ describe('PosView — PR-2b producto filtering (REQ-FIN-28, REQ-FIN-30)', () => 
       expect(boton.exists()).toBe(true)
       await boton.trigger('click')
       await flushPromises()
-      expect(spy).toHaveBeenCalledWith('/eventos/e-1/productos')
+      expect(spy).toHaveBeenCalledWith('/eventos/e-1/gestion')
     })
   })
 
@@ -1514,10 +1512,10 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
       const { wrapper } = await mountView()
       await flushPromises()
       // In simplified mode, the old ProductoCardGrid should not be visible
-      // (the simplified ProductGrid replaces it). Search is now parent-owned
-      // via the pos-buscar input passed as :busqueda prop to ProductGrid.
-      const searchInput = wrapper.find('[data-testid="pos-buscar"]')
-      expect(searchInput.exists()).toBe(true)
+      // (the simplified ProductGrid replaces it). Filter chips replace
+      // the old search bar for category/sort filtering.
+      const filterChips = wrapper.find('[data-testid="pos-filtro-todos"]')
+      expect(filterChips.exists()).toBe(true)
     })
   })
 

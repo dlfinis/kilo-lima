@@ -1,7 +1,7 @@
 // mobile-ux-redesign Phase 3: ProductGrid — responsive grid of
 // ProductButton components for the simplified POS mode. Emits
-// 'add-to-cart' when a product is clicked. Accepts optional
-// `busqueda` prop for external search control.
+// 'add-to-cart' when a product is clicked. Receives already-filtered
+// products from the parent (no internal search).
 import { describe, expect, it } from 'vitest'
 import { mount } from '@vue/test-utils'
 import { createVuetify } from 'vuetify'
@@ -48,40 +48,12 @@ describe('ProductGrid', () => {
     expect(searchInput.exists()).toBe(false)
   })
 
-  it('filters products by busqueda prop (external search)', async () => {
-    const wrapper = mountGrid({ busqueda: 'Brown' })
-    const buttons = wrapper.findAllComponents(ProductButton)
-    expect(buttons).toHaveLength(1)
-    expect(wrapper.text()).toContain('Brownies')
-  })
-
-  it('filters case-insensitively via busqueda prop', () => {
-    const wrapper = mountGrid({ busqueda: 'brown' })
-    const buttons = wrapper.findAllComponents(ProductButton)
-    expect(buttons).toHaveLength(1)
-  })
-
-  it('shows all products when busqueda is empty', () => {
-    let wrapper = mountGrid({ busqueda: 'ch' })
-    expect(wrapper.findAllComponents(ProductButton)).toHaveLength(1)
-    wrapper = mountGrid({ busqueda: '' })
-    expect(wrapper.findAllComponents(ProductButton)).toHaveLength(5)
-  })
-
-  it('shows all products when busqueda prop is omitted', () => {
+  it('renders all provided products (filtering is parent responsibility)', () => {
     const wrapper = mountGrid()
     expect(wrapper.findAllComponents(ProductButton)).toHaveLength(5)
   })
 
-  it('shows empty state message when no products match busqueda', () => {
-    const wrapper = mountGrid({ busqueda: 'xyznotfound' })
-    expect(wrapper.findAllComponents(ProductButton)).toHaveLength(0)
-    expect(wrapper.find('[data-testid="product-grid-empty"]').text()).toContain(
-      'No hay productos que coincidan con "xyznotfound"',
-    )
-  })
-
-  it('shows empty state message when productos array is empty', () => {
+  it('shows empty state when productos array is empty', () => {
     const wrapper = mountGrid({ productos: [] })
     expect(wrapper.findAllComponents(ProductButton)).toHaveLength(0)
     expect(wrapper.text()).toContain('Sin productos')
@@ -91,7 +63,6 @@ describe('ProductGrid', () => {
     const wrapper = mountGrid()
     const gridContainer = wrapper.find('.product-grid')
     expect(gridContainer.exists()).toBe(true)
-    // The row should exist containing the grid columns
     expect(wrapper.find('.v-row').exists()).toBe(true)
   })
 })
