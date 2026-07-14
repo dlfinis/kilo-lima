@@ -823,35 +823,20 @@ async function confirmarEliminar() {
         </v-card-text>
       </v-card>
 
-      <!-- Analysis Summary -->
-      <v-row v-if="analisisProductos.length > 0" dense class="mb-4">
-        <v-col cols="12" sm="6">
-          <v-card data-testid="ventas-analisis-total-ventas">
-            <v-card-text>
-              <div class="text-caption text-medium-emphasis">Total de ventas (análisis)</div>
-              <div class="text-h5 font-weight-bold">
-                {{ formatearUSD(analisisTotalVentas) }}
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-        <v-col cols="12" sm="6">
-          <v-card data-testid="ventas-analisis-cantidad-items">
-            <v-card-text>
-              <div class="text-caption text-medium-emphasis">Cantidad de items (análisis)</div>
-              <div class="text-h5 font-weight-bold">
-                {{ analisisCantidadItems }}
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
-      </v-row>
-
       <!-- Analysis Table -->
       <v-card v-if="analisisProductos.length > 0" data-testid="ventas-analisis-productos">
         <v-card-title class="d-flex align-center">
           <v-icon class="mr-2">mdi-chart-bar</v-icon>
           Análisis por producto
+          <v-spacer />
+          <div class="d-flex align-center ga-3">
+            <v-chip size="small" color="primary" variant="tonal">
+              {{ formatearUSD(analisisTotalVentas) }}
+            </v-chip>
+            <v-chip size="small" variant="tonal">
+              {{ analisisCantidadItems }} items
+            </v-chip>
+          </div>
         </v-card-title>
         <v-divider />
         <v-table density="compact">
