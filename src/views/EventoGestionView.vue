@@ -21,9 +21,11 @@ import { computed, nextTick, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import EventoStatusChip from '@/components/business/EventoStatusChip.vue'
+import IngredientesEventoPanel from '@/components/business/IngredientesEventoPanel.vue'
 import MargenSlider from '@/components/business/MargenSlider.vue'
 import ProyeccionCostosCard from '@/components/business/ProyeccionCostosCard.vue'
 import { useEvents } from '@/composables/useEvents'
+import { useIngredientesEvento } from '@/composables/useIngredientesEvento'
 import { useProyeccionCostos } from '@/composables/useProyeccionCostos'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { useProductoProduccionStore } from '@/stores/productoProduccion.store'
@@ -53,6 +55,7 @@ const productosStore = useProductosStore()
 const recipesStore = useRecipesStore()
 const ingredientsStore = useIngredientsStore()
 const proyeccion = useProyeccionCostos(eventoId)
+const ingredientesEvento = useIngredientesEvento(eventoId)
 
 // Editable gate based on evento state.
 const editable = computed(() =>
@@ -612,6 +615,8 @@ const inversionTotal = computed<number>(() => {
               </span>
             </template>
           </v-data-table>
+
+          <IngredientesEventoPanel :resultado="ingredientesEvento" />
         </v-card>
 
         <!-- Projection rail -->

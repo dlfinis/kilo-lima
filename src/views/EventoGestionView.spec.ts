@@ -11,7 +11,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { mount, flushPromises } from '@vue/test-utils'
 import { createPinia, setActivePinia } from 'pinia'
-import { createApp, type App } from 'vue'
+import { createApp, type App, nextTick } from 'vue'
 import { createVuetify } from 'vuetify'
 import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
@@ -28,6 +28,7 @@ import type {
 } from '@/types'
 import EventoGestionView from './EventoGestionView.vue'
 import { useEventsStore } from '@/stores/events.store'
+import { useProductoProduccionStore } from '@/stores/productoProduccion.store'
 import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
@@ -78,7 +79,7 @@ const mkReceta = (id: string, rendimiento = 1): RecetaConIngredientes => ({
   ingredientes: [],
 })
 
-const mkMateria = (id: string, costo: number): MateriaPrima => ({
+const mkMateria = (id: string, costo: number, disponible?: number): MateriaPrima => ({
   id,
   nombre: `MP ${id}`,
   unidad: 'kg',
@@ -86,6 +87,7 @@ const mkMateria = (id: string, costo: number): MateriaPrima => ({
   notas: null,
   created_at: '2026-06-20T00:00:00Z',
   updated_at: '2026-06-20T00:00:00Z',
+  cantidad_disponible: disponible,
 })
 
 let aplicacion: App
@@ -261,5 +263,125 @@ describe('EventoGestionView', () => {
     const totalUnidades = wrapper.find('[data-testid="evento-gestion-total-unidades"]')
     expect(totalUnidades.exists()).toBe(true)
     expect(totalUnidades.text()).toContain('30')
+  })
+
+  // --- Phase 4: ingredient purchasing panel integration ---
+
+  it('renders the ingredient purchasing panel when derivation data exists', async () => {
+    await conContexto(async () => {
+      const evStore = useEventsStore()
+      evStore.eventos.push(mkEvento('e-1'))
+    })
+    await prepararCatalogo()
+    // Assign available stock to mp-1 so the consolidated table shows
+    // a purchase gap (requerido 10 − disponible 3 = 7 faltante).
+    await conContexto(async () => {
+      const ingStore = useIngredientsStore()
+      const mp = ingStore.materiasPrimas.find((m) => m.id === 'mp-1')
+      if (mp) mp.cantidad_disponible = 3
+    })
+    __pushSupabaseResponse<EventoProducto[]>({
+      data: [mkEP({ id: 'ep-1', producto_id: 'p-1', incluido: true })],
+      error: null,
+    })
+    __pushSupabaseResponse<ProductoProduccion[]>({
+      data: [mkPP({ evento_producto_id: 'ep-1', unidades_a_producir: 10 })],
+      error: null,
+    })
+
+    const wrapper = await mountView('e-1')
+    await flushPromises()
+
+    // ingredient derivation: (1 / 1) × 10 = 10 required for mp-1,
+    // with 3 available → faltante 7.
+    expect(wrapper.find('[data-testid="ingredientes-panels"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="ingredientes-consolidado-panel"]').exists()).toBe(true)
+    expect(wrapper.find('[data-testid="ingredientes-producto-panel-ep-1"]').exists()).toBe(true)
+
+    // Title text is always rendered (even when collapsed).
+    const body = document.body.textContent ?? ''
+    expect(body).toContain('Resumen de compras')
+    expect(body).toContain('Café latte')
+
+    // Expand the consolidated panel to check table content.
+    const consolTitle = wrapper.find(
+      '[data-testid="ingredientes-consolidado-panel"] .v-expansion-panel-title',
+    )
+    await consolTitle.trigger('click')
+    await nextTick()
+
+    const bodyExpanded = document.body.textContent ?? ''
+    expect(bodyExpanded).toContain('MP mp-1')
+    expect(bodyExpanded).toContain('10.00')
+    expect(bodyExpanded).toContain('3.00')
+    expect(bodyExpanded).toContain('7.00')
+  })
+
+  it('shows the empty ingredient state when no derivation data is available', async () => {
+    await conContexto(async () => {
+      const evStore = useEventsStore()
+      evStore.eventos.push(mkEvento('e-1'))
+    })
+    await prepararCatalogo()
+    // EP included but no production units → no ingredient requirements derived.
+    __pushSupabaseResponse<EventoProducto[]>({
+      data: [mkEP({ id: 'ep-1', producto_id: 'p-1', incluido: true })],
+      error: null,
+    })
+    __pushSupabaseResponse<ProductoProduccion[]>({ data: [], error: null })
+
+    const wrapper = await mountView('e-1')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="ingredientes-empty"]').exists()).toBe(true)
+  })
+
+  it('reactively re-derives ingredient requirements after production unit changes', async () => {
+    await conContexto(async () => {
+      const evStore = useEventsStore()
+      evStore.eventos.push(mkEvento('e-1'))
+    })
+    await prepararCatalogo()
+    __pushSupabaseResponse<EventoProducto[]>({
+      data: [mkEP({ id: 'ep-1', producto_id: 'p-1', incluido: true })],
+      error: null,
+    })
+    __pushSupabaseResponse<ProductoProduccion[]>({
+      data: [mkPP({ evento_producto_id: 'ep-1', unidades_a_producir: 5 })],
+      error: null,
+    })
+
+    const wrapper = await mountView('e-1')
+    await flushPromises()
+
+    // Expand the consolidated panel to read table content.
+    const consolTitle = wrapper.find(
+      '[data-testid="ingredientes-consolidado-panel"] .v-expansion-panel-title',
+    )
+    await consolTitle.trigger('click')
+    await nextTick()
+
+    // Initial: 5 units → (1/1) × 5 = 5 required, 0 disponible → 5 faltante.
+    let body = document.body.textContent ?? ''
+    expect(body).toContain('5.00')
+
+    // Mutate the store: bump production to 30 units.
+    await conContexto(async () => {
+      const ppStore = useProductoProduccionStore()
+      const rows = ppStore.produccionPorEvento.get('e-1') ?? []
+      ppStore.produccionPorEvento.set(
+        'e-1',
+        rows.map((r) =>
+          r.evento_producto_id === 'ep-1'
+            ? { ...r, unidades_a_producir: 30 }
+            : r,
+        ),
+      )
+    })
+    await nextTick()
+
+    // After reactivity: 30 units → 30 required.
+    body = document.body.textContent ?? ''
+    expect(body).toContain('30.00')
   })
 })
