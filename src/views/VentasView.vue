@@ -78,7 +78,7 @@ async function cargarDatos() {
 onMounted(async () => {
   // Load events if not already loaded
   if (eventsStore.eventos.length === 0) {
-    await eventsStore.cargar()
+    await eventsStore.cargarTodas()
   }
   
   // Auto-select active event if available
