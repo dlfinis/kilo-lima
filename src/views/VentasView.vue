@@ -158,17 +158,23 @@ const CATEGORIAS_PRODUCTO = [
 const analisisProductos = computed(() => {
   let ventasParaAnalisis = ventasDelEvento.value
   
-  // Apply analysis date filter
+  // Apply analysis date filter (use local date comparison like ventasFiltradas)
   if (analisisFiltroFechaInicio.value) {
-    const inicio = new Date(analisisFiltroFechaInicio.value)
-    inicio.setHours(0, 0, 0, 0)
-    ventasParaAnalisis = ventasParaAnalisis.filter((v) => new Date(v.fecha) >= inicio)
+    const [year, month, day] = analisisFiltroFechaInicio.value.split('-').map(Number)
+    const inicio = new Date(year, month - 1, day, 0, 0, 0, 0)
+    ventasParaAnalisis = ventasParaAnalisis.filter((v) => {
+      const ventaDate = new Date(v.fecha)
+      return ventaDate >= inicio
+    })
   }
   
   if (analisisFiltroFechaFin.value) {
-    const fin = new Date(analisisFiltroFechaFin.value)
-    fin.setHours(23, 59, 59, 999)
-    ventasParaAnalisis = ventasParaAnalisis.filter((v) => new Date(v.fecha) <= fin)
+    const [year, month, day] = analisisFiltroFechaFin.value.split('-').map(Number)
+    const fin = new Date(year, month - 1, day, 23, 59, 59, 999)
+    ventasParaAnalisis = ventasParaAnalisis.filter((v) => {
+      const ventaDate = new Date(v.fecha)
+      return ventaDate <= fin
+    })
   }
   
   const productoMap = new Map<string, { nombre: string; cantidad: number; total: number; categoria: string | null }>()
