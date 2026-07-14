@@ -40,6 +40,11 @@ vi.mock('@/composables/useInventario', () => {
   return {
     useInventario: () => ({
       items: ref(INGREDIENTES_RAW),
+      stockDisponible: computed(() => new Map<string, number>([
+        ['mp-1', 5],
+        ['mp-2', 30],
+        ['mp-3', 200],
+      ])),
       necesidadTotal: computed(() => NECESIDAD_MAP),
       stockCritico: computed(() => 1),
       unidadesPosiblesPorProducto: computed(() => new Map()),

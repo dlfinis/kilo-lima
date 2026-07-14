@@ -8,7 +8,7 @@ import { useInventario, type AlertLevel } from '@/composables/useInventario'
 import StockAlertItem from './StockAlertItem.vue'
 import type { StockAlertItemProps } from './StockAlertItem.vue'
 
-const { items, necesidadTotal, alertLevel } = useInventario()
+const { items, stockDisponible, necesidadTotal, alertLevel } = useInventario()
 
 const alertPriority: Record<AlertLevel, number> = {
   'crítico': 0,
@@ -19,7 +19,7 @@ const alertPriority: Record<AlertLevel, number> = {
 const sortedItems = computed<StockAlertItemProps[]>(() =>
   [...items.value]
     .map((mp) => {
-      const disponible = mp.cantidad_disponible ?? 0
+      const disponible = stockDisponible.value.get(mp.id) ?? 0
       const necesidad = necesidadTotal.value.get(mp.id) ?? 0
       return {
         nombre: mp.nombre,

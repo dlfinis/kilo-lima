@@ -15,21 +15,12 @@ const props = defineProps<{
   }
 }>()
 
-const { items } = useInventario()
+const { items, stockDisponible } = useInventario()
 
-/** Stock map: materia_prima_id → cantidad_disponible */
-const stockMap = computed<Map<string, number>>(() => {
-  const map = new Map<string, number>()
-  for (const mp of items.value) {
-    map.set(mp.id, mp.cantidad_disponible ?? 0)
-  }
-  return map
-})
-
-/** Maximum producible units for this product's recipe. */
+/** Maximum producible units for this product's recipe, using ledger-derived stock. */
 const capacidad = computed<number>(() => {
   if (props.producto.receta.length === 0) return 0
-  return unidadesPosibles(stockMap.value, props.producto.receta)
+  return unidadesPosibles(stockDisponible.value, props.producto.receta)
 })
 
 /** Identify which ingredient limits production the most. */
@@ -40,7 +31,7 @@ const limitante = computed<{ nombre: string; sobraPara: number } | null>(() => {
   let minIngrediente: { nombre: string; sobraPara: number } | null = null
 
   for (const ing of props.producto.receta) {
-    const disponible = stockMap.value.get(ing.materia_prima_id) ?? 0
+    const disponible = stockDisponible.value.get(ing.materia_prima_id) ?? 0
     const cantidadNecesaria = ing.cantidad
     if (cantidadNecesaria <= 0) continue
 

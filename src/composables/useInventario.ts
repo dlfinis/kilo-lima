@@ -6,6 +6,7 @@ import type { MateriaPrima } from '@/types'
 
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useRecipesStore } from '@/stores/recipes.store'
+import { useStockMovementsStore } from '@/stores/stockMovements.store'
 
 // -----------------------------------------------------------------------
 // Pure functions — exported for unit testing
@@ -75,9 +76,24 @@ export function unidadesPosibles(
 export function useInventario() {
   const ingredientsStore = useIngredientsStore()
   const recipesStore = useRecipesStore()
+  const stockMovementsStore = useStockMovementsStore()
 
   /** All ingredients from the store. */
   const items = computed<MateriaPrima[]>(() => ingredientsStore.materiasPrimas)
+
+  /**
+   * Ledger-derived stock: materia_prima_id → stock_actual.
+   * Reads from the movement ledger (DerivedStock), not from
+   * MateriaPrima.cantidad_disponible.
+   * Falls back to 0 when no ledger entry exists for a material.
+   */
+  const stockDisponible = computed<Map<string, number>>(() => {
+    const map = new Map<string, number>()
+    for (const entry of stockMovementsStore.stockActual) {
+      map.set(entry.materia_prima_id, entry.stock_actual)
+    }
+    return map
+  })
 
   /**
    * Total ingredient need summed across all recipes.
@@ -96,13 +112,14 @@ export function useInventario() {
 
   /**
    * Count of ingredients whose alert level is 'crítico'.
-   * Uses necesidadTotal as the stockNecesario parameter.
-   * Ingredients not used in any recipe have necesidad=0 → alertLevel returns 'normal'.
+   * Stock is ledger-derived (stockDisponible); need comes from
+   * necesidadTotal. Ingredients not in any recipe have
+   * necesidad=0 → alertLevel returns 'normal'.
    */
   const stockCritico = computed<number>(() => {
     let count = 0
     for (const mp of ingredientsStore.materiasPrimas) {
-      const disponible = mp.cantidad_disponible ?? 0
+      const disponible = stockDisponible.value.get(mp.id) ?? 0
       const necesidad = necesidadTotal.value.get(mp.id) ?? 0
       if (alertLevel(disponible, necesidad) === 'crítico') {
         count++
@@ -113,17 +130,14 @@ export function useInventario() {
 
   /**
    * Map of receta_id → producible units.
-   * For each recipe, computes min(stock_i / cantidad_i) across ingredients.
-   * Recipes with no ingredients or missing stock return 0.
+   * For each recipe, computes min(stock_i / cantidad_i) across ingredients
+   * using ledger-derived stock. Recipes with no ingredients or
+   * missing stock return 0.
    */
   const unidadesPosiblesPorProducto = computed<Map<string, number>>(() => {
     const map = new Map<string, number>()
-    const stock = new Map<string, number>()
-    for (const mp of ingredientsStore.materiasPrimas) {
-      stock.set(mp.id, mp.cantidad_disponible ?? 0)
-    }
     for (const receta of recipesStore.recetas) {
-      const units = unidadesPosibles(stock, receta.ingredientes)
+      const units = unidadesPosibles(stockDisponible.value, receta.ingredientes)
       map.set(receta.id, units)
     }
     return map
@@ -131,6 +145,7 @@ export function useInventario() {
 
   return {
     items,
+    stockDisponible,
     necesidadTotal,
     stockCritico,
     unidadesPosiblesPorProducto,

@@ -14,7 +14,8 @@ import {
 } from './useInventario'
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useRecipesStore } from '@/stores/recipes.store'
-import type { Database, MateriaPrima, RecetaConIngredientes } from '@/types'
+import { useStockMovementsStore } from '@/stores/stockMovements.store'
+import type { Database, DerivedStock, MateriaPrima, RecetaConIngredientes } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Task 4.7 — alertLevel
@@ -210,18 +211,29 @@ describe('useInventario (store-integrated)', () => {
     })
   })
 
-  it('stockCritico counts items with alert level crítico', () => {
+  it('stockCritico counts items with alert level crítico — ledger-backed stock', () => {
     conContexto(() => {
       const ingStore = useIngredientsStore()
       const recStore = useRecipesStore()
+      const stockStore = useStockMovementsStore()
 
-      // 10 / 100 = 10% → crítico
-      ingStore.materiasPrimas.push(mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 10 }))
-      ingStore.materiasPrimas.push(mkMateria('mp-2', { nombre: 'Azúcar', cantidad_disponible: 200 }))
-      ingStore.materiasPrimas.push(mkMateria('mp-3', { nombre: 'Huevos', cantidad_disponible: 5 }))
+      // Ingredients: cantidad_disponible is the OLD field; stockActual from
+      // ledger should be preferred. Set them to DIFFERENT values to prove
+      // the composable reads the ledger.
+      ingStore.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 9999 }),
+        mkMateria('mp-2', { nombre: 'Azúcar', cantidad_disponible: 9999 }),
+        mkMateria('mp-3', { nombre: 'Huevos', cantidad_disponible: 9999 }),
+      )
 
-      // Recipe needs 100 of each → Harina at 10%, Huevos at 5% → crítico
-      // Azúcar well above 50% → normal
+      // Ledger says: Harina=10, Azúcar=200, Huevos=5
+      stockStore.stockActual = [
+        { materia_prima_id: 'mp-1', nombre: 'Harina', unidad: 'kg', stock_actual: 10 },
+        { materia_prima_id: 'mp-2', nombre: 'Azúcar', unidad: 'kg', stock_actual: 200 },
+        { materia_prima_id: 'mp-3', nombre: 'Huevos', unidad: 'unidad', stock_actual: 5 },
+      ]
+
+      // Recipe needs 100 of each
       recStore.recetas.push(mkReceta('rec-1', {
         ingredientes: [
           { id: 'ri-1', receta_id: 'rec-1', materia_prima_id: 'mp-1', cantidad: 100, created_at: '' },
@@ -238,13 +250,23 @@ describe('useInventario (store-integrated)', () => {
     })
   })
 
-  it('stockCritico is 0 when all ingredients have normal stock', () => {
+  it('stockCritico is 0 when all ingredients have normal stock — ledger-backed', () => {
     conContexto(() => {
       const ingStore = useIngredientsStore()
       const recStore = useRecipesStore()
+      const stockStore = useStockMovementsStore()
 
-      ingStore.materiasPrimas.push(mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 1000 }))
-      ingStore.materiasPrimas.push(mkMateria('mp-2', { nombre: 'Azúcar', cantidad_disponible: 800 }))
+      // Ingredients with high flat cantidad_disponible
+      ingStore.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 1000 }),
+        mkMateria('mp-2', { nombre: 'Azúcar', cantidad_disponible: 800 }),
+      )
+
+      // Ledger confirms high stock too
+      stockStore.stockActual = [
+        { materia_prima_id: 'mp-1', nombre: 'Harina', unidad: 'kg', stock_actual: 1000 },
+        { materia_prima_id: 'mp-2', nombre: 'Azúcar', unidad: 'kg', stock_actual: 800 },
+      ]
 
       // Recipe needs 100 each → both at 800%+ → normal
       recStore.recetas.push(mkReceta('rec-1', {
@@ -259,16 +281,24 @@ describe('useInventario (store-integrated)', () => {
     })
   })
 
-  it('unidadesPosiblesPorProducto calculates capacity per product recipe', () => {
+  it('unidadesPosiblesPorProducto calculates capacity from ledger stock', () => {
     conContexto(() => {
       const ingStore = useIngredientsStore()
       const recStore = useRecipesStore()
+      const stockStore = useStockMovementsStore()
 
-      // Stock: 500g harina, 200g azúcar
+      // Ingredients: cantidad_disponible set to DIFFERENT (old) values —
+      // the composable must use ledger stock instead
       ingStore.materiasPrimas.push(
-        mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 500 }),
-        mkMateria('mp-2', { nombre: 'Azúcar', cantidad_disponible: 200 }),
+        mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 9999 }),
+        mkMateria('mp-2', { nombre: 'Azúcar', cantidad_disponible: 9999 }),
       )
+
+      // Ledger: 500g harina, 200g azúcar
+      stockStore.stockActual = [
+        { materia_prima_id: 'mp-1', nombre: 'Harina', unidad: 'g', stock_actual: 500 },
+        { materia_prima_id: 'mp-2', nombre: 'Azúcar', unidad: 'g', stock_actual: 200 },
+      ]
 
       // Recipe: Brownies needs 200g harina + 100g azúcar
       recStore.recetas.push(mkReceta('rec-1', {
@@ -287,15 +317,22 @@ describe('useInventario (store-integrated)', () => {
     })
   })
 
-  it('unidadesPosiblesPorProducto returns 0 when an ingredient is out of stock', () => {
+  it('unidadesPosiblesPorProducto returns 0 when an ingredient is out of stock — ledger-backed', () => {
     conContexto(() => {
       const ingStore = useIngredientsStore()
       const recStore = useRecipesStore()
+      const stockStore = useStockMovementsStore()
 
       ingStore.materiasPrimas.push(
-        mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 0 }),
+        mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 9999 }),
         mkMateria('mp-2', { nombre: 'Azúcar', cantidad_disponible: 200 }),
       )
+
+      // Ledger: Harina has 0 stock
+      stockStore.stockActual = [
+        { materia_prima_id: 'mp-1', nombre: 'Harina', unidad: 'g', stock_actual: 0 },
+        { materia_prima_id: 'mp-2', nombre: 'Azúcar', unidad: 'g', stock_actual: 200 },
+      ]
 
       recStore.recetas.push(mkReceta('rec-1', {
         ingredientes: [
@@ -320,6 +357,148 @@ describe('useInventario (store-integrated)', () => {
       store.materiasPrimas.push(mkMateria('mp-1', { nombre: 'Nuevo' }))
       expect(items.value).toHaveLength(1)
       expect(items.value[0]!.nombre).toBe('Nuevo')
+    })
+  })
+
+  // ---- Work Unit 4: ledger-backed stock ----
+
+  it('stockDisponible reflects ledger stock and ignores cantidad_disponible', () => {
+    conContexto(() => {
+      const ingStore = useIngredientsStore()
+      const stockStore = useStockMovementsStore()
+
+      ingStore.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 500 }),
+        mkMateria('mp-2', { nombre: 'Azúcar', cantidad_disponible: 200 }),
+      )
+
+      // Ledger says: Harina=300, Azúcar=100 — different from cantidad_disponible
+      stockStore.stockActual = [
+        { materia_prima_id: 'mp-1', nombre: 'Harina', unidad: 'g', stock_actual: 300 },
+        { materia_prima_id: 'mp-2', nombre: 'Azúcar', unidad: 'g', stock_actual: 100 },
+      ]
+
+      const { stockDisponible } = useInventario()
+      expect(stockDisponible.value.get('mp-1')).toBe(300)
+      expect(stockDisponible.value.get('mp-2')).toBe(100)
+    })
+  })
+
+  it('stockDisponible returns 0 for ingredients with no ledger entry', () => {
+    conContexto(() => {
+      const ingStore = useIngredientsStore()
+      const stockStore = useStockMovementsStore()
+
+      // Ingredient with high flat value but NO ledger entry
+      ingStore.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Huevos', cantidad_disponible: 999 }),
+      )
+
+      // Ledger has NO entry for mp-1
+      stockStore.stockActual = []
+
+      const { stockDisponible, stockCritico } = useInventario()
+      // Falls back to 0, NOT to cantidad_disponible
+      expect(stockDisponible.value.get('mp-1')).toBeUndefined()
+      // stockCritico should see 0 stock (but no recipe needs it → normal)
+      expect(stockCritico.value).toBe(0)
+    })
+  })
+
+  it('stockCritico uses ledger stock, not cantidad_disponible — regression gate', () => {
+    conContexto(() => {
+      const ingStore = useIngredientsStore()
+      const recStore = useRecipesStore()
+      const stockStore = useStockMovementsStore()
+
+      // Flat DB says: all fine (high stock)
+      ingStore.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 500 }),
+        mkMateria('mp-2', { nombre: 'Azúcar', cantidad_disponible: 500 }),
+      )
+
+      // But ledger reveals: both are critically low
+      stockStore.stockActual = [
+        { materia_prima_id: 'mp-1', nombre: 'Harina', unidad: 'g', stock_actual: 10 },
+        { materia_prima_id: 'mp-2', nombre: 'Azúcar', unidad: 'g', stock_actual: 10 },
+      ]
+
+      recStore.recetas.push(mkReceta('rec-1', {
+        ingredientes: [
+          { id: 'ri-1', receta_id: 'rec-1', materia_prima_id: 'mp-1', cantidad: 100, created_at: '' },
+          { id: 'ri-2', receta_id: 'rec-1', materia_prima_id: 'mp-2', cantidad: 100, created_at: '' },
+        ],
+      }))
+
+      const { stockCritico } = useInventario()
+      // 10/100 = 10% → crítico for both
+      expect(stockCritico.value).toBe(2)
+    })
+  })
+
+  it('unidadesPosiblesPorProducto uses ledger stock — regression gate', () => {
+    conContexto(() => {
+      const ingStore = useIngredientsStore()
+      const recStore = useRecipesStore()
+      const stockStore = useStockMovementsStore()
+
+      // Flat DB says: plenty (9999 each → would give min(49, 99) = 49)
+      ingStore.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 9999 }),
+        mkMateria('mp-2', { nombre: 'Azúcar', cantidad_disponible: 9999 }),
+      )
+
+      // Ledger says: only 200g harina, 100g azúcar
+      stockStore.stockActual = [
+        { materia_prima_id: 'mp-1', nombre: 'Harina', unidad: 'g', stock_actual: 200 },
+        { materia_prima_id: 'mp-2', nombre: 'Azúcar', unidad: 'g', stock_actual: 100 },
+      ]
+
+      recStore.recetas.push(mkReceta('rec-1', {
+        ingredientes: [
+          { id: 'ri-1', receta_id: 'rec-1', materia_prima_id: 'mp-1', cantidad: 200, created_at: '' },
+          { id: 'ri-2', receta_id: 'rec-1', materia_prima_id: 'mp-2', cantidad: 100, created_at: '' },
+        ],
+      }))
+
+      const { unidadesPosiblesPorProducto } = useInventario()
+      // min(200/200, 100/100) = min(1, 1) = 1 — NOT min(49, 99) = 49
+      expect(unidadesPosiblesPorProducto.value.get('rec-1')).toBe(1)
+    })
+  })
+
+  it('stockCritico is reactive when ledger stock changes', () => {
+    conContexto(() => {
+      const ingStore = useIngredientsStore()
+      const recStore = useRecipesStore()
+      const stockStore = useStockMovementsStore()
+
+      ingStore.materiasPrimas.push(
+        mkMateria('mp-1', { nombre: 'Harina', cantidad_disponible: 0 }),
+      )
+
+      recStore.recetas.push(mkReceta('rec-1', {
+        ingredientes: [
+          { id: 'ri-1', receta_id: 'rec-1', materia_prima_id: 'mp-1', cantidad: 100, created_at: '' },
+        ],
+      }))
+
+      // Ledger: critically low
+      stockStore.stockActual = [
+        { materia_prima_id: 'mp-1', nombre: 'Harina', unidad: 'g', stock_actual: 10 },
+      ]
+
+      const { stockCritico, stockDisponible } = useInventario()
+      // 10/100 = 10% → crítico
+      expect(stockCritico.value).toBe(1)
+
+      // Replenish: now well above threshold
+      stockStore.stockActual = [
+        { materia_prima_id: 'mp-1', nombre: 'Harina', unidad: 'g', stock_actual: 200 },
+      ]
+      // 200/100 = 200% → normal
+      expect(stockCritico.value).toBe(0)
+      expect(stockDisponible.value.get('mp-1')).toBe(200)
     })
   })
 })
