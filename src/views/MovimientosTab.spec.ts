@@ -233,7 +233,7 @@ describe('MovimientosTab', () => {
     ]
     __resetSupabaseMock([
       { data: materias as unknown as StockMovement[], error: null },
-      { data: movements, error: null },
+      { data: null, error: { code: 'TEST_ERROR', message: 'Error al cargar los movimientos de inventario' } },
     ])
     const wrapper = montarVista()
     await esperarCargaInicial()
