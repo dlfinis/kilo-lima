@@ -32,9 +32,9 @@ describe('Navigation Integration (Phase 6)', () => {
       await router.push('/productos')
       expect(router.currentRoute.value.path).toBe('/productos')
 
-      // Inventario
+      // Inventario (redirects to default tab /inventario/materias)
       await router.push('/inventario')
-      expect(router.currentRoute.value.path).toBe('/inventario')
+      expect(router.currentRoute.value.path).toBe('/inventario/materias')
 
       // Reportes
       await router.push('/reportes')
@@ -97,10 +97,46 @@ describe('Navigation Integration (Phase 6)', () => {
     })
   })
 
+  // inventory-tabs-redesign WU 1: nested tab navigation under /inventario
+  describe('Nested navigation under /inventario', () => {
+    it('navigates Inventario → Movimientos → Compras → Materias', async () => {
+      await router.push('/inventario')
+      expect(router.currentRoute.value.path).toBe('/inventario/materias')
+      expect(router.currentRoute.value.name).toBe('inventario')
+
+      await router.push('/inventario/movimientos')
+      expect(router.currentRoute.value.path).toBe('/inventario/movimientos')
+      expect(router.currentRoute.value.name).toBe('inventario-movimientos')
+
+      await router.push('/inventario/compras')
+      expect(router.currentRoute.value.path).toBe('/inventario/compras')
+      expect(router.currentRoute.value.name).toBe('inventario-compras')
+
+      await router.push('/inventario/materias')
+      expect(router.currentRoute.value.path).toBe('/inventario/materias')
+      expect(router.currentRoute.value.name).toBe('inventario')
+    })
+
+    it('/inventario layout renders child route via InventarioLayout', async () => {
+      await router.push('/inventario/materias')
+      expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('/inventario/movimientos layout renders child route via InventarioLayout', async () => {
+      await router.push('/inventario/movimientos')
+      expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
+    })
+
+    it('/inventario/compras layout renders child route via InventarioLayout', async () => {
+      await router.push('/inventario/compras')
+      expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
+    })
+  })
+
   describe('Legacy route redirects', () => {
-    it('/materias-primas redirects to /inventario', async () => {
+    it('/materias-primas redirects to /inventario/materias', async () => {
       await router.push('/materias-primas')
-      expect(router.currentRoute.value.path).toBe('/inventario')
+      expect(router.currentRoute.value.path).toBe('/inventario/materias')
     })
 
     // catalog-domain-refactor / Slice 3: /recetas redirects to canonical path
@@ -144,9 +180,25 @@ describe('Navigation Integration (Phase 6)', () => {
       expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Productos', 'Preparaciones', 'Detalle'])
     })
 
-    it('/inventario breadcrumb is [Inicio, Inventario]', async () => {
+    it('/inventario breadcrumb is [Inicio, Inventario, Materias]', async () => {
       await router.push('/inventario')
-      expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Inventario'])
+      expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Inventario', 'Materias'])
+    })
+
+    // inventory-tabs-redesign WU 1: tab breadcrumbs
+    it('/inventario/materias breadcrumb is [Inicio, Inventario, Materias]', async () => {
+      await router.push('/inventario/materias')
+      expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Inventario', 'Materias'])
+    })
+
+    it('/inventario/movimientos breadcrumb is [Inicio, Inventario, Movimientos]', async () => {
+      await router.push('/inventario/movimientos')
+      expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Inventario', 'Movimientos'])
+    })
+
+    it('/inventario/compras breadcrumb is [Inicio, Inventario, Compras]', async () => {
+      await router.push('/inventario/compras')
+      expect(router.currentRoute.value.meta.breadcrumb).toEqual(['Inicio', 'Inventario', 'Compras'])
     })
 
     it('/reportes breadcrumb is [Inicio, Reportes, Resumen]', async () => {
@@ -193,10 +245,12 @@ describe('Navigation Integration (Phase 6)', () => {
       expect(route.path).toBe('/productos/preparaciones/r-1')
     })
 
-    it('named route "inventario" resolves from router', async () => {
+    it('named route "inventario" resolves to materias tab', async () => {
       const route = router.resolve({ name: 'inventario' })
       expect(route.name).toBe('inventario')
-      expect(route.path).toBe('/inventario')
+      // Named route now lives on the materias child; resolves directly to
+      // /inventario/materias without needing a redirect.
+      expect(route.path).toBe('/inventario/materias')
     })
   })
 

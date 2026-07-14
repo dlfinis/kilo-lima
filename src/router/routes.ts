@@ -18,11 +18,38 @@ const routes: RouteRecordRaw[] = [
     path: '/materias-primas',
     redirect: '/inventario',
   },
+  // inventory-tabs-redesign / WU 1: nested tabbed layout.
+  // Parent owns the tabs and <router-view>; children are individual
+  // tab views. /inventario redirects to the default materias tab.
+  // Name 'inventario' kept on materias child for backward-compat
+  // named-route resolution (router.resolve / router.push by name).
   {
     path: '/inventario',
-    name: 'inventario',
-    component: () => import('@/views/InventarioView.vue'),
-    meta: { breadcrumb: ['Inicio', 'Inventario'] },
+    component: () => import('@/components/layout/InventarioLayout.vue'),
+    children: [
+      {
+        path: '',
+        redirect: '/inventario/materias',
+      },
+      {
+        path: 'materias',
+        name: 'inventario',
+        component: () => import('@/views/InventarioTab.vue'),
+        meta: { breadcrumb: ['Inicio', 'Inventario', 'Materias'] },
+      },
+      {
+        path: 'movimientos',
+        name: 'inventario-movimientos',
+        component: () => import('@/views/MovimientosTab.vue'),
+        meta: { breadcrumb: ['Inicio', 'Inventario', 'Movimientos'] },
+      },
+      {
+        path: 'compras',
+        name: 'inventario-compras',
+        component: () => import('@/views/ComprasTab.vue'),
+        meta: { breadcrumb: ['Inicio', 'Inventario', 'Compras'] },
+      },
+    ],
   },
   // catalog-domain-refactor / Slice 3: canonical preparation routes.
   // /recetas and /productos/recetas redirect to the new canonical

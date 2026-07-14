@@ -58,10 +58,11 @@ describe('Route consolidation (Phase 6)', () => {
     expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
   })
 
-  it('/materias-primas redirects to /inventario', async () => {
+  // inventory-tabs-redesign WU 1: /materias-primas → /inventario → /inventario/materias
+  it('/materias-primas redirects to /inventario/materias', async () => {
     await setupRouter()
     await router.push('/materias-primas')
-    expect(router.currentRoute.value.path).toBe('/inventario')
+    expect(router.currentRoute.value.path).toBe('/inventario/materias')
   })
 
   // catalog-domain-refactor / Slice 3: /recetas redirects to canonical /productos/preparaciones
@@ -115,11 +116,60 @@ describe('Route consolidation (Phase 6)', () => {
     expect(meta.breadcrumb).toEqual(['Inicio', 'Productos', 'Preparaciones', 'Detalle'])
   })
 
-  it('/inventario breadcrumb is [Inicio, Inventario]', async () => {
+  it('/inventario breadcrumb is [Inicio, Inventario, Materias]', async () => {
     await setupRouter()
     await router.push('/inventario')
     const meta = router.currentRoute.value.meta
-    expect(meta.breadcrumb).toEqual(['Inicio', 'Inventario'])
+    expect(meta.breadcrumb).toEqual(['Inicio', 'Inventario', 'Materias'])
+  })
+
+  // inventory-tabs-redesign WU 1: nested tab route tests
+  it('/inventario redirects to /inventario/materias', async () => {
+    await setupRouter()
+    await router.push('/inventario')
+    expect(router.currentRoute.value.path).toBe('/inventario/materias')
+  })
+
+  it('/inventario/materias resolves to InventarioTab', async () => {
+    await setupRouter()
+    await router.push('/inventario/materias')
+    expect(router.currentRoute.value.path).toBe('/inventario/materias')
+    expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('/inventario/movimientos resolves to MovimientosTab', async () => {
+    await setupRouter()
+    await router.push('/inventario/movimientos')
+    expect(router.currentRoute.value.path).toBe('/inventario/movimientos')
+    expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('/inventario/compras resolves to ComprasTab', async () => {
+    await setupRouter()
+    await router.push('/inventario/compras')
+    expect(router.currentRoute.value.path).toBe('/inventario/compras')
+    expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
+  })
+
+  it('/inventario/materias breadcrumb is [Inicio, Inventario, Materias]', async () => {
+    await setupRouter()
+    await router.push('/inventario/materias')
+    const meta = router.currentRoute.value.meta
+    expect(meta.breadcrumb).toEqual(['Inicio', 'Inventario', 'Materias'])
+  })
+
+  it('/inventario/movimientos breadcrumb is [Inicio, Inventario, Movimientos]', async () => {
+    await setupRouter()
+    await router.push('/inventario/movimientos')
+    const meta = router.currentRoute.value.meta
+    expect(meta.breadcrumb).toEqual(['Inicio', 'Inventario', 'Movimientos'])
+  })
+
+  it('/inventario/compras breadcrumb is [Inicio, Inventario, Compras]', async () => {
+    await setupRouter()
+    await router.push('/inventario/compras')
+    const meta = router.currentRoute.value.meta
+    expect(meta.breadcrumb).toEqual(['Inicio', 'Inventario', 'Compras'])
   })
 
   it('/reportes breadcrumb is correct', async () => {
