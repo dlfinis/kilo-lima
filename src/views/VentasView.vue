@@ -6,12 +6,20 @@ import { useRouter } from 'vue-router'
 
 import { useEventsStore } from '@/stores/events.store'
 import { useVentasStore } from '@/stores/ventas.store'
+import { useProductosStore } from '@/stores/productos.store'
 import { formatearUSD } from '@/utils/format'
 import type { VentaConItems, MetodoPago } from '@/types'
 
 const router = useRouter()
 const eventsStore = useEventsStore()
 const ventasStore = useVentasStore()
+const productosStore = useProductosStore()
+
+// Helper to get product name by id
+function obtenerNombreProducto(productoId: string): string {
+  const producto = productosStore.productos.find((p) => p.id === productoId)
+  return producto?.nombre ?? 'Producto no encontrado'
+}
 
 // Auto-select active event or allow manual selection
 const eventoSeleccionadoId = ref<string | null>(null)
@@ -43,11 +51,31 @@ const promedioVenta = computed(() => {
 // Filter by payment method
 const filtroMetodoPago = ref<MetodoPago | null>(null)
 
+// Filter by date range
+const fechaInicio = ref<string | null>(null)
+const fechaFin = ref<string | null>(null)
+
 const ventasFiltradas = computed(() => {
   let result = ventasDelEvento.value
+  
+  // Filter by payment method
   if (filtroMetodoPago.value) {
     result = result.filter((v) => v.metodo_pago === filtroMetodoPago.value)
   }
+  
+  // Filter by date range
+  if (fechaInicio.value) {
+    const inicio = new Date(fechaInicio.value)
+    inicio.setHours(0, 0, 0, 0)
+    result = result.filter((v) => new Date(v.fecha) >= inicio)
+  }
+  
+  if (fechaFin.value) {
+    const fin = new Date(fechaFin.value)
+    fin.setHours(23, 59, 59, 999)
+    result = result.filter((v) => new Date(v.fecha) <= fin)
+  }
+  
   return result.sort((a, b) => new Date(b.fecha).getTime() - new Date(a.fecha).getTime())
 })
 
@@ -67,6 +95,8 @@ function cerrarDetalleVenta() {
 
 function limpiarFiltros() {
   filtroMetodoPago.value = null
+  fechaInicio.value = null
+  fechaFin.value = null
 }
 
 async function cargarDatos() {
@@ -79,6 +109,11 @@ onMounted(async () => {
   // Load events if not already loaded
   if (eventsStore.eventos.length === 0) {
     await eventsStore.cargarTodas()
+  }
+  
+  // Load products for name lookup in sale details
+  if (productosStore.productos.length === 0) {
+    await productosStore.cargarTodos()
   }
   
   // Auto-select active event if available
@@ -179,7 +214,7 @@ function formatearFecha(fecha: string): string {
     <template v-if="eventoSeleccionadoId && eventoSeleccionado">
       <!-- KPIs -->
       <v-row dense class="mb-4">
-        <v-col cols="12" sm="6" md="3">
+        <v-col cols="12" sm="4">
           <v-card data-testid="ventas-kpi-total">
             <v-card-text>
               <div class="text-caption text-medium-emphasis">Total ventas</div>
@@ -189,7 +224,7 @@ function formatearFecha(fecha: string): string {
             </v-card-text>
           </v-card>
         </v-col>
-        <v-col cols="12" sm="6" md="3">
+        <v-col cols="12" sm="4">
           <v-card data-testid="ventas-kpi-cantidad">
             <v-card-text>
               <div class="text-caption text-medium-emphasis">Cantidad</div>
@@ -199,7 +234,7 @@ function formatearFecha(fecha: string): string {
             </v-card-text>
           </v-card>
         </v-col>
-        <v-col cols="12" sm="6" md="3">
+        <v-col cols="12" sm="4">
           <v-card data-testid="ventas-kpi-promedio">
             <v-card-text>
               <div class="text-caption text-medium-emphasis">Promedio</div>
@@ -209,23 +244,13 @@ function formatearFecha(fecha: string): string {
             </v-card-text>
           </v-card>
         </v-col>
-        <v-col cols="12" sm="6" md="3">
-          <v-card data-testid="ventas-kpi-evento">
-            <v-card-text>
-              <div class="text-caption text-medium-emphasis">Evento</div>
-              <div class="text-body-1 font-weight-medium">
-                {{ eventoSeleccionado.nombre }}
-              </div>
-            </v-card-text>
-          </v-card>
-        </v-col>
       </v-row>
 
       <!-- Filters -->
       <v-card class="mb-4" data-testid="ventas-filtros">
         <v-card-text>
-          <div class="d-flex align-center ga-2 flex-wrap">
-            <span class="text-body-2 font-weight-medium">Filtrar por método de pago:</span>
+          <div class="d-flex align-center ga-2 flex-wrap mb-3">
+            <span class="text-body-2 font-weight-medium">Método de pago:</span>
             <v-chip
               :color="filtroMetodoPago === null ? 'primary' : undefined"
               :variant="filtroMetodoPago === null ? 'flat' : 'tonal'"
@@ -246,11 +271,36 @@ function formatearFecha(fecha: string): string {
             >
               {{ metodo.label }}
             </v-chip>
+          </div>
+          
+          <div class="d-flex align-center ga-2 flex-wrap">
+            <span class="text-body-2 font-weight-medium">Rango de fechas:</span>
+            <v-text-field
+              v-model="fechaInicio"
+              type="date"
+              label="Desde"
+              variant="outlined"
+              density="compact"
+              hide-details
+              style="max-width: 180px"
+              data-testid="ventas-fecha-inicio"
+            />
+            <span>—</span>
+            <v-text-field
+              v-model="fechaFin"
+              type="date"
+              label="Hasta"
+              variant="outlined"
+              density="compact"
+              hide-details
+              style="max-width: 180px"
+              data-testid="ventas-fecha-fin"
+            />
             
             <v-spacer />
             
             <v-btn
-              v-if="filtroMetodoPago"
+              v-if="filtroMetodoPago || fechaInicio || fechaFin"
               size="small"
               variant="text"
               color="error"
@@ -360,7 +410,7 @@ function formatearFecha(fecha: string): string {
               </thead>
               <tbody>
                 <tr v-for="item in ventaSeleccionada.items" :key="item.id">
-                  <td>{{ item.producto_nombre }}</td>
+                  <td>{{ obtenerNombreProducto(item.producto_id) }}</td>
                   <td class="text-right">{{ item.cantidad }}</td>
                   <td class="text-right">{{ formatearUSD(item.precio_unitario) }}</td>
                   <td class="text-right">{{ formatearUSD(item.subtotal) }}</td>
