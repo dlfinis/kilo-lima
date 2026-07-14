@@ -146,6 +146,8 @@ const tabActiva = ref<'ventas' | 'analisis'>('ventas')
 const analisisFiltroFechaInicio = ref<string | null>(null)
 const analisisFiltroFechaFin = ref<string | null>(null)
 const analisisFiltroCategoria = ref<string | null>(null)
+const analisisRangoRapidoActivo = ref<string | null>(null)
+const analisisMostrarFechasPersonalizadas = ref(false)
 
 const CATEGORIAS_PRODUCTO = [
   { value: 'dulce', label: 'Dulce' },
@@ -153,6 +155,44 @@ const CATEGORIAS_PRODUCTO = [
   { value: 'helado', label: 'Helado' },
   { value: 'bebida', label: 'Bebida' },
 ]
+
+// Quick date range options for analysis
+function setAnalisisRangoRapido(rango: string) {
+  const ahora = new Date()
+  analisisRangoRapidoActivo.value = rango
+  analisisMostrarFechasPersonalizadas.value = false
+  
+  // Use local date methods to avoid timezone issues (UTC-5)
+  const year = ahora.getFullYear()
+  const month = ahora.getMonth()
+  const day = ahora.getDate()
+  
+  switch (rango) {
+    case 'hoy':
+      analisisFiltroFechaInicio.value = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      analisisFiltroFechaFin.value = analisisFiltroFechaInicio.value
+      break
+    case 'ayer':
+      const ayer = new Date(year, month, day - 1)
+      analisisFiltroFechaInicio.value = `${ayer.getFullYear()}-${String(ayer.getMonth() + 1).padStart(2, '0')}-${String(ayer.getDate()).padStart(2, '0')}`
+      analisisFiltroFechaFin.value = analisisFiltroFechaInicio.value
+      break
+    case 'semana':
+      const hace7Dias = new Date(year, month, day - 6)
+      analisisFiltroFechaInicio.value = `${hace7Dias.getFullYear()}-${String(hace7Dias.getMonth() + 1).padStart(2, '0')}-${String(hace7Dias.getDate()).padStart(2, '0')}`
+      analisisFiltroFechaFin.value = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      break
+    case 'mes':
+      analisisFiltroFechaInicio.value = `${year}-${String(month + 1).padStart(2, '0')}-01`
+      analisisFiltroFechaFin.value = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+      break
+    case 'personalizado':
+      analisisMostrarFechasPersonalizadas.value = true
+      analisisFiltroFechaInicio.value = null
+      analisisFiltroFechaFin.value = null
+      break
+  }
+}
 
 // Product sales analysis (with independent filters)
 const analisisProductos = computed(() => {
@@ -206,10 +246,21 @@ const analisisProductos = computed(() => {
   return result.sort((a, b) => b.total - a.total)
 })
 
+// Analysis totals for verification
+const analisisTotalVentas = computed(() => {
+  return analisisProductos.value.reduce((sum, p) => sum + p.total, 0)
+})
+
+const analisisCantidadItems = computed(() => {
+  return analisisProductos.value.reduce((sum, p) => sum + p.cantidad, 0)
+})
+
 function limpiarFiltrosAnalisis() {
   analisisFiltroFechaInicio.value = null
   analisisFiltroFechaFin.value = null
   analisisFiltroCategoria.value = null
+  analisisRangoRapidoActivo.value = null
+  analisisMostrarFechasPersonalizadas.value = false
 }
 
 // Get unique products from filtered sales
@@ -271,6 +322,8 @@ onMounted(async () => {
     await cargarDatos()
     // Default to today's sales
     setRangoRapido('hoy')
+    // Default analysis to today's sales too
+    setAnalisisRangoRapido('hoy')
   }
 })
 
@@ -643,6 +696,70 @@ async function confirmarEliminar() {
         <v-card-text>
           <div class="d-flex align-center ga-2 flex-wrap mb-3">
             <span class="text-body-2 font-weight-medium">Rango de fechas:</span>
+            <v-chip
+              :color="analisisRangoRapidoActivo === 'hoy' ? 'primary' : undefined"
+              :variant="analisisRangoRapidoActivo === 'hoy' ? 'flat' : 'tonal'"
+              size="small"
+              data-testid="ventas-analisis-rango-hoy"
+              @click="setAnalisisRangoRapido('hoy')"
+            >
+              Hoy
+            </v-chip>
+            <v-chip
+              :color="analisisRangoRapidoActivo === 'ayer' ? 'primary' : undefined"
+              :variant="analisisRangoRapidoActivo === 'ayer' ? 'flat' : 'tonal'"
+              size="small"
+              data-testid="ventas-analisis-rango-ayer"
+              @click="setAnalisisRangoRapido('ayer')"
+            >
+              Ayer
+            </v-chip>
+            <v-chip
+              :color="analisisRangoRapidoActivo === 'semana' ? 'primary' : undefined"
+              :variant="analisisRangoRapidoActivo === 'semana' ? 'flat' : 'tonal'"
+              size="small"
+              data-testid="ventas-analisis-rango-semana"
+              @click="setAnalisisRangoRapido('semana')"
+            >
+              Última semana
+            </v-chip>
+            <v-chip
+              :color="analisisRangoRapidoActivo === 'mes' ? 'primary' : undefined"
+              :variant="analisisRangoRapidoActivo === 'mes' ? 'flat' : 'tonal'"
+              size="small"
+              data-testid="ventas-analisis-rango-mes"
+              @click="setAnalisisRangoRapido('mes')"
+            >
+              Este mes
+            </v-chip>
+            <v-chip
+              :color="analisisMostrarFechasPersonalizadas ? 'primary' : undefined"
+              :variant="analisisMostrarFechasPersonalizadas ? 'flat' : 'tonal'"
+              size="small"
+              prepend-icon="mdi-calendar-edit"
+              data-testid="ventas-analisis-rango-personalizado"
+              @click="setAnalisisRangoRapido('personalizado')"
+            >
+              Personalizado
+            </v-chip>
+            
+            <v-spacer />
+            
+            <v-btn
+              v-if="analisisRangoRapidoActivo || analisisFiltroCategoria"
+              size="small"
+              variant="text"
+              color="error"
+              prepend-icon="mdi-filter-remove"
+              data-testid="ventas-analisis-limpiar"
+              @click="limpiarFiltrosAnalisis"
+            >
+              Limpiar
+            </v-btn>
+          </div>
+          
+          <!-- Custom date range (only shown when activated) -->
+          <div v-if="analisisMostrarFechasPersonalizadas" class="d-flex align-center ga-2 flex-wrap mb-3">
             <v-text-field
               v-model="analisisFiltroFechaInicio"
               type="date"
@@ -705,6 +822,30 @@ async function confirmarEliminar() {
           </div>
         </v-card-text>
       </v-card>
+
+      <!-- Analysis Summary -->
+      <v-row v-if="analisisProductos.length > 0" dense class="mb-4">
+        <v-col cols="12" sm="6">
+          <v-card data-testid="ventas-analisis-total-ventas">
+            <v-card-text>
+              <div class="text-caption text-medium-emphasis">Total de ventas (análisis)</div>
+              <div class="text-h5 font-weight-bold">
+                {{ formatearUSD(analisisTotalVentas) }}
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+        <v-col cols="12" sm="6">
+          <v-card data-testid="ventas-analisis-cantidad-items">
+            <v-card-text>
+              <div class="text-caption text-medium-emphasis">Cantidad de items (análisis)</div>
+              <div class="text-h5 font-weight-bold">
+                {{ analisisCantidadItems }}
+              </div>
+            </v-card-text>
+          </v-card>
+        </v-col>
+      </v-row>
 
       <!-- Analysis Table -->
       <v-card v-if="analisisProductos.length > 0" data-testid="ventas-analisis-productos">
