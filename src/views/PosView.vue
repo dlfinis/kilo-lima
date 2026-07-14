@@ -784,19 +784,72 @@ async function reintentarHistorial() {
         :cargando="cargandoVentas"
       />
 
-      <!-- REQ-POS-23: search input. Clean, rounded, light weight. -->
+      <!-- Category filters and sort controls -->
       <div class="mb-4">
-        <v-text-field
-          v-model="busqueda"
-          placeholder="Buscar producto…"
-          prepend-inner-icon="mdi-magnify"
-          variant="outlined"
-          density="compact"
-          hide-details
-          clearable
-          data-testid="pos-buscar"
-          class="pos-search"
-        />
+        <div class="d-flex align-center ga-2 flex-wrap">
+          <!-- Category chips -->
+          <v-chip
+            :color="categoriaFiltro === null ? 'primary' : undefined"
+            :variant="categoriaFiltro === null ? 'flat' : 'tonal'"
+            size="small"
+            data-testid="pos-filter-todos"
+            @click="categoriaFiltro = null"
+          >
+            Todos
+          </v-chip>
+          <v-chip
+            v-for="cat in CATEGORIAS"
+            :key="cat.value"
+            :color="categoriaFiltro === cat.value ? 'primary' : undefined"
+            :variant="categoriaFiltro === cat.value ? 'flat' : 'tonal'"
+            size="small"
+            :data-testid="`pos-filter-${cat.value}`"
+            @click="categoriaFiltro = categoriaFiltro === cat.value ? null : cat.value"
+          >
+            {{ cat.label }}
+          </v-chip>
+
+          <v-spacer />
+
+          <!-- Sort dropdown -->
+          <v-menu>
+            <template #activator="{ props: menuProps }">
+              <v-btn
+                v-bind="menuProps"
+                size="small"
+                variant="tonal"
+                :color="ordenamiento ? 'primary' : undefined"
+                prepend-icon="mdi-sort"
+                data-testid="pos-sort-btn"
+              >
+                {{ ordenamientoLabel }}
+              </v-btn>
+            </template>
+            <v-list density="compact">
+              <v-list-item
+                v-for="opcion in OPCIONES_ORDENAMIENTO"
+                :key="opcion.value"
+                :active="ordenamiento === opcion.value"
+                @click="ordenamiento = ordenamiento === opcion.value ? null : opcion.value"
+              >
+                <v-list-item-title>{{ opcion.label }}</v-list-item-title>
+              </v-list-item>
+            </v-list>
+          </v-menu>
+
+          <!-- Clear filters button -->
+          <v-btn
+            v-if="hayFiltrosActivos"
+            size="small"
+            variant="text"
+            color="error"
+            prepend-icon="mdi-filter-remove"
+            data-testid="pos-clear-filters"
+            @click="limpiarFiltros"
+          >
+            Limpiar
+          </v-btn>
+        </div>
       </div>
 
       <!-- REQ-POS-49: loading state. -->
@@ -897,7 +950,6 @@ async function reintentarHistorial() {
           <v-col cols="12" sm="12" md="8" lg="9" data-testid="pos-products-col">
             <ProductGrid
               :productos="productosSimplificados"
-              :busqueda="busqueda"
               @add-to-cart="manejarAgregar"
             />
           </v-col>
@@ -940,7 +992,6 @@ async function reintentarHistorial() {
           <ProductoCardGrid
             :productos="productosMapeados"
             :recetas="recetasParaGrid"
-            :busqueda="busqueda"
             @agregar="manejarAgregar"
           />
         </v-col>
