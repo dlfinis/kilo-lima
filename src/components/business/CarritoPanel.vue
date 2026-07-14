@@ -54,22 +54,24 @@ function cancelarVaciar() {
     <!-- Header with cart icon -->
     <div class="d-flex align-center ga-2 mb-3">
       <v-icon size="20" color="primary">mdi-cart-outline</v-icon>
-      <span class="text-subtitle-1 font-weight-bold">Carrito</span>
+      <span class="text-subtitle-1 font-weight-bold" style="color: #1A1A2E">Carrito</span>
       <v-spacer />
       <span
         v-if="carrito.length > 0"
-        class="text-caption text-medium-emphasis"
+        class="text-caption font-weight-medium"
+        style="color: #1A1A2E"
       >{{ carrito.length }} item(s)</span>
     </div>
 
     <!-- Items area -->
     <div
       v-if="carrito.length === 0"
-      class="text-medium-emphasis text-body-2 py-6 text-center"
+      class="text-body-2 py-6 text-center"
+      style="color: #1A1A2E"
       data-testid="carrito-vacio"
     >
       <v-icon size="32" color="grey-lighten-1" class="mb-1">mdi-cart-remove</v-icon>
-      <p class="mb-0">Carrito vacío</p>
+      <p class="mb-0 font-weight-medium">Carrito vacío</p>
     </div>
 
     <div v-else class="flex-grow-1 carrito-items">
@@ -85,8 +87,8 @@ function cancelarVaciar() {
     <!-- Totals and CTAs -->
     <div class="carrito-footer mt-3 pt-3" style="border-top: 1px solid rgba(var(--v-border-color), 0.4)">
       <div class="d-flex justify-space-between align-center mb-2">
-        <span class="text-subtitle-2">Total</span>
-        <span class="text-h6 font-weight-bold" data-testid="carrito-total">{{ totalTexto }}</span>
+        <span class="text-subtitle-2 font-weight-bold" style="color: #1A1A2E">Total</span>
+        <span class="text-h6 font-weight-bold" style="color: #1A1A2E" data-testid="carrito-total">{{ totalTexto }}</span>
       </div>
       <v-btn
         v-if="!props.hideRegisterButton"

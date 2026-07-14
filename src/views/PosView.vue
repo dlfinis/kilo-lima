@@ -19,8 +19,6 @@
 //   - The empty state for "no productos configured for this evento"
 //     surfaces a `Configurar productos` button that routes to
 //     `/eventos/:id/productos` (REQ-FIN-30).
-//   - A `Margen: {evento.margen_ganancia * 100}%` badge reflects the
-//     active evento's default margin (REQ-FIN-29).
 //   - `agregarAlCarrito` calls the store with (productoId, 1) — the
 //     store derives precio + costo + margen via usePreciosEvento.
 //   - The PR-2b event-cerrado guard is the existing EVENTO_CERRADO
@@ -264,14 +262,6 @@ const hayProductosParaVender = computed(() => productosParaGrid.value.length > 0
 const mostrarSinProductos = computed(
   () => !hayProductosParaVender.value && !errorCargaDependencias.value,
 )
-
-// REQ-FIN-29: badge text. evento.margen_ganancia is the default
-// margin (nullable in DB; falls back to "—" when unset).
-const margenBadge = computed(() => {
-  const m = eventoEnCurso.value?.margen_ganancia
-  if (m === null || m === undefined) return null
-  return `${Math.round(m * 100)}%`
-})
 
 const dialogoCrearImprevisto = ref(false)
 
@@ -558,38 +548,40 @@ async function reintentarHistorial() {
       >
         Historial
       </v-btn>
-      <!-- Margen badge: compact, inline -->
-      <v-chip
-        v-if="margenBadge"
-        size="x-small"
-        color="primary"
-        variant="tonal"
-        data-testid="pos-margen-badge"
-      >
-        {{ margenBadge }}
-      </v-chip>
       <!-- Gastos imprevistos: quick-access menu -->
       <v-menu v-if="eventoEnCurso" :close-on-content-click="false" location="bottom end">
         <template #activator="{ props: menuProps }">
+          <v-badge
+            v-if="totalImprevistos > 0"
+            :content="`$${totalImprevistos.toFixed(0)}`"
+            color="error"
+          >
+            <template #default>
+              <v-btn
+                v-bind="menuProps"
+                size="small"
+                variant="text"
+                color="warning"
+                data-testid="pos-imprevistos-btn"
+              >
+                <v-icon size="22">mdi-receipt-text-plus</v-icon>
+              </v-btn>
+            </template>
+          </v-badge>
           <v-btn
+            v-else
             v-bind="menuProps"
-            icon="mdi-cash-remove"
-            size="x-small"
+            size="small"
             variant="text"
             color="warning"
             data-testid="pos-imprevistos-btn"
           >
-            <v-badge
-              v-if="totalImprevistos > 0"
-              :content="`$${totalImprevistos.toFixed(0)}`"
-              color="error"
-              inline
-            />
+            <v-icon size="22">mdi-receipt-text-plus</v-icon>
           </v-btn>
         </template>
         <v-card min-width="320" max-width="400" data-testid="pos-imprevistos-menu">
           <v-card-title class="d-flex align-center text-body-1">
-            <v-icon class="mr-2">mdi-cash-remove</v-icon>
+            <v-icon class="mr-2">mdi-receipt-text-plus</v-icon>
             Gastos imprevistos
             <v-spacer />
             <v-chip size="x-small" data-testid="pos-imprevistos-total">
