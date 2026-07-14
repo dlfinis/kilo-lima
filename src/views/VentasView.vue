@@ -36,12 +36,12 @@ const ventasDelEvento = computed<VentaConItems[]>(() => {
   return ventasStore.ventas.filter((v) => v.evento_id === id)
 })
 
-// KPIs
+// KPIs (calculated on filtered sales)
 const totalVentas = computed(() => {
-  return ventasDelEvento.value.reduce((sum, v) => sum + v.total, 0)
+  return ventasFiltradas.value.reduce((sum, v) => sum + v.total, 0)
 })
 
-const cantidadVentas = computed(() => ventasDelEvento.value.length)
+const cantidadVentas = computed(() => ventasFiltradas.value.length)
 
 const promedioVenta = computed(() => {
   if (cantidadVentas.value === 0) return 0
@@ -54,11 +54,14 @@ const filtroMetodoPago = ref<MetodoPago | null>(null)
 // Filter by date range
 const fechaInicio = ref<string | null>(null)
 const fechaFin = ref<string | null>(null)
+const mostrarFechasPersonalizadas = ref(false)
+const rangoRapidoActivo = ref<string | null>(null)
 
 // Quick date range options
 function setRangoRapido(rango: string) {
   const hoy = new Date()
   hoy.setHours(23, 59, 59, 999)
+  rangoRapidoActivo.value = rango
   
   switch (rango) {
     case 'hoy':
@@ -89,6 +92,9 @@ function setRangoRapido(rango: string) {
       inicioMes.setHours(0, 0, 0, 0)
       fechaInicio.value = inicioMes.toISOString().split('T')[0]
       fechaFin.value = hoy.toISOString().split('T')[0]
+      break
+    case 'personalizado':
+      mostrarFechasPersonalizadas.value = true
       break
   }
 }
@@ -135,6 +141,8 @@ function limpiarFiltros() {
   filtroMetodoPago.value = null
   fechaInicio.value = null
   fechaFin.value = null
+  mostrarFechasPersonalizadas.value = false
+  rangoRapidoActivo.value = null
 }
 
 async function cargarDatos() {
@@ -185,6 +193,49 @@ function formatearFecha(fecha: string): string {
     hour: '2-digit',
     minute: '2-digit',
   })
+}
+
+function obtenerIconoMetodoPago(metodo: MetodoPago): string {
+  const iconos: Record<MetodoPago, string> = {
+    efectivo: 'mdi-cash',
+    transferencia: 'mdi-bank-transfer',
+    tarjeta: 'mdi-credit-card',
+    mixto: 'mdi-swap-horizontal',
+  }
+  return iconos[metodo] || 'mdi-cash'
+}
+
+function formatearMetodoPago(metodo: MetodoPago): string {
+  const labels: Record<MetodoPago, string> = {
+    efectivo: 'Efectivo',
+    transferencia: 'Transferencia',
+    tarjeta: 'Tarjeta',
+    mixto: 'Mixto',
+  }
+  return labels[metodo] || metodo
+}
+
+// Delete sale functionality
+const dialogoEliminarAbierto = ref(false)
+const ventaAEliminar = ref<VentaConItems | null>(null)
+
+function abrirDialogoEliminar(venta: VentaConItems) {
+  ventaAEliminar.value = venta
+  dialogoEliminarAbierto.value = true
+}
+
+async function confirmarEliminar() {
+  if (!ventaAEliminar.value) return
+  try {
+    await ventasStore.eliminarVenta(ventaAEliminar.value.id)
+    dialogoEliminarAbierto.value = false
+    ventaAEliminar.value = null
+    // Recargar datos para actualizar KPIs
+    await cargarDatos()
+  } catch (error) {
+    console.error('Error al eliminar venta:', error)
+    // TODO: Mostrar error al usuario
+  }
 }
 </script>
 
@@ -313,10 +364,11 @@ function formatearFecha(fecha: string): string {
             </v-chip>
           </div>
           
-          <div class="d-flex align-center ga-2 flex-wrap mb-3">
-            <span class="text-body-2 font-weight-medium">Rango rápido:</span>
+          <div class="d-flex align-center ga-2 flex-wrap">
+            <span class="text-body-2 font-weight-medium">Rango de fechas:</span>
             <v-chip
-              variant="tonal"
+              :color="rangoRapidoActivo === 'hoy' ? 'primary' : undefined"
+              :variant="rangoRapidoActivo === 'hoy' ? 'flat' : 'tonal'"
               size="small"
               data-testid="ventas-rango-hoy"
               @click="setRangoRapido('hoy')"
@@ -324,7 +376,8 @@ function formatearFecha(fecha: string): string {
               Hoy
             </v-chip>
             <v-chip
-              variant="tonal"
+              :color="rangoRapidoActivo === 'ayer' ? 'primary' : undefined"
+              :variant="rangoRapidoActivo === 'ayer' ? 'flat' : 'tonal'"
               size="small"
               data-testid="ventas-rango-ayer"
               @click="setRangoRapido('ayer')"
@@ -332,7 +385,8 @@ function formatearFecha(fecha: string): string {
               Ayer
             </v-chip>
             <v-chip
-              variant="tonal"
+              :color="rangoRapidoActivo === 'semana' ? 'primary' : undefined"
+              :variant="rangoRapidoActivo === 'semana' ? 'flat' : 'tonal'"
               size="small"
               data-testid="ventas-rango-semana"
               @click="setRangoRapido('semana')"
@@ -340,17 +394,42 @@ function formatearFecha(fecha: string): string {
               Última semana
             </v-chip>
             <v-chip
-              variant="tonal"
+              :color="rangoRapidoActivo === 'mes' ? 'primary' : undefined"
+              :variant="rangoRapidoActivo === 'mes' ? 'flat' : 'tonal'"
               size="small"
               data-testid="ventas-rango-mes"
               @click="setRangoRapido('mes')"
             >
               Este mes
             </v-chip>
+            <v-chip
+              :color="mostrarFechasPersonalizadas ? 'primary' : undefined"
+              :variant="mostrarFechasPersonalizadas ? 'flat' : 'tonal'"
+              size="small"
+              prepend-icon="mdi-calendar-edit"
+              data-testid="ventas-rango-personalizado"
+              @click="setRangoRapido('personalizado')"
+            >
+              Personalizado
+            </v-chip>
+            
+            <v-spacer />
+            
+            <v-btn
+              v-if="filtroMetodoPago || fechaInicio || fechaFin"
+              size="small"
+              variant="text"
+              color="error"
+              prepend-icon="mdi-filter-remove"
+              data-testid="ventas-limpiar-filtros"
+              @click="limpiarFiltros"
+            >
+              Limpiar
+            </v-btn>
           </div>
           
-          <div class="d-flex align-center ga-2 flex-wrap">
-            <span class="text-body-2 font-weight-medium">Personalizado:</span>
+          <!-- Custom date range (only shown when activated) -->
+          <div v-if="mostrarFechasPersonalizadas" class="d-flex align-center ga-2 flex-wrap mt-3">
             <v-text-field
               v-model="fechaInicio"
               type="date"
@@ -372,20 +451,6 @@ function formatearFecha(fecha: string): string {
               style="max-width: 180px"
               data-testid="ventas-fecha-fin"
             />
-            
-            <v-spacer />
-            
-            <v-btn
-              v-if="filtroMetodoPago || fechaInicio || fechaFin"
-              size="small"
-              variant="text"
-              color="error"
-              prepend-icon="mdi-filter-remove"
-              data-testid="ventas-limpiar-filtros"
-              @click="limpiarFiltros"
-            >
-              Limpiar
-            </v-btn>
           </div>
         </v-card-text>
       </v-card>
@@ -416,15 +481,25 @@ function formatearFecha(fecha: string): string {
             @click="abrirDetalleVenta(venta)"
           >
             <template #prepend>
-              <v-icon color="primary">mdi-receipt</v-icon>
+              <v-icon color="primary">
+                {{ obtenerIconoMetodoPago(venta.metodo_pago) }}
+              </v-icon>
             </template>
             <v-list-item-title class="font-weight-medium">
               {{ formatearUSD(venta.total) }}
             </v-list-item-title>
             <v-list-item-subtitle>
-              {{ formatearFecha(venta.fecha) }} · {{ venta.metodo_pago }} · {{ venta.items.length }} item(s)
+              {{ formatearFecha(venta.fecha) }} · {{ formatearMetodoPago(venta.metodo_pago) }} · {{ venta.items.length }} item(s)
             </v-list-item-subtitle>
             <template #append>
+              <v-btn
+                icon="mdi-delete"
+                variant="text"
+                size="x-small"
+                color="error"
+                data-testid="ventas-eliminar-btn"
+                @click.stop="abrirDialogoEliminar(venta)"
+              />
               <v-icon size="small">mdi-chevron-right</v-icon>
             </template>
           </v-list-item>
@@ -463,15 +538,23 @@ function formatearFecha(fecha: string): string {
         </v-card-title>
         <v-divider />
         <v-card-text>
-          <div class="mb-4">
-            <div class="text-caption text-medium-emphasis">Fecha</div>
-            <div class="text-body-1">{{ formatearFecha(ventaSeleccionada.fecha) }}</div>
-          </div>
-          <div class="mb-4">
-            <div class="text-caption text-medium-emphasis">Método de pago</div>
-            <v-chip size="small" color="primary" variant="tonal">
-              {{ ventaSeleccionada.metodo_pago }}
-            </v-chip>
+          <div class="d-flex align-center ga-4 mb-4">
+            <div>
+              <div class="text-caption text-medium-emphasis">Método de pago</div>
+              <div class="d-flex align-center">
+                <v-icon class="mr-2" color="primary">
+                  {{ obtenerIconoMetodoPago(ventaSeleccionada.metodo_pago) }}
+                </v-icon>
+                <span class="text-body-1 font-weight-medium">
+                  {{ formatearMetodoPago(ventaSeleccionada.metodo_pago) }}
+                </span>
+              </div>
+            </div>
+            <v-divider vertical />
+            <div>
+              <div class="text-caption text-medium-emphasis">Fecha</div>
+              <div class="text-body-1">{{ formatearFecha(ventaSeleccionada.fecha) }}</div>
+            </div>
           </div>
           <div class="mb-4">
             <div class="text-caption text-medium-emphasis mb-2">Productos</div>
@@ -502,6 +585,59 @@ function formatearFecha(fecha: string): string {
             </span>
           </div>
         </v-card-text>
+      </v-card>
+    </v-dialog>
+
+    <!-- Delete sale confirmation dialog -->
+    <v-dialog
+      v-model="dialogoEliminarAbierto"
+      max-width="500"
+      data-testid="ventas-eliminar-dialogo"
+    >
+      <v-card v-if="ventaAEliminar">
+        <v-card-title class="d-flex align-center">
+          <v-icon class="mr-2" color="error">mdi-alert-circle</v-icon>
+          Eliminar venta
+          <v-spacer />
+          <v-btn
+            icon="mdi-close"
+            variant="text"
+            size="small"
+            @click="dialogoEliminarAbierto = false"
+          />
+        </v-card-title>
+        <v-divider />
+        <v-card-text>
+          <p class="text-body-1 mb-3">
+            ¿Estás seguro de que deseas eliminar esta venta?
+          </p>
+          <v-alert type="warning" variant="tonal" density="compact">
+            <div class="text-body-2">
+              <strong>Fecha:</strong> {{ formatearFecha(ventaAEliminar.fecha) }}<br />
+              <strong>Total:</strong> {{ formatearUSD(ventaAEliminar.total) }}<br />
+              <strong>Productos:</strong> {{ ventaAEliminar.items.length }} item(s)
+            </div>
+          </v-alert>
+          <p class="text-caption text-medium-emphasis mt-3 mb-0">
+            Esta acción no se puede deshacer.
+          </p>
+        </v-card-text>
+        <v-card-actions>
+          <v-spacer />
+          <v-btn
+            variant="text"
+            @click="dialogoEliminarAbierto = false"
+          >
+            Cancelar
+          </v-btn>
+          <v-btn
+            color="error"
+            variant="flat"
+            @click="confirmarEliminar"
+          >
+            Eliminar
+          </v-btn>
+        </v-card-actions>
       </v-card>
     </v-dialog>
   </div>

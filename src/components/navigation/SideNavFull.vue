@@ -73,7 +73,7 @@ function isActive(itemRoute: string): boolean {
       />
 
       <v-list-item
-        prepend-icon="mdi-cash-register"
+        prepend-icon="mdi-history"
         title="Ventas"
         to="/ventas"
         :active="isActive('/ventas')"

@@ -578,6 +578,30 @@ export const useVentasStore = defineStore('ventas', () => {
     return { data: res.data, error: null }
   }
 
+  // Delete a sale (for when sales are processed incorrectly)
+  async function eliminarVenta(id: string): Promise<void> {
+    const traceId = createTraceId()
+    logTrace('eliminarVenta', 'delete-start', { ventaId: id, traceId })
+    
+    const respuesta = await servicio.eliminar(id)
+    if (respuesta.error) {
+      logError('eliminarVenta', 'failed to delete venta', {
+        ventaId: id,
+        error: respuesta.error,
+        traceId,
+      })
+      throw respuesta.error
+    }
+    
+    // Remove from local state
+    const index = ventas.value.findIndex((v) => v.id === id)
+    if (index !== -1) {
+      ventas.value.splice(index, 1)
+    }
+    
+    logInfo('eliminarVenta', 'venta deleted', { ventaId: id, traceId })
+  }
+
   return {
     ventas,
     carrito,
@@ -598,6 +622,7 @@ export const useVentasStore = defineStore('ventas', () => {
     cargarPorEvento,
     registrarVenta,
     corregirVenta,
+    eliminarVenta,
     descartarToast,
     CODIGO_SIN_EVENTO,
     CODIGO_EVENTO_CERRADO,
