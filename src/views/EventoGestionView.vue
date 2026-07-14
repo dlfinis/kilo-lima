@@ -505,7 +505,7 @@ const inversionTotal = computed<number>(() => {
               { title: 'Und. producir', key: 'unidades_a_producir', width: 130, align: 'center' },
               { title: 'Márgenes', key: 'margenes', minWidth: 300 },
               { title: 'Precio', key: 'precio_final', width: 140, align: 'center' },
-              { title: 'Contrib. unit.', key: 'contribucion_unit', width: 110, align: 'end' },
+              { title: 'Contrib. total', key: 'contribucion_unit', width: 120, align: 'end' },
             ]"
             density="comfortable"
             data-testid="evento-gestion-tabla"
@@ -546,7 +546,7 @@ const inversionTotal = computed<number>(() => {
                 :disabled="!editable"
                 :data-testid="`evento-gestion-unidades-${item.producto_id}`"
                 class="text-center mx-auto"
-                style="max-width: 100px"
+                style="width: 100%"
                 suffix="und."
                 @update:model-value="(v) => onUnidadesInput(item.producto_id, v)"
                 @blur="() => alGuardarUnidades(item)"
@@ -593,10 +593,10 @@ const inversionTotal = computed<number>(() => {
               />
             </template>
 
-            <!-- Unit contribution: costo × contribución% -->
+            <!-- Total planned contribution: unidades × costo × contribución% -->
             <template #[`item.contribucion_unit`]="{ item }">
               <span class="font-weight-medium text-orange-darken-2">
-                ${{ ((item.costo_unitario ?? 0) * (contribucionPct[item.producto_id] ?? 0)).toFixed(2) }}
+                ${{ ((item.unidades_a_producir ?? 0) * (item.costo_unitario ?? 0) * (contribucionPct[item.producto_id] ?? 0)).toFixed(2) }}
               </span>
             </template>
           </v-data-table>
