@@ -32,16 +32,6 @@ const porUnidad = computed(() => {
 const hayFaltantes = computed(() =>
   lineas.value.some((l) => l.advertencia === 'MATERIA_PRIMA_FALTANTE'),
 )
-
-/** Scale a quantity for display. Returns the scaled value. */
-function cantidadEscalada(cantidad: number): number {
-  return cantidad * factor.value
-}
-
-/** Scale a subtotal for display. */
-function subtotalEscalada(subtotal: number): number {
-  return subtotal * factor.value
-}
 </script>
 
 <template>
@@ -77,12 +67,12 @@ function subtotalEscalada(subtotal: number): number {
             >mdi-alert</v-icon>
           </td>
           <td class="text-right">
-            {{ formatearUnidad(cantidadEscalada(linea.ingrediente.cantidad), linea.materiaPrima?.unidad ?? '') }}
+            {{ formatearUnidad(linea.ingrediente.cantidad * factor, linea.materiaPrima?.unidad ?? '') }}
           </td>
           <td class="text-right">
             {{ linea.materiaPrima ? formatearUSD(linea.materiaPrima.costo_por_unidad) : '—' }}
           </td>
-          <td class="text-right">{{ formatearUSD(subtotalEscalada(linea.subtotal)) }}</td>
+          <td class="text-right">{{ formatearUSD(linea.subtotal * factor) }}</td>
         </tr>
       </tbody>
       <tfoot>
