@@ -1,7 +1,7 @@
 // REQ-UX-17..19: pure function `obtenerSiguientePaso(contadores)` returns
 // the recommended next step for the home CTA. Six-branch hierarchy:
 //
-//   1. materiasPrimas === 0                → CREAR MATERIA PRIMA  /materias-primas (primary)
+//   1. materiasPrimas === 0                → CREAR MATERIA PRIMA  /inventario (primary)
 //   2. recetas === 0                       → CREAR PREPARACIÓN   /productos/preparaciones (primary)
 //   3. eventosTotal === 0                  → PLANIFICAR EVENTO    /eventos        (primary)
 //   4. eventosEnCurso === 0 && eventosTotal > 0

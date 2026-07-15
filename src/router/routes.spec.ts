@@ -58,13 +58,6 @@ describe('Route consolidation (Phase 6)', () => {
     expect(router.currentRoute.value.matched.length).toBeGreaterThanOrEqual(2)
   })
 
-  // inventory-tabs-redesign WU 1: /materias-primas → /inventario → /inventario/materias
-  it('/materias-primas redirects to /inventario/materias', async () => {
-    await setupRouter()
-    await router.push('/materias-primas')
-    expect(router.currentRoute.value.path).toBe('/inventario/materias')
-  })
-
   // catalog-domain-refactor / Slice 3: /recetas redirects to canonical /productos/preparaciones
   it('/recetas redirects to /productos/preparaciones', async () => {
     await setupRouter()

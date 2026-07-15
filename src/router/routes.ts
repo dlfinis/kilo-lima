@@ -14,10 +14,6 @@ const routes: RouteRecordRaw[] = [
     component: () => import('@/views/HomeView.vue'),
     meta: { breadcrumb: ['Inicio'] },
   },
-  {
-    path: '/materias-primas',
-    redirect: '/inventario',
-  },
   // inventory-tabs-redesign / WU 1: nested tabbed layout.
   // Parent owns the tabs and <router-view>; children are individual
   // tab views. /inventario redirects to the default materias tab.

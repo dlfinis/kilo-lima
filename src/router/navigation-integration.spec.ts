@@ -134,11 +134,6 @@ describe('Navigation Integration (Phase 6)', () => {
   })
 
   describe('Legacy route redirects', () => {
-    it('/materias-primas redirects to /inventario/materias', async () => {
-      await router.push('/materias-primas')
-      expect(router.currentRoute.value.path).toBe('/inventario/materias')
-    })
-
     // catalog-domain-refactor / Slice 3: /recetas redirects to canonical path
     it('/recetas redirects to /productos/preparaciones', async () => {
       await router.push('/recetas')
