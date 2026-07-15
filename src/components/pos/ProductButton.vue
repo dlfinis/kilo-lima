@@ -27,7 +27,6 @@ function formatPrecio(val: number): string {
     :aria-label="product.nombre"
     block
     variant="tonal"
-    color="surface-variant"
     class="product-button text-caption font-weight-medium py-2"
     :min-height="60"
     @click="emit('click', product)"
@@ -41,7 +40,7 @@ function formatPrecio(val: number): string {
         {{ product.icono || 'mdi-food' }}
       </v-icon>
       <span class="text-truncate text-body-2 font-weight-regular">{{ product.nombre }}</span>
-      <span class="text-body-1 font-weight-bold mt-0">S/ {{ formatPrecio(product.precio) }}</span>
+      <span class="text-body-1 font-weight-bold mt-0">${{ formatPrecio(product.precio) }}</span>
     </div>
   </v-btn>
 </template>

@@ -84,7 +84,6 @@ function exacto(): void {
 function establecerMetodoPago(metodo: MetodoPago): void {
   metodoPago.value = metodo
 }
-defineExpose({ exacto, montoRecibido, cambio, alConfirmar, establecerMetodoPago, metodoPago })
 
 watch(
   () => props.modelValue,
@@ -104,6 +103,13 @@ const cambioTexto = computed<string>(() => {
   if (cambio.value === null) return ''
   return formatearUSD(cambio.value)
 })
+
+const puedeConfirmar = computed(() => {
+  if (metodoPago.value !== 'efectivo') return true
+  return montoRecibido.value !== null && montoRecibido.value !== undefined
+})
+
+defineExpose({ exacto, montoRecibido, cambio, alConfirmar, establecerMetodoPago, metodoPago, puedeConfirmar })
 
 function alConfirmar(): void {
   emit('confirmar', {
@@ -217,6 +223,7 @@ function alConfirmar(): void {
         </v-btn>
         <v-btn
           color="primary"
+          :disabled="!puedeConfirmar"
           data-testid="registrar-venta-confirmar"
           @click="alConfirmar"
         >

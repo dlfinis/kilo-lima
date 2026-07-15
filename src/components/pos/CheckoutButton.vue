@@ -33,7 +33,7 @@ function formatTotal(val: number): string {
     >
       Cobrar
       <template v-if="total > 0">
-        &nbsp;S/ {{ formatTotal(total) }}
+        &nbsp;${{ formatTotal(total) }}
       </template>
     </v-btn>
     <div
