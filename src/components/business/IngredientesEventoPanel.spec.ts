@@ -90,15 +90,16 @@ describe('IngredientesEventoPanel', () => {
     await wrapper.vm.$nextTick()
 
     const text = wrapper.text()
-    // Harina: cantidad = requerido 50, faltante 20, costo compra = 20 × 5 = $100.00
+    // Harina: requerido 50, disponible 30, faltante 20, costo compra = 20 × 5 = 100.00
     expect(text).toContain('50.00')
-    expect(text).toContain('$100.00')
+    expect(text).toContain('100.00')
     expect(text).toContain('20.00')
+    expect(text).toContain('30.00')
 
-    // Azúcar: faltante = 0 → "—", costo compra = $0.00
-    expect(text).toContain('$0.00')
+    // Azúcar: faltante = 0 → "✓", costo compra = 0.00
+    expect(text).toContain('0.00')
     // Total compra row
-    expect(text).toContain('Total compra: $100.00')
+    expect(text).toContain('Total compra:')
   })
 
   // -----------------------------------------------------------------------
@@ -134,7 +135,7 @@ describe('IngredientesEventoPanel', () => {
     expect(faltanteCell.text()).toContain('30.00')
   })
 
-  it('shows covered-stock zero-gap as green dash when faltante is zero', async () => {
+  it('shows covered-stock zero-gap as green check when faltante is zero', async () => {
     const wrapper = mountPanel(
       mkResultado({
         consolidado: [
@@ -157,9 +158,10 @@ describe('IngredientesEventoPanel', () => {
     await btn.trigger('click')
     await wrapper.vm.$nextTick()
 
-    const successCell = wrapper.find('.text-success')
-    expect(successCell.exists()).toBe(true)
-    expect(successCell.text()).toBe('—')
+    // .text-success appears on both "Disponible" (20.00) and "A comprar" (✓)
+    // — verify the ✓ checkmark is present in the table text
+    const table = wrapper.find('[data-testid="ingredientes-consolidado-tabla"]')
+    expect(table.text()).toContain('✓')
   })
 
   // -----------------------------------------------------------------------

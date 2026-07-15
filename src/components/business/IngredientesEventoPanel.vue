@@ -32,11 +32,12 @@ const hayDatos = computed(
 
 const compraHeaders = [
   { title: 'Ingrediente', key: 'nombre' },
-  { title: 'Cantidad', key: 'cantidadDisplay', align: 'end' as const, width: 100 },
+  { title: 'Requerido', key: 'requeridoDisplay', align: 'end' as const, width: 100 },
+  { title: 'Disponible', key: 'disponibleDisplay', align: 'end' as const, width: 100 },
+  { title: 'A comprar', key: 'faltanteDisplay', align: 'end' as const, width: 100 },
   { title: 'Tipo', key: 'unidadTipo', align: 'center' as const, width: 40 },
-  { title: 'C.U', key: 'costoUnitario', align: 'end' as const, width: 110 },
+  { title: 'C.U', key: 'costoUnitario', align: 'end' as const, width: 130 },
   { title: 'Subtotal', key: 'costoCompra', align: 'end' as const, width: 110 },
-  // { title: 'A comprar', key: 'faltanteDisplay', align: 'end' as const, width: 120 },
 ]
 
 const costoCompraTotal = computed<number>(() =>
@@ -124,12 +125,27 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
             :items="consolidado"
             :headers="compraHeaders"
             density="compact"
-            hide-default-footer
+            :items-per-page="25"
+            :items-per-page-options="[10, 25, 50, 100, -1]"
             data-testid="ingredientes-consolidado-tabla"
           >
-            <!-- cantidadDisplay -->
-            <template #[`item.cantidadDisplay`]="{ item }">
+            <!-- requeridoDisplay -->
+            <template #[`item.requeridoDisplay`]="{ item }">
               {{ item.requerido.toFixed(2) }}
+            </template>
+            <!-- disponibleDisplay: on-hand stock -->
+            <template #[`item.disponibleDisplay`]="{ item }">
+              <span :class="{ 'text-success': item.disponible >= item.requerido }">
+                {{ item.disponible.toFixed(2) }}
+              </span>
+            </template>
+            <!-- faltanteDisplay: colour-coded: red when gap > 0, green when 0 -->
+            <template #[`item.faltanteDisplay`]="{ item }">
+              <span
+                v-if="item.faltante > 0"
+                class="font-weight-bold text-error"
+              >{{ item.faltante.toFixed(2) }}</span>
+              <span v-else class="text-success">✓</span>
             </template>
             <!-- unidadTipo -->
             <template #[`item.unidadTipo`]="{ item }">
@@ -138,7 +154,7 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
             <!-- costoUnitario -->
             <template #[`item.costoUnitario`]="{ item }">
               <span :class="{ 'text-medium-emphasis': item.faltante === 0 }">
-                {{ (item.costoUnitario).toFixed(2) }}
+                {{ (item.costoUnitario).toFixed(4) }}
               </span>
             </template>
             <!-- costoCompra: unit cost × faltante -->
@@ -147,14 +163,6 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
                 {{ (item.faltante * item.costoUnitario).toFixed(2) }}
               </span>
             </template>
-            <!-- faltanteDisplay: colour-coded: red when gap > 0, green when 0 -->
-            <!-- <template #[`item.faltanteDisplay`]="{ item }">
-              <span
-                v-if="item.faltante > 0"
-                class="font-weight-bold text-error"
-              >{{ faltanteFmt(item.faltante) }}</span>
-              <span v-else class="text-success">—</span>
-            </template> -->
           </v-data-table>
 
           <div
