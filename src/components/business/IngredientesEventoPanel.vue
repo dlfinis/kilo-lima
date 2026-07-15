@@ -32,12 +32,51 @@ const hayDatos = computed(
 
 const compraHeaders = [
   { title: 'Ingrediente', key: 'nombre' },
-  { title: 'Requerido', key: 'requeridoDisplay', align: 'end' as const, width: 100 },
-  { title: 'Disponible', key: 'disponibleDisplay', align: 'end' as const, width: 100 },
-  { title: 'A comprar', key: 'faltanteDisplay', align: 'end' as const, width: 100 },
-  { title: 'Tipo', key: 'unidadTipo', align: 'center' as const, width: 40 },
-  { title: 'C.U', key: 'costoUnitario', align: 'end' as const, width: 130 },
-  { title: 'Subtotal', key: 'costoCompra', align: 'end' as const, width: 110 },
+  {
+    title: 'Requerido',
+    key: 'requeridoDisplay',
+    value: (item: IngredienteCompra) =>
+      aUnidadDisplay(item.requerido, item.unidad, mejorUnidad(item.unidad, item.requerido)),
+    align: 'end' as const,
+    width: 100,
+  },
+  {
+    title: 'Disponible',
+    key: 'disponibleDisplay',
+    value: (item: IngredienteCompra) =>
+      aUnidadDisplay(item.disponible, item.unidad, mejorUnidad(item.unidad, item.requerido)),
+    align: 'end' as const,
+    width: 100,
+  },
+  {
+    title: 'A comprar',
+    key: 'faltanteDisplay',
+    value: (item: IngredienteCompra) =>
+      aUnidadDisplay(item.faltante, item.unidad, mejorUnidad(item.unidad, item.requerido)),
+    align: 'end' as const,
+    width: 100,
+  },
+  {
+    title: 'Tipo',
+    key: 'unidadTipo',
+    value: (item: IngredienteCompra) => mejorUnidad(item.unidad, item.requerido),
+    align: 'center' as const,
+    width: 40,
+  },
+  {
+    title: 'C.U',
+    key: 'costoUnitario',
+    value: (item: IngredienteCompra) => item.costoUnitario,
+    align: 'end' as const,
+    width: 130,
+  },
+  {
+    title: 'Subtotal',
+    key: 'costoCompra',
+    value: (item: IngredienteCompra) => item.faltante * item.costoUnitario,
+    align: 'end' as const,
+    width: 110,
+  },
 ]
 
 const costoCompraTotal = computed<number>(() =>
