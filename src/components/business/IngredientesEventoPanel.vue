@@ -62,6 +62,37 @@ function unidadTipoLabel(u: string): string {
   return u
 }
 
+/**
+ * Unit-conversion helpers for display only. The underlying math
+ * (faltante, costo) still operates in the original unit.
+ *
+ * Strategy: decide the display unit ONCE per row (based on `requerido`),
+ * then convert all values in that row to the same unit so columns stay
+ * comparable. 1500 g required → show everything in kg for that row.
+ *
+ *   1500 g  → 1.5 kg      0.5 kg  → 500 g
+ *   2000 ml → 2 l          0.5 l   → 500 ml
+ */
+
+/** Pick the most legible unit for a row, based on the required amount. */
+function mejorUnidad(unidad: string, requerido: number): string {
+  if (unidad === 'g' && requerido >= 1000) return 'kg'
+  if (unidad === 'kg' && requerido > 0 && requerido < 1) return 'g'
+  if (unidad === 'ml' && requerido >= 1000) return 'l'
+  if (unidad === 'l' && requerido > 0 && requerido < 1) return 'ml'
+  return unidad
+}
+
+/** Convert a value from the original unit to the display unit. */
+function aUnidadDisplay(valor: number, unidadOriginal: string, unidadDestino: string): number {
+  if (unidadOriginal === unidadDestino) return valor
+  if (unidadOriginal === 'g' && unidadDestino === 'kg') return valor / 1000
+  if (unidadOriginal === 'kg' && unidadDestino === 'g') return valor * 1000
+  if (unidadOriginal === 'ml' && unidadDestino === 'l') return valor / 1000
+  if (unidadOriginal === 'l' && unidadDestino === 'ml') return valor * 1000
+  return valor
+}
+
 const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
   PRODUCTO_FALTANTE: 'Producto faltante en catálogo',
   RECETA_FALTANTE: 'Receta faltante',
@@ -129,27 +160,27 @@ const ETIQUETAS_ADVERTENCIA: Record<Advertencia['codigo'], string> = {
             :items-per-page-options="[10, 25, 50, 100, -1]"
             data-testid="ingredientes-consolidado-tabla"
           >
-            <!-- requeridoDisplay -->
+            <!-- requeridoDisplay (converted to display unit) -->
             <template #[`item.requeridoDisplay`]="{ item }">
-              {{ item.requerido.toFixed(2) }}
+              {{ aUnidadDisplay(item.requerido, item.unidad, mejorUnidad(item.unidad, item.requerido)).toFixed(2) }}
             </template>
-            <!-- disponibleDisplay: on-hand stock -->
+            <!-- disponibleDisplay: on-hand stock (converted to display unit) -->
             <template #[`item.disponibleDisplay`]="{ item }">
               <span :class="{ 'text-success': item.disponible >= item.requerido }">
-                {{ item.disponible.toFixed(2) }}
+                {{ aUnidadDisplay(item.disponible, item.unidad, mejorUnidad(item.unidad, item.requerido)).toFixed(2) }}
               </span>
             </template>
-            <!-- faltanteDisplay: colour-coded: red when gap > 0, green when 0 -->
+            <!-- faltanteDisplay: colour-coded (converted to display unit) -->
             <template #[`item.faltanteDisplay`]="{ item }">
               <span
                 v-if="item.faltante > 0"
                 class="font-weight-bold text-error"
-              >{{ item.faltante.toFixed(2) }}</span>
+              >{{ aUnidadDisplay(item.faltante, item.unidad, mejorUnidad(item.unidad, item.requerido)).toFixed(2) }}</span>
               <span v-else class="text-success">✓</span>
             </template>
-            <!-- unidadTipo -->
+            <!-- unidadTipo: display unit for the row (may differ from original) -->
             <template #[`item.unidadTipo`]="{ item }">
-              {{ unidadTipoLabel(item.unidad) }}
+              {{ unidadTipoLabel(mejorUnidad(item.unidad, item.requerido)) }}
             </template>
             <!-- costoUnitario -->
             <template #[`item.costoUnitario`]="{ item }">

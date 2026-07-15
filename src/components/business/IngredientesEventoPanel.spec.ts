@@ -353,6 +353,104 @@ describe('IngredientesEventoPanel', () => {
   })
 
   // -----------------------------------------------------------------------
+  // Unit conversion (visualisation only — math uses original unit)
+  // -----------------------------------------------------------------------
+
+  it('converts large gram values to kg for display (1500 g → 1.50 kg)', async () => {
+    const wrapper = mountPanel(
+      mkResultado({
+        consolidado: [
+          {
+            materiaPrimaId: 'mp-1',
+            nombre: 'Harina',
+            unidad: 'g',
+            requerido: 1500,
+            disponible: 500,
+            faltante: 1000,
+            costoUnitario: 0.005,
+          },
+        ],
+      }),
+    )
+
+    const panel = wrapper.find('[data-testid="ingredientes-consolidado-panel"]')
+    await panel.find('button').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const table = wrapper.find('[data-testid="ingredientes-consolidado-tabla"]')
+    const text = table.text()
+    // All values converted to kg: requerido=1.50, disponible=0.50, faltante=1.00
+    expect(text).toContain('1.50')
+    expect(text).toContain('0.50')
+    expect(text).toContain('1.00')
+    // Type column shows "kg"
+    expect(text).toContain('kg')
+    // Original "g" should NOT appear in the table
+    expect(text).not.toContain('1500.00')
+  })
+
+  it('converts small kg values to g for display (0.5 kg → 500 g)', async () => {
+    const wrapper = mountPanel(
+      mkResultado({
+        consolidado: [
+          {
+            materiaPrimaId: 'mp-1',
+            nombre: 'Sal',
+            unidad: 'kg',
+            requerido: 0.5,
+            disponible: 0.2,
+            faltante: 0.3,
+            costoUnitario: 2,
+          },
+        ],
+      }),
+    )
+
+    const panel = wrapper.find('[data-testid="ingredientes-consolidado-panel"]')
+    await panel.find('button').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const table = wrapper.find('[data-testid="ingredientes-consolidado-tabla"]')
+    const text = table.text()
+    // All values converted to g: requerido=500, disponible=200, faltante=300
+    expect(text).toContain('500')
+    expect(text).toContain('200')
+    expect(text).toContain('300')
+    // Type column shows "g"
+    expect(text).toContain('g')
+  })
+
+  it('converts ml to l and l to ml consistently', async () => {
+    const wrapper = mountPanel(
+      mkResultado({
+        consolidado: [
+          {
+            materiaPrimaId: 'mp-1',
+            nombre: 'Leche',
+            unidad: 'ml',
+            requerido: 2000,
+            disponible: 500,
+            faltante: 1500,
+            costoUnitario: 0.003,
+          },
+        ],
+      }),
+    )
+
+    const panel = wrapper.find('[data-testid="ingredientes-consolidado-panel"]')
+    await panel.find('button').trigger('click')
+    await wrapper.vm.$nextTick()
+
+    const table = wrapper.find('[data-testid="ingredientes-consolidado-tabla"]')
+    const text = table.text()
+    // Converted to l: requerido=2.00, disponible=0.50, faltante=1.50
+    expect(text).toContain('2.00')
+    expect(text).toContain('0.50')
+    expect(text).toContain('1.50')
+    expect(text).toContain('l')
+  })
+
+  // -----------------------------------------------------------------------
   // Edge: empty perProducto but consolidated present (warnings only)
   // -----------------------------------------------------------------------
 
