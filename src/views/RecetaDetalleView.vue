@@ -17,7 +17,11 @@
 //
 // REQ-UX-29: the local "Volver" button was removed — the global
 // AppBar back button replaces it.
-import { computed, onMounted, ref } from 'vue'
+//
+// REQ-RECIPE-SCALE: projection input allows scaling the recipe to
+// produce more (or fewer) units than the base yield. Factor is
+// passed to RecetaCostoDesglose for display-only scaling.
+import { computed, onMounted, ref, watch } from 'vue'
 import { useRoute } from 'vue-router'
 
 import ProductoForm from '@/components/business/ProductoForm.vue'
@@ -43,6 +47,27 @@ const receta = computed(() =>
 )
 
 const calculo = useCalculoReceta(recetaId)
+
+// REQ-RECIPE-SCALE: projection state
+const unidadesProyectadas = ref<number>(0)
+
+// Reset projection when recipe changes
+watch(
+  () => receta.value,
+  (r) => {
+    if (r) {
+      unidadesProyectadas.value = r.rendimiento_unidades
+    }
+  },
+  { immediate: true },
+)
+
+// Scale factor: units desired / base yield
+const factorEscala = computed<number>(() => {
+  if (!receta.value || receta.value.rendimiento_unidades <= 0) return 1
+  const factor = unidadesProyectadas.value / receta.value.rendimiento_unidades
+  return Number.isFinite(factor) && factor > 0 ? factor : 1
+})
 
 const productoAsociado = computed<Producto | null>(() => {
   if (!recetaId.value) return null
@@ -111,11 +136,36 @@ async function manejarSubmitProducto(input: ProductoInput) {
       <p v-else class="mb-4 text-medium-emphasis">Sin descripción</p>
 
       <v-card class="mb-4 pa-4">
-        <p><strong>Rendimiento:</strong> {{ receta.rendimiento_unidades }} unidades</p>
+        <div class="d-flex align-center ga-4 flex-wrap">
+          <div>
+            <strong>Rendimiento base:</strong> {{ receta.rendimiento_unidades }} unidades
+          </div>
+          <v-divider v-if="receta.rendimiento_unidades > 0" vertical class="mx-2" />
+          <v-text-field
+            v-model.number="unidadesProyectadas"
+            label="Proyectar a (unidades)"
+            type="number"
+            min="1"
+            step="1"
+            density="compact"
+            hide-details
+            style="max-width: 180px"
+            data-testid="receta-proyeccion-input"
+          />
+          <v-chip
+            v-if="factorEscala !== 1"
+            color="primary"
+            variant="tonal"
+            size="small"
+            data-testid="receta-factor-escala"
+          >
+            Factor: {{ factorEscala.toFixed(2) }}×
+          </v-chip>
+        </div>
       </v-card>
 
       <h2 class="mb-2">Desglose de costo</h2>
-      <RecetaCostoDesglose v-if="calculo" :calculo="calculo" />
+      <RecetaCostoDesglose v-if="calculo" :calculo="calculo" :factor-escala="factorEscala" />
     </template>
 
     <v-dialog

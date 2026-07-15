@@ -89,4 +89,78 @@ describe('RecetaCostoDesglose', () => {
     const texto = wrapper.text()
     expect(texto).toMatch(/Materia prima no disponible|no disponible/i)
   })
+
+  // REQ-RECIPE-SCALE: scaling tests
+  it('scales quantities and subtotals by factorEscala (2x projection)', () => {
+    const calculo = mkCalculo({
+      costoTotal: 5,
+      costoPorUnidad: 0.5,
+      ingredientes: [
+        {
+          ingrediente: {
+            id: 'ri-1',
+            receta_id: 'r-1',
+            materia_prima_id: 'mp-1',
+            cantidad: 1,
+            created_at: '2026-01-01T00:00:00Z',
+          },
+          materiaPrima: {
+            id: 'mp-1',
+            nombre: 'Harina',
+            unidad: 'kg',
+            costo_por_unidad: 5,
+            notas: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+          subtotal: 5,
+        },
+      ],
+    })
+    const wrapper = mount(RecetaCostoDesglose, {
+      props: { calculo, factorEscala: 2 },
+      global: { plugins: [vuetify] },
+    })
+
+    const texto = wrapper.text()
+    // Quantity scaled: 1 kg → 2 kg
+    expect(texto).toContain('2')
+    // Subtotal scaled: $5 → $10
+    expect(texto).toContain('10')
+    // Total scaled: $5 → $10
+    expect(texto).toContain('10.00')
+  })
+
+  it('defaults to factor 1 when factorEscala is not provided', () => {
+    const calculo = mkCalculo({
+      costoTotal: 5,
+      ingredientes: [
+        {
+          ingrediente: {
+            id: 'ri-1',
+            receta_id: 'r-1',
+            materia_prima_id: 'mp-1',
+            cantidad: 2.5,
+            created_at: '2026-01-01T00:00:00Z',
+          },
+          materiaPrima: {
+            id: 'mp-1',
+            nombre: 'Azúcar',
+            unidad: 'kg',
+            costo_por_unidad: 3,
+            notas: null,
+            created_at: '2026-01-01T00:00:00Z',
+            updated_at: '2026-01-01T00:00:00Z',
+          },
+          subtotal: 7.5,
+        },
+      ],
+    })
+    const wrapper = mountDesglose(calculo)
+
+    const texto = wrapper.text()
+    // No scaling: quantity stays 2.5, subtotal stays $7.50
+    expect(texto).toContain('2.5')
+    expect(texto).toContain('7.50')
+  })
 })

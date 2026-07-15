@@ -182,4 +182,44 @@ describe('RecetaDetalleView', () => {
     expect(document.body.textContent).toContain('Vender esta preparación')
     expect(document.querySelector('form.producto-form')).not.toBeNull()
   })
+
+  // REQ-RECIPE-SCALE: projection input tests
+  it('renders the projection input initialized to recipe yield', async () => {
+    const wrapper = await montarVista('r-1')
+    const { useRecipesStore } = await import('@/stores/recipes.store')
+    await aplicacion.runWithContext(() => {
+      useRecipesStore().recetas.push(mkReceta('r-1')) // rendimiento = 2
+    })
+    await flushPromises()
+
+    const input = wrapper.find('[data-testid="receta-proyeccion-input"]')
+    expect(input.exists()).toBe(true)
+    // v-text-field wraps an actual input; find it
+    const nativeInput = input.find('input[type="number"]')
+    expect(nativeInput.exists()).toBe(true)
+    expect(nativeInput.element.value).toBe('2')
+  })
+
+  it('passes factorEscala to RecetaCostoDesglose when projection changes', async () => {
+    const wrapper = await montarVista('r-1')
+    const { useRecipesStore } = await import('@/stores/recipes.store')
+    await aplicacion.runWithContext(() => {
+      useRecipesStore().recetas.push(mkReceta('r-1')) // rendimiento = 2
+    })
+    await flushPromises()
+
+    // Change projection to 4 units (factor = 4/2 = 2)
+    const input = wrapper.find('[data-testid="receta-proyeccion-input"]')
+    const nativeInput = input.find('input[type="number"]')
+    await nativeInput.setValue('4')
+    await flushPromises()
+
+    const desglose = wrapper.findComponent(RecetaCostoDesglose)
+    expect(desglose.props('factorEscala')).toBe(2)
+
+    // Factor chip should show "2.00×"
+    const chip = wrapper.find('[data-testid="receta-factor-escala"]')
+    expect(chip.exists()).toBe(true)
+    expect(chip.text()).toContain('2.00')
+  })
 })

@@ -4,19 +4,44 @@
 // renders the per-line breakdown + totals. The MATERIA_PRIMA_FALTANTE
 // warning surfaces as a yellow v-alert so the user knows the line is
 // excluded from the total. Display-only — no emits, no store import.
+//
+// REQ-RECIPE-SCALE: optional `factorEscala` prop (default 1) scales
+// quantities and subtotals for projection (e.g. recipe yields 10 units,
+// user wants to see what's needed for 20 → factor = 2). The base
+// CalculoReceta is NOT modified; only the display is scaled.
 import { computed } from 'vue'
 
 import { formatearUSD, formatearUnidad } from '@/utils/format'
 import type { CalculoReceta } from '@/types'
 
-const props = defineProps<{ calculo: CalculoReceta }>()
+const props = withDefaults(
+  defineProps<{
+    calculo: CalculoReceta
+    factorEscala?: number
+  }>(),
+  { factorEscala: 1 },
+)
 
+const factor = computed(() => Math.max(props.factorEscala, 0))
 const lineas = computed(() => props.calculo.ingredientes)
-const total = computed(() => formatearUSD(props.calculo.costoTotal))
-const porUnidad = computed(() => formatearUSD(props.calculo.costoPorUnidad))
+const total = computed(() => formatearUSD(props.calculo.costoTotal * factor.value))
+const porUnidad = computed(() => {
+  // costoPorUnidad stays constant when scaling (same recipe, more units)
+  return formatearUSD(props.calculo.costoPorUnidad)
+})
 const hayFaltantes = computed(() =>
   lineas.value.some((l) => l.advertencia === 'MATERIA_PRIMA_FALTANTE'),
 )
+
+/** Scale a quantity for display. Returns the scaled value. */
+function cantidadEscalada(cantidad: number): number {
+  return cantidad * factor.value
+}
+
+/** Scale a subtotal for display. */
+function subtotalEscalada(subtotal: number): number {
+  return subtotal * factor.value
+}
 </script>
 
 <template>
@@ -52,12 +77,12 @@ const hayFaltantes = computed(() =>
             >mdi-alert</v-icon>
           </td>
           <td class="text-right">
-            {{ formatearUnidad(linea.ingrediente.cantidad, linea.materiaPrima?.unidad ?? '') }}
+            {{ formatearUnidad(cantidadEscalada(linea.ingrediente.cantidad), linea.materiaPrima?.unidad ?? '') }}
           </td>
           <td class="text-right">
             {{ linea.materiaPrima ? formatearUSD(linea.materiaPrima.costo_por_unidad) : '—' }}
           </td>
-          <td class="text-right">{{ formatearUSD(linea.subtotal) }}</td>
+          <td class="text-right">{{ formatearUSD(subtotalEscalada(linea.subtotal)) }}</td>
         </tr>
       </tbody>
       <tfoot>
