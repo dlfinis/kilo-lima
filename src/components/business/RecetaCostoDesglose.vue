@@ -67,7 +67,7 @@ const hayFaltantes = computed(() =>
             >mdi-alert</v-icon>
           </td>
           <td class="text-right">
-            {{ formatearUnidad(linea.ingrediente.cantidad * factor, linea.materiaPrima?.unidad ?? '') }}
+            {{ formatearUnidad(+(linea.ingrediente.cantidad * factor).toFixed(4), linea.materiaPrima?.unidad ?? '') }}
           </td>
           <td class="text-right">
             {{ linea.materiaPrima ? formatearUSD(linea.materiaPrima.costo_por_unidad) : '—' }}
