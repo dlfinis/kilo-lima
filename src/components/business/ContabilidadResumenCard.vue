@@ -27,7 +27,25 @@ const colorUtilidadNeta = computed(() => (props.resumen.utilidadNeta >= 0 ? 'suc
         </template>
       </v-list-item>
       <v-list-item>
-        <template #title>COGS</template>
+        <template #title>
+          <span>COGS</span>
+          <v-tooltip
+            v-if="!resumen.cogsConfiable && resumen.totalCogs === 0"
+            text="COGS no verificado — no hay movimientos de consumo registrados para este evento"
+            location="top"
+          >
+            <template #activator="{ props: tooltipProps }">
+              <v-icon
+                v-bind="tooltipProps"
+                size="small"
+                color="warning"
+                class="ml-1"
+              >
+                mdi-alert-circle-outline
+              </v-icon>
+            </template>
+          </v-tooltip>
+        </template>
         <template #append>
           <span class="font-weight-medium">{{ formatearUSD(resumen.totalCogs) }}</span>
         </template>

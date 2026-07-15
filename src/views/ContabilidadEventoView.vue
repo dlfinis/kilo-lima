@@ -3,18 +3,16 @@ import { computed, onMounted, ref } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 
 import SociosEventoDialog from '@/components/business/SociosEventoDialog.vue'
-import CompraInsumoForm from '@/components/business/CompraInsumoForm.vue'
 import AporteForm from '@/components/business/AporteForm.vue'
 import ContabilidadResumenCard from '@/components/business/ContabilidadResumenCard.vue'
 import DistribucionCard from '@/components/business/DistribucionCard.vue'
 import TimelineMovimientos from '@/components/business/TimelineMovimientos.vue'
-import { useAbastecimientoStore } from '@/stores/abastecimiento.store'
 import { useSociosStore } from '@/stores/socios.store'
 import { useGastosFijosStore } from '@/stores/gastosFijos.store'
 import { useGastosImprevistosStore } from '@/stores/gastosImprevistos.store'
 import { useVentasStore } from '@/stores/ventas.store'
 import { useContabilidad } from '@/composables/useContabilidad'
-import type { AporteInput, CompraInsumoInput } from '@/types'
+import type { AporteInput } from '@/types'
 
 const route = useRoute()
 const router = useRouter()
@@ -25,7 +23,6 @@ const eventoId = computed<string | null>(() => {
 })
 
 const sociosStore = useSociosStore()
-const abastecimientoStore = useAbastecimientoStore()
 const {
   resumen,
   distribucion,
@@ -36,7 +33,6 @@ const {
 } = useContabilidad(eventoId)
 
 const dialogoSocios = ref(false)
-const dialogoCompra = ref(false)
 const dialogoAporte = ref(false)
 
 function irADetalle() {
@@ -56,15 +52,6 @@ onMounted(() => {
     }
   }
 })
-
-async function manejarCompraSubmit(input: CompraInsumoInput) {
-  if (!eventoId.value) return
-  await abastecimientoStore.crearCompraInsumo({
-    ...input,
-    evento_id: eventoId.value,
-  })
-  dialogoCompra.value = false
-}
 
 async function manejarAporteSubmit(input: AporteInput) {
   if (!eventoId.value) return
@@ -101,10 +88,6 @@ async function manejarAporteSubmit(input: AporteInput) {
       </div>
 
       <div class="d-flex ga-2 mb-4 flex-wrap">
-        <v-btn color="secondary" variant="flat" prepend-icon="mdi-cart"
-          @click="dialogoCompra = true">
-          + Compra insumo
-        </v-btn>
         <v-btn color="secondary" variant="flat" prepend-icon="mdi-hand-coin"
           @click="dialogoAporte = true">
           + Aporte capital
@@ -131,16 +114,6 @@ async function manejarAporteSubmit(input: AporteInput) {
     </v-alert>
 
     <SociosEventoDialog v-if="eventoId" v-model="dialogoSocios" :evento-id="eventoId" />
-
-    <v-dialog v-if="eventoId" v-model="dialogoCompra" max-width="500">
-      <v-card>
-        <v-card-title>Registrar compra de insumo</v-card-title>
-        <v-card-text>
-          <CompraInsumoForm :evento-id="eventoId" @submit="manejarCompraSubmit"
-            @cancel="dialogoCompra = false" />
-        </v-card-text>
-      </v-card>
-    </v-dialog>
 
     <v-dialog v-if="eventoId" v-model="dialogoAporte" max-width="500">
       <v-card>

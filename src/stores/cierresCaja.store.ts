@@ -29,6 +29,10 @@ import {
   type CierresCajaService,
 } from '@/services/cierresCaja.service'
 import { crearEventsService, type EventsService } from '@/services/events.service'
+import {
+  crearStockMovementsService,
+  type StockMovementsService,
+} from '@/services/stockMovements.service'
 import { useEventsStore } from '@/stores/events.store'
 
 const MENSAJE_ERROR_CARGA = 'Error al cargar el cierre de caja'
@@ -42,6 +46,7 @@ export const useCierresCajaStore = defineStore('cierresCaja', () => {
   const supabase: SupabaseClient<Database> = supabaseInyectado
   const servicio: CierresCajaService = crearCierresCajaService(supabase)
   const eventsServicio: EventsService = crearEventsService(supabase)
+  const stockServicio: StockMovementsService = crearStockMovementsService(supabase)
 
   const cierre = ref<CierreCaja | null>(null)
   const cargando = ref<boolean>(false)
@@ -119,6 +124,11 @@ export const useCierresCajaStore = defineStore('cierresCaja', () => {
         if (eventsStore.eventoActual?.id === cambio.data.id) {
           eventsStore.eventoActual = cambio.data
         }
+
+        // Phase 4 (REQ-STOCK-MOVEMENTS-4): snapshot COGS on event close.
+        // Fire-and-forget — the cierre is already committed; snapshot
+        // failure is logged but doesn't block the cierre.
+        void stockServicio.finalizarEventoSnapshot(input.evento_id)
       }
     }
 
