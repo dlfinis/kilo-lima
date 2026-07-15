@@ -503,8 +503,8 @@ on conflict do nothing;
 -- 2 socios · porcentajes de ganancia para el evento "Festival 2026"
 -- =====================================================================
 insert into public.socios (nombre, email, telefono, notas) values
-  ('Diego',    'diego@example.com',   '+52 55 0000 0001', 'Encargado de producción'),
-  ('Ana',   'lucia@example.com',   '+52 55 0000 0002', 'Encargada de ventas')
+  ('Diego León',    'diego@example.com',   '+52 55 0000 0001', 'Encargado de producción'),
+  ('Lucía Reyes',   'lucia@example.com',   '+52 55 0000 0002', 'Encargada de ventas')
 on conflict (nombre) do nothing;
 
 -- =====================================================================
@@ -910,6 +910,11 @@ insert into public.materias_primas (nombre, unidad, costo_por_unidad, categoria,
   ('Topping brownie', 'g', 0.15, 'ingrediente', 'Brownie en cubos (20g)')
 on conflict do nothing;
 
+-- Receta base para helados (si no existe)
+insert into public.recetas (nombre, descripcion, rendimiento_unidades, notas)
+values ('Helado base', 'Receta base para helados personalizables', 1, 'Se usa como referencia para productos configurables')
+on conflict do nothing;
+
 -- Productos base para helados
 insert into public.productos (nombre, receta_id, categoria, disponible, orden, descripcion, icono, color)
 select 'Helado Simple', r.id, 'helado', true, 100, 'Helado con personalización', 'mdi-ice-cream', 'info'
@@ -921,11 +926,6 @@ insert into public.productos (nombre, receta_id, categoria, disponible, orden, d
 select 'Helado Doble', r.id, 'helado', true, 101, 'Helado doble con personalización', 'mdi-ice-cream', 'primary'
 from public.recetas r
 where r.nombre = 'Helado base'
-on conflict do nothing;
-
--- Receta base para helados (si no existe)
-insert into public.recetas (nombre, descripcion, rendimiento_unidades, notas)
-values ('Helado base', 'Receta base para helados personalizables', 1, 'Se usa como referencia para productos configurables')
 on conflict do nothing;
 
 -- Productos configurables

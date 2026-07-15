@@ -52,6 +52,8 @@ import { useEventoProductosStore } from './eventoProductos.store'
 import { useEventsStore } from './events.store'
 import { useProductosStore } from './productos.store'
 import { useRecipesStore } from './recipes.store'
+import { useIngredientsStore } from './ingredients.store'
+import { useStockMovementsStore } from './stockMovements.store'
 
 const LIMITE_CANTIDAD_MAX = 99
 const MENSAJE_ERROR_CARGA = 'Error al cargar las ventas'
@@ -410,6 +412,18 @@ export const useVentasStore = defineStore('ventas', () => {
       return { data: null, error: res.error }
     }
     ventas.value = [res.data, ...ventas.value]
+
+    // Phase 4 (REQ-STOCK-MOVEMENTS-4): fire-and-forget consumption
+    // registration. After a sale is committed, register stock
+    // consumption for each raw material used in the sold products.
+    // Failures are logged but never block the sale.
+    void registrarConsumoPorVenta(res.data).catch((e) => {
+      logError('registrarVenta', 'consumption-registration-failed', {
+        ventaId: res.data?.id,
+        error: (e as Error)?.message ?? 'unknown',
+      })
+    })
+
     return { data: res.data, error: null }
   }
 
@@ -627,6 +641,50 @@ export const useVentasStore = defineStore('ventas', () => {
     }
     
     logInfo('eliminarVenta', 'venta deleted', { ventaId: id, traceId })
+  }
+
+  // Phase 4: register stock consumption movements for every raw material
+  // used in a sale. Resolves Producto → Receta → Ingredientes, computes
+  // per-unit consumption from the recipe's rendimiento_unidades, and
+  // calls registrar_consumo for each ingredient.
+  async function registrarConsumoPorVenta(venta: VentaConItems): Promise<void> {
+    const stockStore = useStockMovementsStore()
+    const ingredientsStore = useIngredientsStore()
+    const materiaCostMap = new Map(
+      ingredientsStore.materiasPrimas.map((m) => [m.id, m]),
+    )
+
+    for (const item of venta.items) {
+      const producto = productosStore.productos.find(
+        (p) => p.id === item.producto_id,
+      )
+      if (!producto) continue
+
+      const receta = recipesStore.recetas.find(
+        (r) => r.id === producto.receta_id,
+      )
+      if (!receta || !receta.rendimiento_unidades) continue
+
+      // Compute per-recipe-unit → per-sale-unit scaling factor.
+      const factor = item.cantidad / receta.rendimiento_unidades
+
+      for (const ing of receta.ingredientes) {
+        const cantidadConsumida = ing.cantidad * factor
+        if (cantidadConsumida <= 0) continue
+
+        const materia = materiaCostMap.get(ing.materia_prima_id)
+        const costo = materia?.costo_por_unidad ?? 0
+
+        await stockStore.registrarConsumo({
+          materia_prima_id: ing.materia_prima_id,
+          cantidad: cantidadConsumida,
+          costo_unitario: costo,
+          evento_id: venta.evento_id,
+          venta_id: venta.id,
+          fecha: new Date().toISOString().split('T')[0],
+        })
+      }
+    }
   }
 
   return {

@@ -55,17 +55,6 @@ const recetaSeleccionada = computed<RecetaPlanRow | undefined>(() =>
   props.recetas.find((r) => r.id === props.fila.receta_id),
 )
 
-// Primary identity: commercial product name when available, otherwise
-// the preparation name (receta.nombre). The SelectorReceta already
-// shows `nombre` (the grid sets it to producto.nombre when a linked
-// product exists), so `primaryLabel` is used for the secondary line
-// and the tooltip.
-const primaryLabel = computed<string>(() => {
-  const sel = recetaSeleccionada.value
-  if (!sel) return ''
-  return sel.productoNombre ?? sel.recetaNombre ?? sel.nombre
-})
-
 // Secondary identity: the preparation name shown below the primary
 // label only when a commercial product exists — this tells the
 // operator which preparation backs the product.

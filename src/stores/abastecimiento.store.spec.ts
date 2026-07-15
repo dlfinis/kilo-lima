@@ -109,6 +109,7 @@ describe('useAbastecimientoStore', () => {
         cantidad: 15,
         costo_total: 30,
         fecha: '2026-07-14',
+        descripcion: null,
       })
 
       expect(error).toBeNull()

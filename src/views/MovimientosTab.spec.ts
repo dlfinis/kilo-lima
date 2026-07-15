@@ -105,8 +105,8 @@ describe('MovimientosTab', () => {
       mkMateria({ id: 'mp-1', nombre: 'Harina' }),
       mkMateria({ id: 'mp-2', nombre: 'Azúcar' }),
     ]
-    __resetSupabaseMock([
-      { data: materias as unknown as StockMovement[], error: null }, // cargarTodas (useIngredients)
+    __resetSupabaseMock<MateriaPrima[] | StockMovement[]>([
+      { data: materias, error: null }, // cargarTodas (useIngredients)
       { data: movements, error: null }, // cargarMovimientos
     ])
     const wrapper = montarVista()
@@ -135,7 +135,7 @@ describe('MovimientosTab', () => {
     const materias: MateriaPrima[] = [
       mkMateria({ id: 'mp-1', nombre: 'Harina' }),
     ]
-    __resetSupabaseMock([
+    __resetSupabaseMock<MateriaPrima[] | StockMovement[]>([
       { data: materias, error: null },
       { data: movements, error: null },
     ])
@@ -163,8 +163,8 @@ describe('MovimientosTab', () => {
       mkMateria({ id: 'mp-1', nombre: 'Harina' }),
       mkMateria({ id: 'mp-2', nombre: 'Azúcar' }),
     ]
-    __resetSupabaseMock([
-      { data: materias as unknown as StockMovement[], error: null },
+    __resetSupabaseMock<MateriaPrima[] | StockMovement[]>([
+      { data: materias, error: null },
       { data: movements, error: null },
     ])
     const wrapper = montarVista()
@@ -185,7 +185,7 @@ describe('MovimientosTab', () => {
     const materias: MateriaPrima[] = [
       mkMateria({ id: 'mp-1', nombre: 'Harina' }),
     ]
-    __resetSupabaseMock([
+    __resetSupabaseMock<MateriaPrima[] | StockMovement[]>([
       { data: materias, error: null },
       { data: movements, error: null },
     ])
@@ -211,7 +211,7 @@ describe('MovimientosTab', () => {
     const materias: MateriaPrima[] = [
       mkMateria({ id: 'mp-1', nombre: 'Harina' }),
     ]
-    __resetSupabaseMock([
+    __resetSupabaseMock<MateriaPrima[] | StockMovement[]>([
       { data: materias, error: null },
       { data: movements, error: null },
     ])
@@ -231,8 +231,8 @@ describe('MovimientosTab', () => {
     const materias: MateriaPrima[] = [
       mkMateria({ id: 'mp-1', nombre: 'Harina' }),
     ]
-    __resetSupabaseMock([
-      { data: materias as unknown as StockMovement[], error: null },
+    __resetSupabaseMock<MateriaPrima[] | StockMovement[]>([
+      { data: materias, error: null },
       { data: null, error: { code: 'TEST_ERROR', message: 'Error al cargar los movimientos de inventario' } },
     ])
     const wrapper = montarVista()

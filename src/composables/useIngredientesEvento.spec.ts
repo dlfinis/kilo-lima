@@ -25,7 +25,6 @@ import { useProductosStore } from '@/stores/productos.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { calcularIngredientesEvento, useIngredientesEvento } from './useIngredientesEvento'
-import type { IngredienteCompra } from './useIngredientesEvento'
 
 // ---------------------------------------------------------------------------
 // Test factories — minimal valid shapes following the DB column convention
@@ -561,7 +560,8 @@ describe('useIngredientesEvento', () => {
 
   it('returns null when eventoId is undefined', () => {
     conContexto(() => {
-      const resultado = useIngredientesEvento(undefined)
+      const eventoId = undefined as string | null | undefined
+      const resultado = useIngredientesEvento(eventoId ?? null)
       expect(resultado.value).toBeNull()
     })
   })

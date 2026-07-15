@@ -76,7 +76,7 @@ BEGIN
   -- 1. Calcular costo de materiales fijos (ingredientes de la receta base)
   SELECT COALESCE(SUM(mp.costo_por_unidad * ir.cantidad), 0)
   INTO v_costo_materiales
-  FROM ingredientes_receta ir
+  FROM receta_ingredientes ir
   JOIN materias_primas mp ON mp.id = ir.materia_prima_id
   JOIN recetas r ON r.id = ir.receta_id
   JOIN productos p ON p.receta_id = r.id
@@ -145,9 +145,13 @@ CREATE OR REPLACE FUNCTION trigger_recalcular_grupo()
 RETURNS TRIGGER AS $$
 BEGIN
   PERFORM calcular_costo_base_configurable(
-    (SELECT producto_configurable_id FROM grupos_opciones WHERE id = NEW.grupo_id)
+    (
+      SELECT producto_configurable_id
+      FROM grupos_opciones
+      WHERE id = COALESCE(NEW.grupo_id, OLD.grupo_id)
+    )
   );
-  RETURN NEW;
+  RETURN COALESCE(NEW, OLD);
 END;
 $$ LANGUAGE plpgsql;
 

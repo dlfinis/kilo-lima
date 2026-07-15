@@ -5,6 +5,7 @@ import { useAbastecimientoStore } from '@/stores/abastecimiento.store'
 import { useGastosFijosStore } from '@/stores/gastosFijos.store'
 import { useGastosImprevistosStore } from '@/stores/gastosImprevistos.store'
 import { useVentasStore } from '@/stores/ventas.store'
+import { useStockMovementsStore } from '@/stores/stockMovements.store'
 import { redondearCentavos } from '@/utils/moneda'
 import type {
   Aporte,
@@ -17,9 +18,13 @@ import type {
   DistribucionResultado,
 } from '@/types'
 
+// Phase 4 (REQ-STOCK-MOVEMENTS-4): cogsConfiable indicates whether
+// COGS is computed from real stock consumption movements (trusted)
+// or falls back to venta-item theoretical costs (untrusted).
 export interface ResumenContabilidad {
   totalVentas: number
   totalCogs: number
+  cogsConfiable: boolean
   totalGastosFijos: number
   totalGastosImprevistos: number
   totalAportes: number
@@ -68,17 +73,46 @@ export function useContabilidad(eventoId: ComputedRef<string | null>) {
     return useAbastecimientoStore().comprasInsumos.get(id) ?? []
   })
 
+  // Phase 4: COGS from stock movement consumption evidence.
+  // Trusted when real consumption movements exist for the event;
+  // untrusted (zero COGS, flagged) when consumption evidence is missing.
+  // This prevents silent fallback to theoretical costo_unitario values.
+  const cogsDesdeMovimientos = computed<{ total: number; confiable: boolean }>(() => {
+    const id = eventoId.value
+    if (!id) return { total: 0, confiable: false }
+
+    const stockStore = useStockMovementsStore()
+    const consumos = stockStore.movements.filter(
+      (m) => m.tipo === 'consumo' && m.evento_id === id,
+    )
+
+    if (consumos.length === 0) {
+      return { total: 0, confiable: false }
+    }
+
+    const total = consumos.reduce(
+      (s, m) => s + Math.abs(m.cantidad) * (m.costo_unitario_snapshot ?? 0),
+      0,
+    )
+    return { total: redondearCentavos(total), confiable: true }
+  })
+
   const resumen = computed<ResumenContabilidad>(() => {
     const gFijos = gastosFijos.value
     const gImp = gastosImprevistos.value
     const vtas = ventas.value
     const ap = aportes.value
     const comp = compras.value
+    const cogs = cogsDesdeMovimientos.value
 
     const totalVentas = vtas.reduce((s, v) => s + (Number.isFinite(v.total) ? v.total : 0), 0)
-    const totalCogs = vtas.reduce((s, v) => {
-      return s + (v.items ?? []).reduce((si, item) => si + (Number.isFinite(item.costo_unitario) ? item.costo_unitario! * item.cantidad : 0), 0)
-    }, 0)
+
+    // Phase 4: use movement-backed COGS when available.
+    // When no consumption movements exist, cogsConfiable is false
+    // and totalCogs is 0 — the UI should surface the untrusted state.
+    const totalCogs = cogs.total
+    const cogsConfiable = cogs.confiable
+
     const totalGastosFijos = gFijos.reduce((s, g) => s + (Number.isFinite(g.monto) ? g.monto : 0), 0)
     const totalGastosImprevistos = gImp.reduce((s, g) => s + (Number.isFinite(g.monto) ? g.monto : 0), 0)
     const totalAportes = ap.reduce((s, a) => s + (Number.isFinite(a.monto) ? a.monto : 0), 0)
@@ -89,6 +123,7 @@ export function useContabilidad(eventoId: ComputedRef<string | null>) {
     return {
       totalVentas: redondearCentavos(totalVentas),
       totalCogs: redondearCentavos(totalCogs),
+      cogsConfiable,
       totalGastosFijos: redondearCentavos(totalGastosFijos),
       totalGastosImprevistos: redondearCentavos(totalGastosImprevistos),
       totalAportes: redondearCentavos(totalAportes),
@@ -266,10 +301,14 @@ export function useContabilidad(eventoId: ComputedRef<string | null>) {
 
     const sociosStore = useSociosStore()
     const abastecimientoStore = useAbastecimientoStore()
+    const stockStore = useStockMovementsStore()
     await Promise.all([
       sociosStore.cargarSociosEvento(id),
       sociosStore.cargarAportes(id),
       abastecimientoStore.cargarComprasInsumos(id),
+      // Phase 4: load stock movements so COGS can be computed from
+      // real consumption evidence.
+      stockStore.cargarMovimientos(),
     ])
 
     cargando.value = false
@@ -279,6 +318,7 @@ export function useContabilidad(eventoId: ComputedRef<string | null>) {
     cargando,
     error,
     resumen,
+    cogsDesdeMovimientos,
     inversionPorSocio,
     distribucion,
     timeline,

@@ -88,9 +88,7 @@ describe('StockMovementsService', () => {
         },
       ]
 
-      const eqChain = vi.fn().mockReturnThis()
       const orderChain = vi.fn().mockResolvedValue({ data: mockMovements, error: null })
-      const selectChain = vi.fn().mockReturnValue({ eq: eqChain })
       // The eq chain returns an object with order
       const eqResult = { order: orderChain }
       const eqFn = vi.fn().mockReturnValue(eqResult)

@@ -35,15 +35,17 @@ const seleccionesPorGrupo = ref<Map<string, PersonalizacionCarrito[]>>(new Map()
 // Inicializar selecciones con las opciones gratis
 watch(configurable, (conf) => {
   if (!conf) return
-  
+
   seleccionesPorGrupo.value.clear()
-  
+
   conf.grupos.forEach((grupo) => {
     const incluidas: PersonalizacionCarrito[] = []
-    
+
     // Seleccionar automáticamente las primeras N opciones como gratis
     for (let i = 0; i < grupo.incluidas_gratis && i < grupo.opciones.length; i++) {
       const opcion = grupo.opciones[i]
+      if (!opcion) continue
+
       incluidas.push({
         grupo_id: grupo.id,
         materia_prima_id: opcion.materia_prima_id,
@@ -54,7 +56,7 @@ watch(configurable, (conf) => {
         cantidad: 1,
       })
     }
-    
+
     seleccionesPorGrupo.value.set(grupo.id, incluidas)
   })
 }, { immediate: true })
@@ -85,11 +87,6 @@ const costoExtras = computed(() => {
 const precioTotal = computed(() => props.precioBase + totalExtras.value)
 const costoTotal = computed(() => props.costoBase + costoExtras.value)
 
-// Obtener grupo por ID
-function obtenerGrupo(grupoId: string): GrupoOpcionesConOpciones | null {
-  return configurable.value?.grupos.find((g) => g.id === grupoId) || null
-}
-
 // Obtener selecciones de un grupo
 function obtenerSelecciones(grupoId: string): PersonalizacionCarrito[] {
   return seleccionesPorGrupo.value.get(grupoId) || []
@@ -106,10 +103,10 @@ function opcionesGratisDisponibles(grupo: GrupoOpcionesConOpciones): number {
 function seleccionarOpcion(grupo: GrupoOpcionesConOpciones, materiaPrimaId: string) {
   const opcion = grupo.opciones.find((o) => o.materia_prima_id === materiaPrimaId)
   if (!opcion) return
-  
+
   const selecciones = obtenerSelecciones(grupo.id)
   const existente = selecciones.find((s) => s.materia_prima_id === materiaPrimaId)
-  
+
   if (existente) {
     // Si ya está seleccionada, aumentar cantidad
     existente.cantidad++
@@ -117,7 +114,7 @@ function seleccionarOpcion(grupo: GrupoOpcionesConOpciones, materiaPrimaId: stri
     // Determinar si es gratis o paga
     const gratisDisponibles = opcionesGratisDisponibles(grupo)
     const esIncluido = gratisDisponibles > 0
-    
+
     selecciones.push({
       grupo_id: grupo.id,
       materia_prima_id: materiaPrimaId,
@@ -128,7 +125,7 @@ function seleccionarOpcion(grupo: GrupoOpcionesConOpciones, materiaPrimaId: stri
       cantidad: 1,
     })
   }
-  
+
   seleccionesPorGrupo.value.set(grupo.id, [...selecciones])
 }
 
@@ -136,10 +133,13 @@ function seleccionarOpcion(grupo: GrupoOpcionesConOpciones, materiaPrimaId: stri
 function removerSeleccion(grupoId: string, materiaPrimaId: string) {
   const selecciones = obtenerSelecciones(grupoId)
   const index = selecciones.findIndex((s) => s.materia_prima_id === materiaPrimaId)
-  
+
   if (index !== -1) {
-    if (selecciones[index].cantidad > 1) {
-      selecciones[index].cantidad--
+    const seleccion = selecciones[index]
+    if (!seleccion) return
+
+    if (seleccion.cantidad > 1) {
+      seleccion.cantidad--
     } else {
       selecciones.splice(index, 1)
     }
@@ -160,17 +160,17 @@ function abrirDialogoAdicional() {
 
 function agregarAdicional() {
   if (!adicionalSeleccionadoId.value) return
-  
+
   const adicional = productosConfigurablesStore.adicionales.find(
     (a) => a.materia_prima_id === adicionalSeleccionadoId.value
   )
   if (!adicional) return
-  
+
   // Agregar al primer grupo (o crear un grupo "Adicionales" si no existe)
   // Por simplicidad, lo agregamos como una selección sin grupo
   const selecciones = obtenerSelecciones('adicionales')
   const existente = selecciones.find((s) => s.materia_prima_id === adicionalSeleccionadoId.value)
-  
+
   if (existente) {
     existente.cantidad += adicionalCantidad.value
   } else {
@@ -184,7 +184,7 @@ function agregarAdicional() {
       cantidad: adicionalCantidad.value,
     })
   }
-  
+
   seleccionesPorGrupo.value.set('adicionales', [...selecciones])
   dialogoAdicionalAbierto.value = false
 }
@@ -195,7 +195,7 @@ function confirmar() {
   seleccionesPorGrupo.value.forEach((selecciones) => {
     todasPersonalizaciones.push(...selecciones)
   })
-  
+
   emit('confirmar', todasPersonalizaciones, precioTotal.value, costoTotal.value)
 }
 
@@ -213,17 +213,17 @@ function cancelar() {
       <v-btn icon="mdi-close" variant="text" size="small" @click="cancelar" />
     </v-card-title>
     
-    <v-divider />
-    
+      <v-divider />
+
     <v-card-text>
       <!-- Precio base -->
       <div class="mb-4">
         <div class="text-caption text-medium-emphasis">Precio base</div>
         <div class="text-h6 font-weight-bold">{{ formatearUSD(precioBase) }}</div>
       </div>
-      
+
       <v-divider class="mb-4" />
-      
+
       <!-- Grupos de opciones -->
       <div v-if="configurable" class="mb-4">
         <div v-for="grupo in configurable.grupos" :key="grupo.id" class="mb-4">
@@ -238,7 +238,7 @@ function cancelar() {
               Extra: {{ formatearUSD(grupo.precio_venta_extra) }}
             </v-chip>
           </div>
-          
+
           <!-- Opciones disponibles -->
           <div class="d-flex flex-wrap ga-2 mb-2">
             <v-btn
@@ -252,7 +252,7 @@ function cancelar() {
               {{ opcion.materia_prima.nombre }}
             </v-btn>
           </div>
-          
+
           <!-- Opciones seleccionadas -->
           <div v-if="obtenerSelecciones(grupo.id).length > 0">
             <div class="text-caption text-medium-emphasis mb-1">Seleccionadas:</div>
@@ -274,9 +274,9 @@ function cancelar() {
           </div>
         </div>
       </div>
-      
+
       <v-divider class="mb-4" />
-      
+
       <!-- Adicionales no configurados -->
       <div class="mb-4">
         <div class="d-flex align-center mb-2">
@@ -287,7 +287,7 @@ function cancelar() {
             Agregar
           </v-btn>
         </div>
-        
+
         <!-- Adicionales seleccionados -->
         <div v-if="obtenerSelecciones('adicionales').length > 0">
           <v-chip
@@ -306,9 +306,9 @@ function cancelar() {
           </v-chip>
         </div>
       </div>
-      
+
       <v-divider class="mb-4" />
-      
+
       <!-- Totales -->
       <div class="d-flex justify-space-between align-center">
         <div>
@@ -320,14 +320,14 @@ function cancelar() {
         </div>
       </div>
     </v-card-text>
-    
+
     <v-card-actions>
       <v-spacer />
       <v-btn variant="text" @click="cancelar">Cancelar</v-btn>
       <v-btn color="primary" @click="confirmar">Agregar al carrito</v-btn>
     </v-card-actions>
   </v-card>
-  
+
   <!-- Dialog: Agregar adicional -->
   <v-dialog v-model="dialogoAdicionalAbierto" max-width="500">
     <v-card>

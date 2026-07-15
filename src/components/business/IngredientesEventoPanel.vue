@@ -54,10 +54,6 @@ const productoHeaders = [
 // Helpers
 // -----------------------------------------------------------------------
 
-function faltanteFmt(v: number): string {
-  return v > 0 ? v.toFixed(2) : '—'
-}
-
 /** Abbreviated unit label matching `formatearUnidad` conventions. */
 function unidadTipoLabel(u: string): string {
   if (u === 'unidad') return 'u'

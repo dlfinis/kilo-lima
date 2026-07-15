@@ -15,7 +15,7 @@ import {
 import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useStockMovementsStore } from '@/stores/stockMovements.store'
-import type { Database, DerivedStock, MateriaPrima, RecetaConIngredientes } from '@/types'
+import type { Database, MateriaPrima, RecetaConIngredientes } from '@/types'
 
 // ---------------------------------------------------------------------------
 // Task 4.7 — alertLevel
