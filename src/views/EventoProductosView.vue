@@ -38,6 +38,11 @@ import { useVentasStore } from '@/stores/ventas.store'
 import { calcularCostoReceta } from '@/composables/useCalculoReceta'
 import { estadoEsEditable } from '@/utils/estado'
 import { formatearUSD, formatearUSDInput, parsearUSDInput } from '@/utils/format'
+import {
+  ajustarPrecioEventoProducto,
+  calcularMarkupsEventoProducto,
+  distribuirPrecioManual,
+} from '@/utils/eventoPricing'
 import { calcularMargenReal } from '@/utils/pricing'
 import type { EventoProducto, EventoProductoConDetalle } from '@/types'
 
@@ -80,7 +85,14 @@ const editable = computed(() =>
 // flash of bogus numbers before the real data settles.
 const cargandoCompleto = ref(false)
 const cargando = computed(() => epStore.cargando || cargandoCompleto.value)
-const errorCarga = computed(() => epStore.error)
+const MENSAJE_ERROR_COSTO_INVALIDO = 'No se puede ajustar el precio porque el costo unitario actual es 0 o invalido.'
+const errorPrecio = ref<string | null>(null)
+const errorCarga = computed(() => errorPrecio.value ?? epStore.error)
+
+function margenRealParaPrecio(precioVenta: number | null, costoUnitario: number): number | null {
+  if (precioVenta === null || costoUnitario <= 0) return null
+  return calcularMargenReal(precioVenta, costoUnitario)
+}
 
 const porcentajeMargen = computed<number>(() =>
   Math.round((eventoActual.value?.margen_ganancia ?? 0) * 100),
@@ -179,15 +191,30 @@ async function alCambiarGanancia(ep: EventoProductoConDetalle, pct: number) {
   const prevGanancia = gananciaPct.value[ep.producto_id] ?? 0
   const prevContrib = contribucionPct.value[ep.producto_id] ?? 0
   const prevPrecioTexto = precioTexto.value[ep.producto_id]
-  // Optimistic update: show the change immediately.
-  gananciaPct.value = { ...gananciaPct.value, [ep.producto_id]: pct }
-  const nuevoPrecio = ep.costo_unitario * (1 + pct + prevContrib)
-  precioTexto.value = { ...precioTexto.value, [ep.producto_id]: formatearUSDInput(nuevoPrecio) }
-  const res = await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, pct + prevContrib)
+  const ajuste = ajustarPrecioEventoProducto(
+    ep.precio_venta, ep.costo_unitario, prevGanancia, prevContrib, 'ganancia', pct,
+  )
+  if (!ajuste) {
+    errorPrecio.value = MENSAJE_ERROR_COSTO_INVALIDO
+    return
+  }
+  errorPrecio.value = null
+  gananciaPct.value = { ...gananciaPct.value, [ep.producto_id]: ajuste.ganancia }
+  contribucionPct.value = { ...contribucionPct.value, [ep.producto_id]: ajuste.contribucion }
+  precioTexto.value = { ...precioTexto.value, [ep.producto_id]: formatearUSDInput(ajuste.precioVenta) }
+  const res = await epStore.actualizarPrecio(
+    eventoId.value,
+    ep.producto_id,
+    ajuste.precioVenta,
+    margenRealParaPrecio(ajuste.precioVenta, ep.costo_unitario),
+    ajuste.ganancia,
+    ajuste.contribucion,
+  )
   if (res.error) {
     // Save failed — revert to previous state so the UI stays coherent
     // with the DB. The store's error ref is already set by the store.
     gananciaPct.value = { ...gananciaPct.value, [ep.producto_id]: prevGanancia }
+    contribucionPct.value = { ...contribucionPct.value, [ep.producto_id]: prevContrib }
     if (prevPrecioTexto !== undefined) {
       precioTexto.value = { ...precioTexto.value, [ep.producto_id]: prevPrecioTexto }
     }
@@ -199,11 +226,27 @@ async function alCambiarContribucion(ep: EventoProductoConDetalle, pct: number) 
   const prevGanancia = gananciaPct.value[ep.producto_id] ?? 0
   const prevContrib = contribucionPct.value[ep.producto_id] ?? 0
   const prevPrecioTexto = precioTexto.value[ep.producto_id]
-  contribucionPct.value = { ...contribucionPct.value, [ep.producto_id]: pct }
-  const nuevoPrecio = ep.costo_unitario * (1 + prevGanancia + pct)
-  precioTexto.value = { ...precioTexto.value, [ep.producto_id]: formatearUSDInput(nuevoPrecio) }
-  const res = await epStore.actualizarPrecio(eventoId.value, ep.producto_id, nuevoPrecio, prevGanancia + pct)
+  const ajuste = ajustarPrecioEventoProducto(
+    ep.precio_venta, ep.costo_unitario, prevGanancia, prevContrib, 'contribucion', pct,
+  )
+  if (!ajuste) {
+    errorPrecio.value = MENSAJE_ERROR_COSTO_INVALIDO
+    return
+  }
+  errorPrecio.value = null
+  gananciaPct.value = { ...gananciaPct.value, [ep.producto_id]: ajuste.ganancia }
+  contribucionPct.value = { ...contribucionPct.value, [ep.producto_id]: ajuste.contribucion }
+  precioTexto.value = { ...precioTexto.value, [ep.producto_id]: formatearUSDInput(ajuste.precioVenta) }
+  const res = await epStore.actualizarPrecio(
+    eventoId.value,
+    ep.producto_id,
+    ajuste.precioVenta,
+    margenRealParaPrecio(ajuste.precioVenta, ep.costo_unitario),
+    ajuste.ganancia,
+    ajuste.contribucion,
+  )
   if (res.error) {
+    gananciaPct.value = { ...gananciaPct.value, [ep.producto_id]: prevGanancia }
     contribucionPct.value = { ...contribucionPct.value, [ep.producto_id]: prevContrib }
     if (prevPrecioTexto !== undefined) {
       precioTexto.value = { ...precioTexto.value, [ep.producto_id]: prevPrecioTexto }
@@ -211,45 +254,14 @@ async function alCambiarContribucion(ep: EventoProductoConDetalle, pct: number) 
   }
 }
 
-// Initialize slider percentages from loaded data. Ganancia defaults to
-// the event's margen_ganancia (floor); contribución defaults to 10%.
-// Initialize slider percentages from loaded data.
-//
-// NEW product (precio_venta === null in DB): defaults — ganancia =
-// event's margen_ganancia (floor), contribución = 10%. The 10%
-// contribución only makes sense as a starting point for a product
-// the operator hasn't priced yet.
-//
-// EXISTING product (already has precio_venta): balanced 60/40 split
-// of total markup, capped at 90% each. This keeps both sliders within
-// their visual range and gives a meaningful view of where the markup
-// goes instead of dumping everything into ganancia.
 function initSliderPct(ep: EventoProductoConDetalle): { ganancia: number; contribucion: number } {
-  const eventoMargen = eventoActual.value?.margen_ganancia ?? 0.30
-  const costo = ep.costo_unitario
-  const precio = ep.precio_final
-  if (costo <= 0) return { ganancia: eventoMargen, contribucion: 0.10 }
-
-  // Detect new product: no precio_venta override in the raw DB row.
-  const rawEp = epStore.productosPorEvento
-    .get(eventoId.value ?? '')
-    ?.find((p) => p.producto_id === ep.producto_id)
-  const isNew = !rawEp || rawEp.precio_venta === null || rawEp.precio_venta === undefined
-
-  const totalMarkup = (precio / costo) - 1
-  const SLIDER_MAX = 2.00
-
-  if (isNew) {
-    const contribDefault = 0.10
-    const contribucion = Math.max(0, Math.min(contribDefault, totalMarkup))
-    const ganancia = Math.max(0, Math.min(SLIDER_MAX, totalMarkup - contribucion))
-    return { ganancia, contribucion }
-  }
-
-  // Existing product: 60/40 split, each capped at 200%.
-  const ganancia = Math.min(SLIDER_MAX, Math.max(0, totalMarkup * 0.60))
-  const contribucion = Math.min(SLIDER_MAX, Math.max(0, totalMarkup * 0.40))
-  return { ganancia, contribucion }
+  return calcularMarkupsEventoProducto(
+    ep.precio_venta,
+    ep.costo_unitario,
+    ep.ganancia_markup,
+    ep.contribucion_markup,
+    ep.margen ?? eventoActual.value?.margen_ganancia ?? null,
+  )
 }
 
 function initSliderPcts() {
@@ -265,17 +277,31 @@ function initSliderPcts() {
 }
 
 // REQ-CON-10 (PR-2) + productos-mejoras: bulk action — apply the
-// break-even minimum price to every included producto AND write the
-// matching `margen` so `margen_efectivo` stays coherent with the
-// override. Two-step UX (alert-style confirm) lives in the template.
+// break-even minimum price to every included producto and distribute its
+// markup with the same cap/remainder policy used by legacy reconciliation.
 async function aplicarPrecioMinimo() {
   if (!eventoId.value) return
+  let omitidosPorCosto = 0
   for (const ep of productosDelEvento.value) {
     const minimo = precioMinimoParaProducto.value(ep.producto_id)
     if (minimo === null) continue
-    const margenEquivalente = calcularMargenReal(minimo, ep.costo_unitario)
-    await epStore.actualizarPrecio(eventoId.value, ep.producto_id, minimo, margenEquivalente)
+    if (ep.costo_unitario <= 0) {
+      omitidosPorCosto += 1
+      continue
+    }
+    const markups = calcularMarkupsEventoProducto(minimo, ep.costo_unitario, null, null, null)
+    await epStore.actualizarPrecio(
+      eventoId.value,
+      ep.producto_id,
+      minimo,
+      margenRealParaPrecio(minimo, ep.costo_unitario),
+      markups.ganancia,
+      markups.contribucion,
+    )
   }
+  errorPrecio.value = omitidosPorCosto > 0
+    ? `No se aplico el precio minimo a ${omitidosPorCosto} producto(s) porque su costo unitario actual es 0 o invalido.`
+    : null
 }
 
 function volver() {
@@ -351,17 +377,22 @@ function precioTextoFor(productoId: string, precio: number): string {
 function redistributeFromPrecio(productoId: string, nuevoPrecio: number) {
   const ep = productosDelEvento.value.find((e) => e.producto_id === productoId)
   if (!ep || !eventoId.value) return
-  const costo = ep.costo_unitario
-  if (costo <= 0) return
-  const totalMarkup = (nuevoPrecio / costo) - 1
-  const currentContrib = contribucionPct.value[productoId] ?? 0.10
-  // Prioritize contribution: keep it, ganancia gets the rest.
-  const nuevaContrib = totalMarkup >= currentContrib ? currentContrib : Math.max(0, totalMarkup)
-  const nuevaGanancia = totalMarkup - nuevaContrib
-  contribucionPct.value = { ...contribucionPct.value, [productoId]: nuevaContrib }
-  gananciaPct.value = { ...gananciaPct.value, [productoId]: nuevaGanancia }
-  const margenEquiv = nuevaGanancia + nuevaContrib
-  epStore.actualizarPrecio(eventoId.value, productoId, nuevoPrecio, margenEquiv)
+  const ajuste = distribuirPrecioManual(nuevoPrecio, ep.costo_unitario, contribucionPct.value[productoId] ?? 0)
+  if (!ajuste) {
+    errorPrecio.value = MENSAJE_ERROR_COSTO_INVALIDO
+    return
+  }
+  errorPrecio.value = null
+  contribucionPct.value = { ...contribucionPct.value, [productoId]: ajuste.contribucion }
+  gananciaPct.value = { ...gananciaPct.value, [productoId]: ajuste.ganancia }
+  void epStore.actualizarPrecio(
+    eventoId.value,
+    productoId,
+    ajuste.precioVenta,
+    margenRealParaPrecio(ajuste.precioVenta, ep.costo_unitario),
+    ajuste.ganancia,
+    ajuste.contribucion,
+  )
 }
 
 function onPrecioInput(productoId: string, valor: string): void {

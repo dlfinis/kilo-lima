@@ -245,6 +245,33 @@ describe('EventoGestionView', () => {
     expect(titulo.text()).toBe('Feria del Sol')
   })
 
+  it('shows a visible error when pricing is blocked because costo_unitario <= 0', async () => {
+    await conContexto(async () => {
+      const evStore = useEventsStore()
+      evStore.eventos.push(mkEvento('e-1'))
+    })
+    await prepararCatalogo()
+    await conContexto(async () => {
+      const recStore = useRecipesStore()
+      recStore.recetas[0]!.ingredientes = []
+    })
+    __pushSupabaseResponse<EventoProducto[]>({
+      data: [mkEP({ id: 'ep-1', producto_id: 'p-1', precio_venta: 12 })],
+      error: null,
+    })
+    __pushSupabaseResponse<ProductoProduccion[]>({ data: [], error: null })
+    __pushSupabaseResponse<GastoFijo[]>({ data: [], error: null })
+
+    const wrapper = await mountView('e-1')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="evento-gestion-precio-p-1"] input').setValue('15')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="evento-gestion-error"]').exists()).toBe(true)
+    expect(document.body.textContent ?? '').toContain('costo unitario actual es 0 o invalido')
+  })
+
   it('renders summary chips with included count and planned units', async () => {
     await conContexto(async () => {
       const evStore = useEventsStore()
@@ -322,8 +349,8 @@ describe('EventoGestionView', () => {
     const bodyExpanded = document.body.textContent ?? ''
     expect(bodyExpanded).toContain('MP mp-1')
     expect(bodyExpanded).toContain('10.00')
-    // Costo compra: faltante(7) × costo_por_unidad(10) = $70.00
-    expect(bodyExpanded).toContain('$70.00')
+    // Costo compra: faltante(7) × costo_por_unidad(10) = 70.00
+    expect(bodyExpanded).toContain('70.00')
     expect(bodyExpanded).toContain('7.00')
   })
 

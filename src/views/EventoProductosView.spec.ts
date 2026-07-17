@@ -299,6 +299,75 @@ describe('EventoProductosView', () => {
     expect(body).toContain('Error')
   })
 
+  it('shows a visible error when pricing is blocked because costo_unitario <= 0', async () => {
+    await conContexto(async () => {
+      const evStore = useEventsStore()
+      const epStore = useEventoProductosStore()
+      evStore.eventos.push(mkEvento('e-1'))
+      epStore.productosPorEvento.set('e-1', [
+        mkEP({ id: 'ep-1', producto_id: 'p-1', precio_venta: 12 }),
+      ])
+    })
+    await prepararCatalogo()
+    await conContexto(async () => {
+      const recStore = useRecipesStore()
+      recStore.recetas[0]!.ingredientes = []
+    })
+    __pushSupabaseResponse<EventoProducto[]>({
+      data: [mkEP({ id: 'ep-1', producto_id: 'p-1', precio_venta: 12 })],
+      error: null,
+    })
+
+    const wrapper = await mountView('e-1')
+    await flushPromises()
+
+    await wrapper.get('[data-testid="evento-productos-precio-p-1"] input').setValue('15')
+    await flushPromises()
+
+    expect(wrapper.find('[data-testid="evento-productos-error"]').exists()).toBe(true)
+    expect(document.body.textContent ?? '').toContain('costo unitario actual es 0 o invalido')
+  })
+
+  it('applies minimum prices to valid rows and shows one summary error for zero-cost skips', async () => {
+    await conContexto(async () => {
+      const evStore = useEventsStore()
+      const epStore = useEventoProductosStore()
+      evStore.eventos.push(mkEvento('e-1'))
+      epStore.productosPorEvento.set('e-1', [
+        mkEP({ id: 'ep-1', producto_id: 'p-1', precio_venta: 12 }),
+        mkEP({ id: 'ep-2', producto_id: 'p-2', precio_venta: 12 }),
+      ])
+    })
+    await prepararCatalogo()
+    __pushSupabaseResponse<EventoProducto[]>({
+      data: [
+        mkEP({ id: 'ep-1', producto_id: 'p-1', precio_venta: 12 }),
+        mkEP({ id: 'ep-2', producto_id: 'p-2', precio_venta: 12 }),
+      ],
+      error: null,
+    })
+
+    const wrapper = await mountView('e-1')
+    await flushPromises()
+
+    __pushSupabaseResponse<EventoProducto>({
+      data: mkEP({ id: 'ep-1', producto_id: 'p-1', precio_venta: 10, margen: 0, ganancia_markup: 0, contribucion_markup: 0 }),
+      error: null,
+    })
+
+    await wrapper.get('[data-testid="evento-productos-aplicar-minimo"]').trigger('click')
+    await flushPromises()
+
+    await conContexto(() => {
+      const epStore = useEventoProductosStore()
+      const filas = epStore.productosPorEvento.get('e-1') ?? []
+      expect(filas.find((fila) => fila.producto_id === 'p-1')?.precio_venta).toBe(10)
+      expect(filas.find((fila) => fila.producto_id === 'p-2')?.precio_venta).toBe(12)
+    })
+    expect(wrapper.find('[data-testid="evento-productos-error"]').exists()).toBe(true)
+    expect(document.body.textContent ?? '').toContain('No se aplico el precio minimo a 1 producto(s)')
+  })
+
   it('does not render the DataTable when empty', async () => {
     await conContexto(async () => {
       const evStore = useEventsStore()
@@ -453,7 +522,7 @@ describe('EventoProductosView — slider preserves null precio_venta (productos-
     // Push the mutation response AFTER mountView so the ventas-store
     // load inside cargar() doesn't consume it from the queue.
     __pushSupabaseResponse<EventoProducto>({
-      data: mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.5, precio_venta: null }),
+      data: mkEP({ id: 'ep-1', producto_id: 'p-1', margen: 0.4, precio_venta: null, ganancia_markup: 0.5, contribucion_markup: 0.1 }),
       error: null,
     })
 
@@ -461,10 +530,12 @@ describe('EventoProductosView — slider preserves null precio_venta (productos-
       const epStore = useEventoProductosStore()
       const ventStore = useVentasStore()
       ventStore.ventas = []
-      await epStore.actualizarPrecio('e-1', 'p-1', null, 0.5)
+      await epStore.actualizarPrecio('e-1', 'p-1', null, null, 0.5, 0.1)
       const fila = epStore.productosPorEvento.get('e-1')?.[0]
       expect(fila?.precio_venta).toBeNull()
-      expect(fila?.margen).toBe(0.5)
+      expect(fila?.margen).toBe(0.4)
+      expect(fila?.ganancia_markup).toBe(0.5)
+      expect(fila?.contribucion_markup).toBe(0.1)
     })
   })
 })
