@@ -98,17 +98,18 @@ function manejarSubmit() {
       ? `Otro: ${razonOtro.value.trim()} — Responsable: ${responsable.value.trim()}`
       : `${razonLabel.value} — Responsable: ${responsable.value.trim()}`
 
-  if (razon.value === 'compra') {
-    // Purchase-style addition: route through registrar_compra so the
-    // movement gets tipo='compra' and appears in the Compras tab.
-    const input: RegistrarCompraInput = {
-      materia_prima_id: props.materiaPrimaId,
-      cantidad: cantidad.value!,
-      costo_unitario: 0,
-      evento_id: null,
-      compra_insumo_id: null,
-      fecha: new Date().toISOString().slice(0, 10),
-    }
+    if (razon.value === 'compra') {
+      // Purchase-style addition: route through registrar_compra so the
+      // movement gets tipo='compra' and appears in the Compras tab.
+      const input: RegistrarCompraInput = {
+        materia_prima_id: props.materiaPrimaId,
+        cantidad: cantidad.value!,
+        costo_unitario: 0,
+        evento_id: null,
+        compra_insumo_id: null,
+        motivo: motivoFinal,
+        fecha: new Date().toISOString().slice(0, 10),
+      }
     emit('submit', { rpc: 'registrarCompra', input })
   } else {
     // All other reasons route through registrar_ajuste (tipo='ajuste').
@@ -206,6 +207,8 @@ function cerrar() {
         <v-select
           v-model="razon"
           :items="razonesDisponibles"
+          item-title="label"
+          item-value="value"
           label="Motivo"
           variant="outlined"
           density="comfortable"

@@ -154,6 +154,7 @@ export function crearStockMovementsService(
           p_costo_unitario: input.costo_unitario,
           p_evento_id: input.evento_id ?? null,
           p_compra_insumo_id: input.compra_insumo_id ?? null,
+          p_motivo: input.motivo ?? null,
           p_fecha: input.fecha,
         },
       )

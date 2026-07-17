@@ -100,6 +100,19 @@ describe('ProductoForm', () => {
     )
   })
 
+  it('persists the selected visual palette and food icon values', async () => {
+    const wrapper = mountForm({ recetaIdInicial: 'r-1' })
+    await wrapper.find('[data-testid="producto-nombre"] input').setValue('Limonada Feria')
+    await wrapper.find('[data-testid="selector-color-orange"]').trigger('click')
+    await wrapper.find('[data-testid="selector-icono-mdi-juice"]').trigger('click')
+    await wrapper.find('form').trigger('submit.prevent')
+    await flushPromises()
+
+    expect(wrapper.emitted('submit')?.[0]?.[0]).toEqual(
+      expect.objectContaining({ color: 'orange', icono: 'mdi-juice' }),
+    )
+  })
+
   // catalog-domain-refactor / Slice 2: when creating a new product,
   // selecting a receta prefills the commercial name from the receta
   // name. The operator can then edit it before saving.

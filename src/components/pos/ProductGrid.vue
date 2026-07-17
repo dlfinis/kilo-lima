@@ -13,6 +13,9 @@ defineProps<{
     precio: number
     imagen?: string | null
     icono?: string | null
+    color?: string | null
+    categoria?: string | null
+    cantidadEnCarrito?: number
   }>
 }>()
 
@@ -27,15 +30,15 @@ function manejarClick(product: { id: string }) {
 
 <template>
   <div class="product-grid">
-    <!-- Filtered product grid — denser: 3 cols on md, 4 on lg.
-         On xs/sm the grid already uses cols=6 (2 per row). -->
-    <v-row v-if="productos.length > 0" dense>
+    <v-row v-if="productos.length > 0" class="product-grid__row">
       <v-col
         v-for="p in productos"
         :key="p.id"
         cols="6"
+        sm="6"
         md="4"
         lg="3"
+        xl="3"
       >
         <ProductButton :product="p" @click="manejarClick" />
       </v-col>

@@ -50,6 +50,7 @@ export interface RegistrarCompraInput {
   costo_unitario: number
   evento_id?: string | null
   compra_insumo_id?: string | null
+  motivo?: string | null
   fecha?: string
 }
 

@@ -65,4 +65,10 @@ describe('ProductGrid', () => {
     expect(gridContainer.exists()).toBe(true)
     expect(wrapper.find('.v-row').exists()).toBe(true)
   })
+
+  it('keeps a two-column catalog through the small breakpoint', () => {
+    const wrapper = mountGrid()
+    const firstColumn = wrapper.find('[class*="v-col-sm-6"]')
+    expect(firstColumn.classes()).toContain('v-col-sm-6')
+  })
 })

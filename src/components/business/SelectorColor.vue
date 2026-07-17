@@ -1,8 +1,7 @@
 <script setup lang="ts">
-// Selector de color para productos. Colores predefinidos de Vuetify
-// que determinan el color de la card tanto en catalogo como en POS.
-// Soporta colores nombrados y valor hex custom.
-const props = defineProps<{
+// Product palette. Values remain plain CSS colors, as accepted by the
+// persisted producto.color field, while labels describe the visual result.
+defineProps<{
   modelValue: string
 }>()
 
@@ -10,20 +9,13 @@ const emit = defineEmits<{
   'update:modelValue': [color: string]
 }>()
 
-// Colores Vuetify predefinidos + opciones neutras
 const colores = [
-  { value: 'primary', label: 'Azul' },
-  { value: 'secondary', label: 'Gris' },
-  { value: 'success', label: 'Verde' },
-  { value: 'warning', label: 'Amarillo' },
-  { value: 'error', label: 'Rojo' },
-  { value: 'info', label: 'Celeste' },
-  { value: 'purple', label: 'Morado' },
-  { value: 'pink', label: 'Rosa' },
-  { value: 'orange', label: 'Naranja' },
-  { value: 'teal', label: 'Verde azulado' },
-  { value: 'brown', label: 'Marron' },
-  { value: 'indigo', label: 'Indigo' },
+  { value: 'warning', label: 'Amarillo cálido', swatch: '#C79A35' },
+  { value: 'pink', label: 'Rosa baya', swatch: '#B9627B' },
+  { value: 'brown', label: 'Marrón cacao', swatch: '#805A43' },
+  { value: 'orange', label: 'Naranja cítrico', swatch: '#C8752C' },
+  { value: 'primary', label: 'Azul fresco', swatch: '#4E7896' },
+  { value: 'secondary', label: 'Neutral', swatch: '#73706A' },
 ]
 
 function seleccionar(color: string): void {
@@ -33,24 +25,48 @@ function seleccionar(color: string): void {
 
 <template>
   <div>
-    <div class="text-caption text-medium-emphasis mb-2">Color de la tarjeta</div>
-    <div class="d-flex flex-wrap ga-2">
+    <div class="text-caption text-medium-emphasis mb-2">Estilo del producto</div>
+    <div class="product-color-palette">
       <v-btn
         v-for="c in colores"
         :key="c.value"
-        :color="c.value"
-        size="small"
-        :variant="modelValue === c.value ? 'flat' : 'outlined'"
-        :min-width="40"
-        :min-height="40"
+        :color="c.swatch"
+        :variant="modelValue === c.value ? 'flat' : 'tonal'"
+        class="product-color-palette__option text-none"
         :data-testid="`selector-color-${c.value}`"
+        :aria-pressed="modelValue === c.value"
         @click="seleccionar(c.value)"
       >
-        <v-icon v-if="modelValue === c.value" icon="mdi-check" size="small" />
+        <span class="product-color-palette__swatch" :style="{ backgroundColor: c.swatch }">
+          <v-icon v-if="modelValue === c.value" icon="mdi-check" size="small" />
+        </span>
+        {{ c.label }}
       </v-btn>
-    </div>
-    <div class="mt-2 text-caption">
-      Seleccionado: <v-chip :color="modelValue" size="x-small" variant="flat" /> {{ modelValue }}
     </div>
   </div>
 </template>
+
+<style scoped>
+.product-color-palette {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.product-color-palette__option {
+  justify-content: flex-start;
+  min-height: 40px;
+  padding-inline: 8px;
+  font-size: 0.75rem;
+  letter-spacing: normal;
+}
+.product-color-palette__swatch {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-right: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.16);
+  border-radius: 50%;
+  color: white;
+}
+</style>

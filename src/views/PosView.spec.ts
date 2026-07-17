@@ -181,7 +181,7 @@ async function mountView() {
 // catalog store with the same data.
 function fabricarProductoParaPOS(
   productoId: string,
-  opts: { margen?: number; incluido?: boolean; costo?: number; nombre?: string } = {},
+  opts: { margen?: number; incluido?: boolean; costo?: number; nombre?: string; color?: string | null } = {},
 ): { materia: MateriaPrima; receta: RecetaConIngredientes; producto: Producto; ep: EventoProducto } {
   const { margen = 0, incluido = true, costo = 5, nombre = 'Brownies' } = opts
   const materia = mkMateriaPrima(`mp-${productoId}`, { costo_por_unidad: costo })
@@ -197,7 +197,7 @@ function fabricarProductoParaPOS(
       },
     ],
   })
-  const producto = mkProducto(productoId, { receta_id: `r-${productoId}` })
+  const producto = mkProducto(productoId, { receta_id: `r-${productoId}`, color: opts.color ?? null })
   const ep = mkEventoProducto(`ep-${productoId}`, { producto_id: productoId, margen, incluido })
   return { materia, receta, producto, ep }
 }
@@ -722,7 +722,7 @@ describe('PosView — PR-2b producto filtering (REQ-FIN-28, REQ-FIN-30)', () => 
     })
   })
 
-  it('shows the margen badge with evento.margen_ganancia × 100% (REQ-FIN-29)', async () => {
+  it('renders the event-priced product without exposing margin noise in the POS catalog', async () => {
     // Override the evento's margen_ganancia BEFORE pushing the mock
     // so cargarEventos populates with the desired margin.
     __pushSupabaseResponse<Evento[]>({
@@ -738,9 +738,9 @@ describe('PosView — PR-2b producto filtering (REQ-FIN-28, REQ-FIN-30)', () => 
     await conContexto(async () => {
       const { wrapper } = await mountView()
       await flushPromises()
-      const badge = wrapper.find('[data-testid="pos-margen-badge"]')
-      expect(badge.exists()).toBe(true)
-      expect(badge.text()).toContain('40%')
+      const card = wrapper.find('[data-testid="producto-card-active"]')
+      expect(card.exists()).toBe(true)
+      expect(card.text()).not.toContain('40%')
     })
   })
 })
@@ -1381,9 +1381,18 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
     await conContexto(async () => {
       const { wrapper } = await mountView()
       await flushPromises()
-      // The parent-owned search input (pos-buscar) should be rendered
-      const searchInput = wrapper.find('[data-testid="pos-buscar"]')
-      expect(searchInput.exists()).toBe(true)
+      expect(wrapper.find('.product-grid').exists()).toBe(true)
+    })
+  })
+
+  it('renders the compact mobile order bar instead of relying on the inline cart', async () => {
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      expect(wrapper.find('[data-testid="pos-mobile-order-bar"]').exists()).toBe(true)
     })
   })
 
@@ -1438,7 +1447,7 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
       await flushPromises()
       // Select a payment method
       const paymentButtons = wrapper.findAll('[data-testid="payment-option"]')
-      await paymentButtons[0]!.trigger('click')
+      await paymentButtons[2]!.trigger('click')
       await flushPromises()
       const checkoutBtn = wrapper.find('[data-testid="checkout-btn"]')
       expect(checkoutBtn.attributes('disabled')).toBeUndefined()
@@ -1462,7 +1471,7 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
     })
   })
 
-  it('clicking CheckoutButton calls registrarVenta and clears the cart', async () => {
+  it('clicking CheckoutButton with non-efectivo calls registrarVenta and clears the cart', async () => {
     posModeRef.value = true
     sembrarEventoEnCurso()
     sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
@@ -1474,7 +1483,7 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
         evento_id: 'e-1',
         fecha: '2026-06-19T00:00:00Z',
         total: 5,
-        metodo_pago: 'efectivo',
+        metodo_pago: 'tarjeta',
         monto_recibido: null,
         cambio: null,
         comprobante_numero: null,
@@ -1493,7 +1502,7 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
       // Add item to cart + select payment
       const ventas = useVentasStore()
       ventas.agregarAlCarrito('p-1', 1)
-      ventas.setPaymentMethod('efectivo')
+      ventas.setPaymentMethod('tarjeta')
       await flushPromises()
       // Click checkout
       const checkoutBtn = wrapper.find('[data-testid="checkout-btn"]')
@@ -1504,6 +1513,30 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
     })
   })
 
+  it('shows inline cash tendering with live change before checkout', async () => {
+    posModeRef.value = true
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0 })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      // Add item to cart + select efectivo
+      const ventas = useVentasStore()
+      ventas.agregarAlCarrito('p-1', 1)
+      ventas.setPaymentMethod('efectivo')
+      await flushPromises()
+      // Cart should still have items while the operator tenders cash.
+      expect(ventas.carrito.length).toBe(1)
+      await flushPromises()
+      expect(wrapper.find('[data-testid="pos-cash-tender"]').exists()).toBe(true)
+      const tender = wrapper.find('[data-testid="pos-cash-tender-input"] input')
+      await tender.setValue('10')
+      await flushPromises()
+      expect(wrapper.text()).toContain('Cambio')
+      expect(wrapper.text()).toContain('$5.00')
+    })
+  })
+
   it('does NOT render the existing ProductoCardGrid in simplified mode', async () => {
     posModeRef.value = true
     sembrarEventoEnCurso()
@@ -1511,11 +1544,7 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
     await conContexto(async () => {
       const { wrapper } = await mountView()
       await flushPromises()
-      // In simplified mode, the old ProductoCardGrid should not be visible
-      // (the simplified ProductGrid replaces it). Filter chips replace
-      // the old search bar for category/sort filtering.
-      const filterChips = wrapper.find('[data-testid="pos-filtro-todos"]')
-      expect(filterChips.exists()).toBe(true)
+      expect(wrapper.find('.product-grid').exists()).toBe(true)
     })
   })
 
@@ -1543,9 +1572,9 @@ describe('PosView — Phase 3 simplified mode (REQ-POS-1)', () => {
       expect(cartCol.find('[data-testid="checkout-btn"]').exists()).toBe(true)
       // Products column includes the simplified grid (not the old ProductoCardGrid).
       expect(productsCol.find('.product-grid').exists()).toBe(true)
-      // On md+ the layout is side-by-side: products gets col-md-8, cart gets col-md-4.
-      expect(productsCol.classes()).toContain('v-col-md-8')
-      expect(cartCol.classes()).toContain('v-col-md-4')
+      // On md+ the cart has five columns so cart lines retain usable title width.
+       expect(productsCol.classes()).toContain('v-col-md-7')
+       expect(cartCol.classes()).toContain('v-col-md-5')
     })
   })
 })
@@ -1595,6 +1624,20 @@ describe('PosView — corrective pass: no contribution/cost noise in POS cards',
       expect(html).not.toContain('Costo')
       expect(html).not.toContain('Contribución')
       expect(html).not.toContain('Margen')
+    })
+  })
+})
+
+describe('PosView — product card color', () => {
+  it('uses the configured product color as the POS card surface input', async () => {
+    sembrarEventoEnCurso()
+    sembrarProductosEnPOS([fabricarProductoParaPOS('p-1', { margen: 0, color: '#7B3F00' })])
+    await conContexto(async () => {
+      const { wrapper } = await mountView()
+      await flushPromises()
+      const card = wrapper.find('[data-testid="producto-card-active"]')
+      expect(card.attributes('data-product-color')).toBe('#7B3F00')
+      expect(card.attributes('style')).toContain('--product-card-color: #7B3F00')
     })
   })
 })

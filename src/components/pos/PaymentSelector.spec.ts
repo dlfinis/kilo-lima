@@ -27,8 +27,8 @@ describe('PaymentSelector', () => {
   it('displays the three payment method labels', () => {
     const wrapper = mountSelector()
     expect(wrapper.text()).toContain('Efectivo')
-    expect(wrapper.text()).toContain('Yape/Plin')
-    expect(wrapper.text()).toContain('Tarjeta')
+    expect(wrapper.text()).toContain('Transferencia')
+    // expect(wrapper.text()).toContain('Tarj.')
   })
 
   it('displays correct icons for each option', () => {

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // PaymentSelector — v-model payment method picker.
 // Three fast buttons: Efectivo, Yape/Plin, Tarjeta.
-// Selected state highlights via tonal variant in primary.
+// Selected state is high contrast so the next checkout action is unambiguous.
 
 defineProps<{
   modelValue: string | null
@@ -19,14 +19,14 @@ interface PaymentOption {
 
 const opciones: PaymentOption[] = [
   { id: 'efectivo', label: 'Efectivo', icon: 'mdi-cash' },
-  { id: 'transferencia', label: 'Yape/Plin', icon: 'mdi-cellphone' },
-  { id: 'tarjeta', label: 'Tarjeta', icon: 'mdi-credit-card' },
+  { id: 'transferencia', label: 'Transferencia', icon: 'mdi-cellphone' },
+  // { id: 'tarjeta', label: 'Tarj.', icon: 'mdi-credit-card' },
 ]
 </script>
 
 <template>
   <div class="payment-selector">
-    <div class="text-caption text-medium-emphasis mb-1">Método de pago</div>
+    <div class="payment-selector__label">Método de pago</div>
     <v-row dense>
       <v-col
         v-for="opcion in opciones"
@@ -35,10 +35,10 @@ const opciones: PaymentOption[] = [
       >
         <v-btn
           :color="modelValue === opcion.id ? 'primary' : undefined"
-          :variant="modelValue === opcion.id ? 'tonal' : 'text'"
+          :variant="modelValue === opcion.id ? 'flat' : 'outlined'"
           block
           size="default"
-          class="payment-option-btn py-2"
+          class="payment-option-btn"
           :class="{ 'payment-option-btn--selected': modelValue === opcion.id }"
           data-testid="payment-option"
           @click="emit('update:modelValue', opcion.id)"
@@ -55,11 +55,20 @@ const opciones: PaymentOption[] = [
 
 <style scoped>
 .payment-option-btn {
-  border-radius: 8px;
+  border-radius: 10px;
   min-height: 52px;
-  transition: background-color 0.15s, box-shadow 0.15s;
+  font-weight: 700;
+  transition: background-color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 .payment-option-btn--selected {
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  box-shadow: 0 4px 10px rgba(var(--v-theme-primary), 0.2);
+}
+.payment-selector__label {
+  margin-bottom: 8px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.04em;
+  color: rgba(var(--v-theme-on-surface), 0.7);
+  text-transform: uppercase;
 }
 </style>

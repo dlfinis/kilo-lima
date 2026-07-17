@@ -54,7 +54,6 @@ import EditarVentaDialog from '@/components/business/EditarVentaDialog.vue'
 import GastoImprevistoForm from '@/components/business/GastoImprevistoForm.vue'
 import GastoImprevistoListItem from '@/components/business/GastoImprevistoListItem.vue'
 import HistorialVentasEventoDialog from '@/components/business/HistorialVentasEventoDialog.vue'
-import ProductoCardGrid from '@/components/business/ProductoCardGrid.vue'
 import RegistrarVentaDialog from '@/components/business/RegistrarVentaDialog.vue'
 import ResumenVentasHoy from '@/components/business/ResumenVentasHoy.vue'
 import { useEvents } from '@/composables/useEvents'
@@ -63,21 +62,19 @@ import { useIngredientsStore } from '@/stores/ingredients.store'
 import { useRecipesStore } from '@/stores/recipes.store'
 import { useEventoProductosStore } from '@/stores/eventoProductos.store'
 import { useProductosConfigurablesStore } from '@/stores/productosConfigurables.store'
-import { usePosMode } from '@/composables/usePosMode'
 import { usePreciosEvento } from '@/composables/usePreciosEvento'
 import { useProductos } from '@/composables/useProductos'
 import { useRecipes } from '@/composables/useRecipes'
 import { useVentas } from '@/composables/useVentas'
 import { useOnlineStatus } from '@/composables/useOnlineStatus'
 import { estadoEsEditable } from '@/utils/estado'
+import { formatearUSD } from '@/utils/format'
 import { logInfo } from '@/utils/logger'
 import type {
   CategoriaProducto,
   GastoImprevistoInput,
   MetodoPago,
   PersonalizacionCarrito,
-  Producto,
-  RecetaConIngredientes,
   VentaConItems,
 } from '@/types'
 
@@ -85,6 +82,7 @@ const router = useRouter()
 // pos-redesign (REQ-POS-57, REQ-POS-58): build-time feature flag.
 // Default off — operators opt in per environment via .env.local.
 const FLAG_POS_REDESIGN = import.meta.env.VITE_FLAG_POS_REDESIGN === 'true'
+const mobileCartOpen = ref(false)
 
 const { cargando: cargandoProductos, error: errorProductos, cargarTodas, productos } = useProductos()
 const epStore = useEventoProductosStore()
@@ -120,6 +118,10 @@ const {
 } = useGastosImprevistos()
 const { online } = useOnlineStatus()
 
+const totalArticulosCarrito = computed(() =>
+  carrito.value.reduce((total, linea) => total + linea.cantidad, 0),
+)
+
 // UX: Planificacion events that can be started from POS.
 const eventosPlanificacion = computed(() =>
   eventos.value.filter((e) => e.estado === 'planificacion'),
@@ -151,28 +153,47 @@ async function iniciarEventoDesdePOS(id: string): Promise<void> {
   capturarErroresDependencias()
 }
 
-// mobile-ux-redesign Phase 3: POS mode flag for simplified vs full.
-const { isSimplifiedMode } = usePosMode()
-
-// Simplified mode: "Cobrar" is enabled only when cart has items AND
-// a payment method has been selected.
+// Checkout requires a cart, payment method, and enough cash when applicable.
 const cobrarHabilitado = computed(
-  () => carrito.value.length > 0 && paymentMethod.value !== null,
+  () =>
+    carrito.value.length > 0 &&
+    paymentMethod.value !== null &&
+    (paymentMethod.value !== 'efectivo' || montoRecibido.value >= totalCarrito.value),
 )
 
 /** UX hint shown below the checkout button when it is disabled. */
 const checkoutDisabledHint = computed(() => {
-  if (carrito.value.length === 0) return 'Agregar productos al carrito'
-  if (paymentMethod.value === null) return 'Seleccionar método de pago'
+  if (carrito.value.length === 0) return 'Agregá productos para iniciar el pedido'
+  if (paymentMethod.value === null) return 'Elegí un método de pago para cobrar'
+  if (paymentMethod.value === 'efectivo' && montoRecibido.value < totalCarrito.value) {
+    return 'Ingresá un monto recibido igual o mayor al total'
+  }
   return ''
 })
 
-// Simplified-mode checkout: select payment and call registrarVenta.
-async function manejarCheckoutSimplificado() {
+const montoRecibido = ref(0)
+const cambioEfectivo = computed(() => Math.max(0, montoRecibido.value - totalCarrito.value))
+const billetesRapidos = [1, 5, 10, 20, 50]
+
+function seleccionarMetodoPago(metodo: string): void {
+  setPaymentMethod(metodo as MetodoPago)
+  if (metodo !== 'efectivo') montoRecibido.value = 0
+}
+
+function usarMontoExacto(): void {
+  montoRecibido.value = totalCarrito.value
+}
+
+function agregarBillete(monto: number): void {
+  montoRecibido.value += monto
+}
+
+async function manejarCheckout() {
   if (!cobrarHabilitado.value) return
   const metodo = paymentMethod.value as MetodoPago | null
   if (!metodo) return
-  await registrarVenta(metodo)
+  const res = await registrarVenta(metodo, metodo === 'efectivo' ? montoRecibido.value : undefined)
+  if (!res.error) montoRecibido.value = 0
 }
 
 // REQ-FIN-28, REQ-FIN-29: the POS grid source. Reactive on the
@@ -237,41 +258,9 @@ const productosSimplificados = computed(() =>
     precio: ep.precio_final,
     imagen: null,
     icono: ep.producto_icono,
-  })),
-)
-
-// ProductoCardGrid is a presentational component that takes
-// Producto[] + RecetaConIngredientes[]; map the joined shape into
-// the legacy types so we keep the existing card surface without a
-// breaking change to ProductoCardGrid (REQ-FIN-29).
-const productosMapeados = computed<Producto[]>(() =>
-  productosParaGridFiltrados.value.map((ep) => ({
-    id: ep.producto_id,
-    receta_id: ep.receta_id,
-    // catalog-domain-refactor / Slice 3: commercial product identity
-    // from evento_productos join (not from receta).
-    nombre: ep.producto_nombre,
-    categoria: ep.producto_categoria,
-    precio_venta: ep.precio_final,
-    disponible: true,
-    orden: 0,
-    descripcion: null,
-    icono: ep.producto_icono,
     color: ep.producto_color,
-    created_at: ep.created_at,
-    updated_at: ep.updated_at,
-  })),
-)
-const recetasParaGrid = computed<RecetaConIngredientes[]>(() =>
-  productosParaGridFiltrados.value.map((ep) => ({
-    id: ep.receta_id,
-    nombre: ep.producto_nombre,
-    descripcion: null,
-    rendimiento_unidades: 1,
-    notas: null,
-    ingredientes: [],
-    created_at: ep.created_at,
-    updated_at: ep.updated_at,
+    categoria: ep.producto_categoria,
+    cantidadEnCarrito: carrito.value.find((linea) => linea.producto_id === ep.producto_id)?.cantidad ?? 0,
   })),
 )
 
@@ -1007,29 +996,95 @@ async function reintentarHistorial() {
         </v-alert>
       </v-alert>
 
-      <!-- mobile-ux-redesign Phase 3: Simplified POS mode (active event).
-           Single-row layout: products + unified cart/payment/checkout
-           stack so the operator scans cart contents, payment choice,
-           and the checkout action together without scrolling.
-           On xs/sm the row stacks vertically (products full-width,
-           then cart+payment+checkout full-width below).
-           On md+ side-by-side: products 8 cols, checkout 4 cols. -->
-      <template v-if="isSimplifiedMode && !cargandoProductos && !errorProductos">
-        <v-row>
-          <v-col cols="12" sm="12" md="8" lg="9" data-testid="pos-products-col">
-            <ProductGrid
-              :productos="productosSimplificados"
-              @add-to-cart="manejarAgregar"
+      <v-row v-if="!cargandoProductos && !errorProductos" class="pos-workspace">
+        <v-col cols="12" md="7" lg="7" xl="8" data-testid="pos-products-col">
+          <section class="catalog-panel">
+            <div class="d-flex align-center justify-space-between mb-4">
+              <div>
+                <p class="text-overline font-weight-bold mb-0">Catálogo</p>
+                <h2 class="text-h6 font-weight-bold">Seleccioná productos</h2>
+              </div>
+              <v-chip size="small" variant="tonal">{{ productosSimplificados.length }} disponibles</v-chip>
+            </div>
+            <ProductGrid :productos="productosSimplificados" @add-to-cart="manejarAgregar" />
+          </section>
+        </v-col>
+        <v-col cols="12" md="5" lg="5" xl="4" class="pos-transaction-column" data-testid="pos-cart-col">
+          <section class="pos-transaction-panel">
+          <CarritoPanel
+            :carrito="carrito"
+            :total="totalCarrito"
+            :hide-register-button="true"
+            @registrar-venta="abrirDialogoRegistrar"
+            @vaciar="vaciarCarrito"
+            @update-cantidad="actualizarCantidad"
+            @eliminar="quitarDelCarrito"
+          />
+          <div class="pos-payment-panel mt-3">
+            <PaymentSelector :model-value="paymentMethod" @update:model-value="seleccionarMetodoPago" />
+            <div v-if="paymentMethod === 'efectivo'" class="cash-tender mt-3" data-testid="pos-cash-tender">
+              <div class="d-flex align-center justify-space-between mb-2">
+                <span class="text-subtitle-2 font-weight-bold">Efectivo recibido</span>
+                <v-btn size="x-small" variant="text" color="primary" @click="usarMontoExacto">Monto exacto</v-btn>
+              </div>
+              <v-text-field
+                v-model.number="montoRecibido"
+                type="number"
+                min="0"
+                step="0.01"
+                hide-details
+                density="comfortable"
+                prefix="$"
+                aria-label="Monto recibido"
+                data-testid="pos-cash-tender-input"
+              />
+              <div class="d-flex flex-wrap ga-1 mt-2">
+                <v-btn
+                  v-for="billete in billetesRapidos"
+                  :key="billete"
+                  size="small"
+                  variant="outlined"
+                  @click="agregarBillete(billete)"
+                >+${{ billete }}</v-btn>
+              </div>
+              <div class="cash-tender__change mt-3">
+                <span>Cambio</span>
+                <strong>{{ formatearUSD(cambioEfectivo) }}</strong>
+              </div>
+            </div>
+            <CheckoutButton
+              :disabled="!cobrarHabilitado"
+              :total="totalCarrito"
+              :disabled-hint="checkoutDisabledHint"
+              class="mt-3"
+              @checkout="manejarCheckout"
             />
-          </v-col>
-          <v-col
-            cols="12"
-            sm="12"
-            md="4"
-            lg="3"
-            class="d-flex flex-column"
-            data-testid="pos-cart-col"
-          >
+          </div>
+          </section>
+        </v-col>
+      </v-row>
+
+      <button
+        type="button"
+        class="pos-mobile-order-bar"
+        data-testid="pos-mobile-order-bar"
+        @click="mobileCartOpen = true"
+      >
+        <span class="d-flex align-center ga-2">
+          <v-icon>mdi-cart-outline</v-icon>
+          <span>{{ totalArticulosCarrito }} {{ totalArticulosCarrito === 1 ? 'artículo' : 'artículos' }}</span>
+        </span>
+        <strong>{{ formatearUSD(totalCarrito) }}</strong>
+        <v-icon>mdi-chevron-up</v-icon>
+      </button>
+
+      <v-bottom-sheet v-model="mobileCartOpen" content-class="pos-mobile-order-sheet">
+        <v-card class="pos-mobile-order-sheet__card">
+          <div class="d-flex align-center justify-space-between pa-4 pb-0">
+            <h2 class="text-h6 font-weight-bold">Pedido actual</h2>
+            <v-btn icon="mdi-close" variant="text" aria-label="Cerrar pedido" @click="mobileCartOpen = false" />
+          </div>
+          <div class="pos-mobile-order-sheet__content pa-4">
             <CarritoPanel
               :carrito="carrito"
               :total="totalCarrito"
@@ -1039,42 +1094,42 @@ async function reintentarHistorial() {
               @update-cantidad="actualizarCantidad"
               @eliminar="quitarDelCarrito"
             />
-            <PaymentSelector
-              :model-value="paymentMethod"
-              class="mt-3"
-              @update:model-value="setPaymentMethod"
-            />
-            <CheckoutButton
-              :disabled="!cobrarHabilitado"
-              :total="totalCarrito"
-              :disabled-hint="checkoutDisabledHint"
-              class="mt-3"
-              @checkout="manejarCheckoutSimplificado"
-            />
-          </v-col>
-        </v-row>
-      </template>
-
-      <!-- Full mode: existing ProductoCardGrid + CarritoPanel -->
-      <v-row v-else-if="!isSimplifiedMode && !cargandoProductos && !errorProductos">
-        <v-col cols="12" md="8" data-testid="pos-grid-col">
-          <ProductoCardGrid
-            :productos="productosMapeados"
-            :recetas="recetasParaGrid"
-            @agregar="manejarAgregar"
-          />
-        </v-col>
-        <v-col cols="12" md="4" data-testid="pos-cart-col">
-          <CarritoPanel
-            :carrito="carrito"
-            :total="totalCarrito"
-            @registrar-venta="abrirDialogoRegistrar"
-            @vaciar="vaciarCarrito"
-            @update-cantidad="actualizarCantidad"
-            @eliminar="quitarDelCarrito"
-          />
-        </v-col>
-      </v-row>
+            <div class="pos-payment-panel mt-3">
+              <PaymentSelector :model-value="paymentMethod" @update:model-value="seleccionarMetodoPago" />
+              <div v-if="paymentMethod === 'efectivo'" class="cash-tender mt-3" data-testid="pos-mobile-cash-tender">
+                <div class="d-flex align-center justify-space-between mb-2">
+                  <span class="text-subtitle-2 font-weight-bold">Efectivo recibido</span>
+                  <v-btn size="x-small" variant="text" color="primary" @click="usarMontoExacto">Monto exacto</v-btn>
+                </div>
+                <v-text-field
+                  v-model.number="montoRecibido"
+                  type="number"
+                  min="0"
+                  step="0.01"
+                  hide-details
+                  density="comfortable"
+                  prefix="$"
+                  aria-label="Monto recibido"
+                />
+                <div class="d-flex flex-wrap ga-1 mt-2">
+                  <v-btn v-for="billete in billetesRapidos" :key="billete" size="small" variant="outlined" @click="agregarBillete(billete)">+${{ billete }}</v-btn>
+                </div>
+                <div class="cash-tender__change mt-3">
+                  <span>Cambio</span>
+                  <strong>{{ formatearUSD(cambioEfectivo) }}</strong>
+                </div>
+              </div>
+              <CheckoutButton
+                :disabled="!cobrarHabilitado"
+                :total="totalCarrito"
+                :disabled-hint="checkoutDisabledHint"
+                class="mt-3"
+                @checkout="manejarCheckout"
+              />
+            </div>
+          </div>
+        </v-card>
+      </v-bottom-sheet>
     </template>
 
     <v-dialog
@@ -1164,12 +1219,93 @@ async function reintentarHistorial() {
 </template>
 
 <style scoped>
-/* Visual polish: POS-specific component styling.
-   Kept scoped so it doesn't leak into dialogs or other views. */
-
 .pos-context-bar {
-  background: rgba(var(--v-theme-surface-variant), 0.4);
-  border-radius: 6px;
-  min-height: 36px;
+  min-height: 42px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+  border-radius: 12px;
+  background: rgb(var(--v-theme-surface));
+}
+.pos-workspace {
+  align-items: flex-start;
+}
+.catalog-panel {
+  min-height: calc(100vh - 210px);
+  padding: 4px 4px 24px;
+}
+.pos-transaction-column {
+  align-self: flex-start;
+}
+.pos-transaction-panel {
+  position: sticky;
+  top: 12px;
+}
+.pos-payment-panel {
+  padding: 12px;
+  border: 1px solid rgba(var(--v-theme-on-surface), 0.12);
+  border-radius: 16px;
+  background: rgb(var(--v-theme-surface));
+  box-shadow: 0 6px 18px rgba(20, 28, 45, 0.06);
+}
+.cash-tender {
+  padding-top: 10px;
+  border-top: 1px solid rgba(var(--v-theme-on-surface), 0.1);
+}
+.cash-tender__change {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 8px 10px;
+  border-radius: 10px;
+  color: rgb(var(--v-theme-success));
+  background: rgba(var(--v-theme-success), 0.1);
+}
+.pos-mobile-order-bar {
+  display: none;
+}
+.pos-mobile-order-sheet__content {
+  overflow-y: auto;
+}
+@media (max-width: 959px) {
+  .catalog-panel {
+    min-height: auto;
+  }
+  .pos-transaction-panel {
+    position: static;
+  }
+}
+@media (max-width: 768px) {
+  .pos-transaction-column {
+    display: none;
+  }
+  .catalog-panel {
+    padding-bottom: 92px;
+  }
+  .pos-mobile-order-bar {
+    position: fixed;
+    z-index: 1005;
+    right: 12px;
+    bottom: 68px;
+    left: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    min-height: 52px;
+    padding: 0 16px;
+    border: 1px solid rgba(var(--v-theme-primary), 0.5);
+    border-radius: 8px;
+    color: rgb(var(--v-theme-on-primary));
+    background: rgb(var(--v-theme-primary));
+    box-shadow: 0 8px 18px rgba(20, 28, 45, 0.2);
+  }
+  :deep(.pos-mobile-order-sheet) {
+    max-height: calc(100dvh - 24px);
+  }
+  .pos-mobile-order-sheet__card {
+    max-height: calc(100dvh - 24px);
+    border-radius: 12px 12px 0 0;
+  }
+  .pos-mobile-order-sheet__content {
+    max-height: calc(100dvh - 88px);
+  }
 }
 </style>

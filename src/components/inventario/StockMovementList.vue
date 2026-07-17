@@ -5,6 +5,21 @@
 // that needs to render movement history.
 import type { StockMovement } from '@/types'
 
+function motivoDisplay(motivo: StockMovement['motivo']): string {
+  if (!motivo) return ''
+  if (typeof motivo === 'string') {
+    return motivo === '[object Object]' ? 'Movimiento registrado' : motivo
+  }
+  try {
+    if (typeof (motivo as unknown as { motivo?: unknown }).motivo === 'string') {
+      return (motivo as unknown as { motivo: string }).motivo
+    }
+    return JSON.stringify(motivo)
+  } catch {
+    return String(motivo)
+  }
+}
+
 defineProps<{
   movements: StockMovement[]
   /** Map of materia_prima_id → display name for the material column. */
@@ -42,7 +57,7 @@ defineProps<{
       <v-list-item-subtitle class="text-caption">
         {{ new Date(mov.fecha).toLocaleDateString('es-CO', { year: 'numeric', month: 'short', day: 'numeric' }) }}
         <template v-if="mov.motivo">
-          · {{ mov.motivo }}
+          · {{ motivoDisplay(mov.motivo) }}
         </template>
         <template v-if="mov.evento_id">
           · Evento

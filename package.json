@@ -37,7 +37,9 @@
     "db:wipe": "node scripts/db-reset.mjs --wipe",
     "db:wipe:yes": "node scripts/db-reset.mjs --wipe --yes",
     "db:summary": "node scripts/db-reset.mjs --print",
-    "db:health": "node scripts/db-reset.mjs --health"
+    "db:health": "node scripts/db-reset.mjs --health",
+    "db:backup": "node scripts/db-backup.mjs",
+    "db:restore": "node scripts/db-restore.mjs"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",

@@ -38,6 +38,7 @@ const materiaSeleccionada = computed<MateriaPrima | undefined>(() =>
 )
 
 const fechaHoy = computed<string>(() => new Date().toISOString().slice(0, 10))
+const motivoCompra = computed<string>(() => 'Compra manual')
 
 // ----- reset on open -----
 watch(
@@ -79,6 +80,7 @@ function manejarSubmit() {
     costo_unitario: costoUnitario.value!,
     evento_id: null,
     compra_insumo_id: null,
+    motivo: motivoCompra.value,
     fecha: fechaManual.value || undefined,
   }
   emit('submit', input)

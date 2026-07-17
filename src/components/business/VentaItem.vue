@@ -4,8 +4,7 @@
 // interaction is an emit so the parent (CarritoPanel) owns the store
 // mutation.
 //
-// Visual polish: tighter spacing, subtle border between items,
-// cleaner qty controls.
+// Optimized for quick quantity adjustments in the POS transaction panel.
 import { computed } from 'vue'
 
 import { formatearUSD } from '@/utils/format'
@@ -37,33 +36,33 @@ function decrementar() {
 
 <template>
   <div
-    class="venta-item d-flex align-center ga-2 py-2"
+    class="venta-item"
     data-testid="venta-item"
   >
-    <div class="flex-grow-1" style="min-width: 0">
-      <div class="text-body-2 font-weight-medium text-truncate" style="color: #1A1A2E">{{ linea.nombre }}</div>
-      <div class="text-caption font-weight-medium" style="color: #1A1A2E">
-        {{ subtotalTexto }}
+    <div class="venta-item__product">
+      <div class="venta-item__name">{{ linea.nombre }}</div>
+      <div class="text-caption text-medium-emphasis">
+        {{ formatearUSD(linea.precio_unitario) }} c/u
       </div>
     </div>
     <template v-if="editable">
-      <div class="d-flex align-center ga-0">
+      <div class="venta-item__quantity d-flex align-center ga-0">
         <v-btn
           icon="mdi-minus"
           size="x-small"
-          variant="text"
-          density="compact"
+          variant="tonal"
+          color="primary"
           data-testid="venta-item-menos"
           @click="decrementar"
         />
-        <span class="text-caption font-weight-bold mx-1" style="min-width: 1.25rem; text-align: center">
+        <span class="text-body-2 font-weight-bold mx-2" style="min-width: 1.25rem; text-align: center">
           {{ linea.cantidad }}
         </span>
         <v-btn
           icon="mdi-plus"
           size="x-small"
-          variant="text"
-          density="compact"
+          variant="tonal"
+          color="primary"
           data-testid="venta-item-mas"
           @click="incrementar"
         />
@@ -72,21 +71,64 @@ function decrementar() {
         icon="mdi-close"
         size="x-small"
         variant="text"
-        color="grey-lighten-1"
-        density="compact"
+        color="error"
+        class="venta-item__remove"
         data-testid="venta-item-eliminar"
         @click="emit('eliminar', linea.producto_id)"
       />
     </template>
     <div v-else class="text-body-2">{{ linea.cantidad }} × {{ subtotalTexto }}</div>
+    <div v-if="editable" class="venta-item__subtotal">{{ subtotalTexto }}</div>
   </div>
 </template>
 
 <style scoped>
 .venta-item {
+  display: grid;
+  grid-template-columns: minmax(9rem, 1fr) auto auto 4rem;
+  grid-template-areas: 'product quantity remove subtotal';
+  align-items: center;
+  column-gap: 6px;
+  min-height: 68px;
+  padding: 8px 0;
   border-bottom: 1px solid rgba(var(--v-border-color), 0.3);
 }
 .venta-item:last-child {
   border-bottom: none;
+}
+.venta-item__subtotal {
+  grid-area: subtotal;
+  min-width: 62px;
+  font-size: 0.9rem;
+  font-weight: 800;
+  text-align: right;
+}
+.venta-item__product {
+  grid-area: product;
+  min-width: 0;
+}
+.venta-item__name {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  font-size: 0.875rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+.venta-item__quantity {
+  grid-area: quantity;
+}
+.venta-item__remove {
+  grid-area: remove;
+}
+@media (max-width: 420px) {
+  .venta-item {
+    grid-template-columns: minmax(0, 1fr) auto 4rem;
+    grid-template-areas:
+      'product product subtotal'
+      'quantity remove subtotal';
+    row-gap: 4px;
+  }
 }
 </style>

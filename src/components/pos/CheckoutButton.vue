@@ -1,8 +1,7 @@
 <script setup lang="ts">
 // CheckoutButton — prominent "Cobrar" button for the POS flow.
 // Shows total amount, respects disabled state, emits checkout.
-// Uses accent (#FF6B35) — the brief's designated "color de ventas"
-// — for visual distinction from the rest of the POS surface.
+import { formatearUSD } from '@/utils/format'
 
 defineProps<{
   disabled: boolean
@@ -14,9 +13,6 @@ const emit = defineEmits<{
   checkout: []
 }>()
 
-function formatTotal(val: number): string {
-  return val.toFixed(2)
-}
 </script>
 
 <template>
@@ -27,21 +23,42 @@ function formatTotal(val: number): string {
       size="large"
       :disabled="disabled"
       prepend-icon="mdi-cart-check"
-      class="checkout-btn py-3"
+      class="checkout-btn"
       data-testid="checkout-btn"
       @click="emit('checkout')"
     >
-      Cobrar
+      Cobrar ahora
       <template v-if="total > 0">
-        &nbsp;${{ formatTotal(total) }}
+        <span class="checkout-btn__total">{{ formatearUSD(total) }}</span>
       </template>
     </v-btn>
     <div
       v-if="disabled && disabledHint"
-      class="text-caption text-disabled text-center mt-1"
+      class="checkout-btn__hint"
       data-testid="checkout-disabled-hint"
     >
       {{ disabledHint }}
     </div>
   </div>
 </template>
+
+<style scoped>
+.checkout-btn {
+  min-height: 52px;
+  border-radius: 12px;
+  font-size: 1rem;
+  font-weight: 800;
+  letter-spacing: 0;
+}
+.checkout-btn__total {
+  margin-left: 10px;
+  font-size: 1.05rem;
+}
+.checkout-btn__hint {
+  margin-top: 8px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  text-align: center;
+  color: rgba(var(--v-theme-on-surface), 0.62);
+}
+</style>

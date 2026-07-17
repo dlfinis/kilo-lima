@@ -82,4 +82,22 @@ describe('ProductButton', () => {
     const button = wrapper.find('button')
     expect(button.exists()).toBe(true)
   })
+
+  it('uses the configured product color as a subtle card accent', () => {
+    const wrapper = mountButton({ product: mkProduct({ color: 'success' }) })
+    expect(wrapper.find('button').attributes('style')).toContain('--product-card-accent: #5D8A67')
+  })
+
+  it('uses the primary treatment for cart state instead of product color', () => {
+    const wrapper = mountButton({ product: mkProduct({ color: 'warning', cantidadEnCarrito: 2 }) })
+    expect(wrapper.find('.product-button--selected').exists()).toBe(true)
+    expect(wrapper.text()).toContain('2 en carrito')
+  })
+
+  it('keeps header, name, and footer in stable layout rows', () => {
+    const wrapper = mountButton({ product: mkProduct({ cantidadEnCarrito: 2 }) })
+    expect(wrapper.find('.product-button__header').exists()).toBe(true)
+    expect(wrapper.find('.product-button__body').exists()).toBe(true)
+    expect(wrapper.find('.product-button__footer').exists()).toBe(true)
+  })
 })
