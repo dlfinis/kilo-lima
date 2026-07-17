@@ -36,6 +36,12 @@ import { useGastosFijosStore } from '@/stores/gastosFijos.store'
 import { calcularCostoReceta } from '@/composables/useCalculoReceta'
 import { estadoEsEditable } from '@/utils/estado'
 import { formatearUSD, formatearUSDInput, parsearUSDInput } from '@/utils/format'
+import {
+  ajustarPrecioEventoProducto,
+  calcularMarkupsEventoProducto,
+  distribuirPrecioManual,
+} from '@/utils/eventoPricing'
+import { calcularMargenReal } from '@/utils/pricing'
 import type {
   EventoProducto,
   ProductoProduccion,
@@ -74,6 +80,8 @@ interface FilaGestion {
   incluido: boolean
   precio_venta: number | null
   margen: number | null
+  ganancia_markup: number | null | undefined
+  contribucion_markup: number | null | undefined
   // producto
   producto_nombre: string
   producto_categoria: string | null
@@ -127,6 +135,8 @@ const filasGestion = computed<FilaGestion[]>(() => {
       incluido: ep.incluido,
       precio_venta: ep.precio_venta,
       margen: ep.margen,
+      ganancia_markup: ep.ganancia_markup,
+      contribucion_markup: ep.contribucion_markup,
       producto_nombre: producto?.nombre ?? '(producto sin nombre)',
       producto_categoria: producto?.categoria ?? null,
       producto_icono: producto?.icono ?? null,
@@ -163,33 +173,24 @@ function unidadesTextoFor(productoId: string, unidades: number): string {
 // ---- Loading state ----
 const cargandoCompleto = ref(false)
 const cargando = computed(() => epStore.cargando || ppStore.cargando || cargandoCompleto.value)
-const errorCarga = computed(() => epStore.error ?? ppStore.error)
+const MENSAJE_ERROR_COSTO_INVALIDO = 'No se puede ajustar el precio porque el costo unitario actual es 0 o invalido.'
+const errorPrecio = ref<string | null>(null)
+const errorCarga = computed(() => errorPrecio.value ?? epStore.error ?? ppStore.error)
+
+function margenRealParaPrecio(precioVenta: number | null, costoUnitario: number): number | null {
+  if (precioVenta === null || costoUnitario <= 0) return null
+  return calcularMargenReal(precioVenta, costoUnitario)
+}
 
 // ---- Initialize slider percentages from loaded data ----
 function initSliderPct(fila: FilaGestion): { ganancia: number; contribucion: number } {
-  const eventoMargen = eventoActual.value?.margen_ganancia ?? 0.30
-  const costo = fila.costo_unitario
-  const precio = fila.precio_venta ?? 0
-  if (costo <= 0) return { ganancia: eventoMargen, contribucion: 0.10 }
-
-  const rawEp = epStore.productosPorEvento
-    .get(eventoId.value ?? '')
-    ?.find((p) => p.producto_id === fila.producto_id)
-  const isNew = !rawEp || rawEp.precio_venta === null || rawEp.precio_venta === undefined
-
-  const totalMarkup = precio > 0 && costo > 0 ? (precio / costo) - 1 : 0
-  const SLIDER_MAX = 2.00
-
-  if (isNew) {
-    const contribDefault = 0.10
-    const contribucion = Math.max(0, Math.min(contribDefault, totalMarkup))
-    const ganancia = Math.max(0, Math.min(SLIDER_MAX, totalMarkup - contribucion))
-    return { ganancia, contribucion }
-  }
-
-  const ganancia = Math.min(SLIDER_MAX, Math.max(0, totalMarkup * 0.60))
-  const contribucion = Math.min(SLIDER_MAX, Math.max(0, totalMarkup * 0.40))
-  return { ganancia, contribucion }
+  return calcularMarkupsEventoProducto(
+    fila.precio_venta,
+    fila.costo_unitario,
+    fila.ganancia_markup,
+    fila.contribucion_markup,
+    fila.margen ?? eventoActual.value?.margen_ganancia ?? null,
+  )
 }
 
 function initSliderPcts() {
@@ -258,12 +259,28 @@ async function alCambiarGanancia(fila: FilaGestion, pct: number) {
   const prevGanancia = gananciaPct.value[fila.producto_id] ?? 0
   const prevContrib = contribucionPct.value[fila.producto_id] ?? 0
   const prevPrecioTexto = precioTexto.value[fila.producto_id]
-  gananciaPct.value = { ...gananciaPct.value, [fila.producto_id]: pct }
-  const nuevoPrecio = fila.costo_unitario * (1 + pct + prevContrib)
-  precioTexto.value = { ...precioTexto.value, [fila.producto_id]: formatearUSDInput(nuevoPrecio) }
-  const res = await epStore.actualizarPrecio(eventoId.value, fila.producto_id, nuevoPrecio, pct + prevContrib)
+  const ajuste = ajustarPrecioEventoProducto(
+    fila.precio_venta, fila.costo_unitario, prevGanancia, prevContrib, 'ganancia', pct,
+  )
+  if (!ajuste) {
+    errorPrecio.value = MENSAJE_ERROR_COSTO_INVALIDO
+    return
+  }
+  errorPrecio.value = null
+  gananciaPct.value = { ...gananciaPct.value, [fila.producto_id]: ajuste.ganancia }
+  contribucionPct.value = { ...contribucionPct.value, [fila.producto_id]: ajuste.contribucion }
+  precioTexto.value = { ...precioTexto.value, [fila.producto_id]: formatearUSDInput(ajuste.precioVenta) }
+  const res = await epStore.actualizarPrecio(
+    eventoId.value,
+    fila.producto_id,
+    ajuste.precioVenta,
+    margenRealParaPrecio(ajuste.precioVenta, fila.costo_unitario),
+    ajuste.ganancia,
+    ajuste.contribucion,
+  )
   if (res.error) {
     gananciaPct.value = { ...gananciaPct.value, [fila.producto_id]: prevGanancia }
+    contribucionPct.value = { ...contribucionPct.value, [fila.producto_id]: prevContrib }
     if (prevPrecioTexto !== undefined) {
       precioTexto.value = { ...precioTexto.value, [fila.producto_id]: prevPrecioTexto }
     }
@@ -275,11 +292,27 @@ async function alCambiarContribucion(fila: FilaGestion, pct: number) {
   const prevGanancia = gananciaPct.value[fila.producto_id] ?? 0
   const prevContrib = contribucionPct.value[fila.producto_id] ?? 0
   const prevPrecioTexto = precioTexto.value[fila.producto_id]
-  contribucionPct.value = { ...contribucionPct.value, [fila.producto_id]: pct }
-  const nuevoPrecio = fila.costo_unitario * (1 + prevGanancia + pct)
-  precioTexto.value = { ...precioTexto.value, [fila.producto_id]: formatearUSDInput(nuevoPrecio) }
-  const res = await epStore.actualizarPrecio(eventoId.value, fila.producto_id, nuevoPrecio, prevGanancia + pct)
+  const ajuste = ajustarPrecioEventoProducto(
+    fila.precio_venta, fila.costo_unitario, prevGanancia, prevContrib, 'contribucion', pct,
+  )
+  if (!ajuste) {
+    errorPrecio.value = MENSAJE_ERROR_COSTO_INVALIDO
+    return
+  }
+  errorPrecio.value = null
+  gananciaPct.value = { ...gananciaPct.value, [fila.producto_id]: ajuste.ganancia }
+  contribucionPct.value = { ...contribucionPct.value, [fila.producto_id]: ajuste.contribucion }
+  precioTexto.value = { ...precioTexto.value, [fila.producto_id]: formatearUSDInput(ajuste.precioVenta) }
+  const res = await epStore.actualizarPrecio(
+    eventoId.value,
+    fila.producto_id,
+    ajuste.precioVenta,
+    margenRealParaPrecio(ajuste.precioVenta, fila.costo_unitario),
+    ajuste.ganancia,
+    ajuste.contribucion,
+  )
   if (res.error) {
+    gananciaPct.value = { ...gananciaPct.value, [fila.producto_id]: prevGanancia }
     contribucionPct.value = { ...contribucionPct.value, [fila.producto_id]: prevContrib }
     if (prevPrecioTexto !== undefined) {
       precioTexto.value = { ...precioTexto.value, [fila.producto_id]: prevPrecioTexto }
@@ -291,16 +324,22 @@ async function alCambiarContribucion(fila: FilaGestion, pct: number) {
 function redistributeFromPrecio(productoId: string, nuevoPrecio: number) {
   const fila = filasGestion.value.find((f) => f.producto_id === productoId)
   if (!fila || !eventoId.value) return
-  const costo = fila.costo_unitario
-  if (costo <= 0) return
-  const totalMarkup = (nuevoPrecio / costo) - 1
-  const currentContrib = contribucionPct.value[productoId] ?? 0.10
-  const nuevaContrib = totalMarkup >= currentContrib ? currentContrib : Math.max(0, totalMarkup)
-  const nuevaGanancia = totalMarkup - nuevaContrib
-  contribucionPct.value = { ...contribucionPct.value, [productoId]: nuevaContrib }
-  gananciaPct.value = { ...gananciaPct.value, [productoId]: nuevaGanancia }
-  const margenEquiv = nuevaGanancia + nuevaContrib
-  epStore.actualizarPrecio(eventoId.value, productoId, nuevoPrecio, margenEquiv)
+  const ajuste = distribuirPrecioManual(nuevoPrecio, fila.costo_unitario, contribucionPct.value[productoId] ?? 0)
+  if (!ajuste) {
+    errorPrecio.value = MENSAJE_ERROR_COSTO_INVALIDO
+    return
+  }
+  errorPrecio.value = null
+  contribucionPct.value = { ...contribucionPct.value, [productoId]: ajuste.contribucion }
+  gananciaPct.value = { ...gananciaPct.value, [productoId]: ajuste.ganancia }
+  void epStore.actualizarPrecio(
+    eventoId.value,
+    productoId,
+    ajuste.precioVenta,
+    margenRealParaPrecio(ajuste.precioVenta, fila.costo_unitario),
+    ajuste.ganancia,
+    ajuste.contribucion,
+  )
 }
 
 function onPrecioInput(productoId: string, valor: string): void {

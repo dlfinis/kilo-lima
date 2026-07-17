@@ -231,7 +231,9 @@ export type Database = {
       evento_productos: {
         Row: {
           created_at: string
+          contribucion_markup: number | null
           evento_id: string
+          ganancia_markup: number | null
           id: string
           incluido: boolean
           margen: number | null
@@ -241,7 +243,9 @@ export type Database = {
         }
         Insert: {
           created_at?: string
+          contribucion_markup?: number | null
           evento_id: string
+          ganancia_markup?: number | null
           id?: string
           incluido?: boolean
           margen?: number | null
@@ -251,7 +255,9 @@ export type Database = {
         }
         Update: {
           created_at?: string
+          contribucion_markup?: number | null
           evento_id?: string
+          ganancia_markup?: number | null
           id?: string
           incluido?: boolean
           margen?: number | null

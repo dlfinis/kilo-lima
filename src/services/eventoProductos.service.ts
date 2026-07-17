@@ -26,15 +26,14 @@ export interface EventoProductosService {
   upsert(
     eventoId: string,
     productoId: string,
-    data: Pick<CrearEventoProductoInput, 'precio_venta' | 'margen' | 'incluido'>,
+    data: Pick<CrearEventoProductoInput, 'precio_venta' | 'margen' | 'incluido' | 'ganancia_markup' | 'contribucion_markup'>,
   ): Promise<{ data: EventoProducto | null; error: ServiceError | null }>
   actualizarPrecio(
     id: string,
-    // productos-mejoras / evento-producto-pricing: both args nullable
-    // (DB column is NUMERIC NULL). null precio_venta means
-    // "auto-calc"; null margen means "inherit evento default".
     precioVenta: number | null,
     margen: number | null,
+    gananciaMarkup: number,
+    contribucionMarkup: number,
   ): Promise<{ data: EventoProducto | null; error: ServiceError | null }>
   toggleIncluido(
     id: string,
@@ -67,6 +66,8 @@ export function crearEventoProductosService(
           producto_id: productoId,
           precio_venta: data.precio_venta,
           margen: data.margen,
+          ganancia_markup: data.ganancia_markup ?? null,
+          contribucion_markup: data.contribucion_markup ?? null,
           incluido: data.incluido,
         },
       ]
@@ -83,10 +84,15 @@ export function crearEventoProductosService(
       }
     },
 
-    async actualizarPrecio(id, precioVenta, margen) {
+    async actualizarPrecio(id, precioVenta, margen, gananciaMarkup, contribucionMarkup) {
       const respuesta = await supabase
         .from('evento_productos')
-        .update({ precio_venta: precioVenta, margen } as Database['public']['Tables']['evento_productos']['Update'])
+        .update({
+          precio_venta: precioVenta,
+          margen,
+          ganancia_markup: gananciaMarkup,
+          contribucion_markup: contribucionMarkup,
+        } as Database['public']['Tables']['evento_productos']['Update'])
         .eq('id', id)
         .select()
         .single()
@@ -123,21 +129,35 @@ export function crearEventoProductosService(
       if (productos.length === 0) {
         return { data: [], error: null }
       }
-      // 2) Build the upsert payload. precio_venta + margen start NULL
-      //    so the operator sets them per-producto via the MargenSlider.
-      //    `incluido = true` so newly-initialized rows show up in the
-      //    POS grid by default (REQ-PRICING-1 default).
-      const payload: CrearEventoProductoInput[] = productos.map((p) => ({
-        evento_id: eventoId,
-        producto_id: p.id,
-        precio_venta: null,
-        margen: null,
-        incluido: true,
-      }))
+      // 2) Only insert catalog products missing from this event. Upserting
+      // every catalog row would overwrite persisted markups on conflicts.
+      const existentesResp = await supabase
+        .from('evento_productos')
+        .select('producto_id')
+        .eq('evento_id', eventoId)
+      if (existentesResp.error) {
+        return { data: null, error: existentesResp.error }
+      }
+      const existentes = new Set((existentesResp.data ?? []).map((ep) => ep.producto_id))
+      const payload: CrearEventoProductoInput[] = productos
+        .filter((p) => !existentes.has(p.id))
+        .map((p) => ({
+          evento_id: eventoId,
+          producto_id: p.id,
+          precio_venta: null,
+          margen: null,
+          ganancia_markup: null,
+          contribucion_markup: null,
+          incluido: true,
+        }))
+      if (payload.length === 0) {
+        return { data: [], error: null }
+      }
       const upsertResp = await supabase
         .from('evento_productos')
         .upsert(payload as Database['public']['Tables']['evento_productos']['Insert'][], {
           onConflict: 'evento_id,producto_id',
+          ignoreDuplicates: true,
         })
         .select()
       return {

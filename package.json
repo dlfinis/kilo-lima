@@ -39,7 +39,8 @@
     "db:summary": "node scripts/db-reset.mjs --print",
     "db:health": "node scripts/db-reset.mjs --health",
     "db:backup": "node scripts/db-backup.mjs",
-    "db:restore": "node scripts/db-restore.mjs"
+    "db:restore": "node scripts/db-restore.mjs",
+    "db:validate": "node scripts/db-validate-backup.mjs"
   },
   "dependencies": {
     "@mdi/font": "^7.4.47",

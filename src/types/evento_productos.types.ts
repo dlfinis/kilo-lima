@@ -19,6 +19,10 @@ export interface EventoProducto {
   // margen + costo) is the de-facto price. The view treats
   // `precio_venta ?? precio_sugerido` as the final price.
   precio_venta: number | null
+  // Independent markups over cost. They are nullable while legacy rows are
+  // reconciled; once set, the UI must use them verbatim.
+  ganancia_markup?: number | null
+  contribucion_markup?: number | null
   // REQ-PRICING-1: decimal 0..1 (DB default 0.40 per PD-1). Nullable
   // when inherited from `evento.margen_ganancia` and the operator
   // didn't override.

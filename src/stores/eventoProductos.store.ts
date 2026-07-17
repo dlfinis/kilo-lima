@@ -114,6 +114,8 @@ export const useEventoProductosStore = defineStore('eventoProductos', () => {
     // to 0 used to overwrite the override semantics in the DB row.
     precioVenta: number | null,
     margen: number | null,
+    gananciaMarkup: number,
+    contribucionMarkup: number,
   ): Promise<{ data: EventoProducto | null; error: ServiceError | null }> {
     const cerrado = asegurarEditable(eventoId)
     if (cerrado) {
@@ -128,7 +130,7 @@ export const useEventoProductosStore = defineStore('eventoProductos', () => {
       return { data: null, error: err }
     }
     error.value = null
-    const res = await servicio.actualizarPrecio(ep.id, precioVenta, margen)
+    const res = await servicio.actualizarPrecio(ep.id, precioVenta, margen, gananciaMarkup, contribucionMarkup)
     if (res.error || !res.data) {
       error.value = MENSAJE_ERROR_GUARDAR
       return res
@@ -159,6 +161,8 @@ export const useEventoProductosStore = defineStore('eventoProductos', () => {
       incluido: true,
       precio_venta: null,
       margen: null,
+      ganancia_markup: null,
+      contribucion_markup: null,
     })
     if (res.error || !res.data) {
       error.value = MENSAJE_ERROR_GUARDAR

@@ -131,15 +131,23 @@ describe('crearEventoProductosService', () => {
   })
 
   describe('actualizarPrecio', () => {
-    it('updates precio_venta + margen on the row', async () => {
-      const actualizado = mkEP({ id: 'ep-1', precio_venta: 20, margen: 0.5 })
+    it('updates precio_venta, margen real, and both persisted markups', async () => {
+      const actualizado = mkEP({
+        id: 'ep-1',
+        precio_venta: 20,
+        margen: 0.4,
+        ganancia_markup: 0.5,
+        contribucion_markup: 0.25,
+      })
       __pushSupabaseResponse<EventoProducto>({ data: actualizado, error: null })
 
-      const { data, error } = await makeService().actualizarPrecio('ep-1', 20, 0.5)
+      const { data, error } = await makeService().actualizarPrecio('ep-1', 20, 0.4, 0.5, 0.25)
 
       expect(error).toBeNull()
       expect(data?.precio_venta).toBe(20)
-      expect(data?.margen).toBe(0.5)
+      expect(data?.margen).toBe(0.4)
+      expect(data?.ganancia_markup).toBe(0.5)
+      expect(data?.contribucion_markup).toBe(0.25)
       const calls = __getSupabaseMockCalls()
       expect(calls.some((c) => c.metodo === 'update')).toBe(true)
     })
@@ -153,7 +161,7 @@ describe('crearEventoProductosService', () => {
       const actualizado = mkEP({ id: 'ep-1', precio_venta: null, margen: null })
       __pushSupabaseResponse<EventoProducto>({ data: actualizado, error: null })
 
-      const { data, error } = await makeService().actualizarPrecio('ep-1', null, null)
+      const { data, error } = await makeService().actualizarPrecio('ep-1', null, null, 0.4, 0.1)
 
       expect(error).toBeNull()
       expect(data?.precio_venta).toBeNull()
@@ -163,6 +171,8 @@ describe('crearEventoProductosService', () => {
       const payload = updateCall?.args[0] as Record<string, unknown>
       expect(payload.precio_venta).toBeNull()
       expect(payload.margen).toBeNull()
+      expect(payload.ganancia_markup).toBe(0.4)
+      expect(payload.contribucion_markup).toBe(0.1)
     })
   })
 
@@ -189,7 +199,9 @@ __pushSupabaseResponse<ProductoLite[]>({
       ],
       error: null,
     })
-      // 2) Upsert result.
+      // 2) No event rows exist yet.
+      __pushSupabaseResponse<Array<{ producto_id: string }>>({ data: [], error: null })
+      // 3) Upsert result.
       __pushSupabaseResponse<EventoProducto[]>({
         data: [
           mkEP({ id: 'ep-1', producto_id: 'p-1' }),
@@ -209,6 +221,7 @@ __pushSupabaseResponse<ProductoLite[]>({
       expect(upsertCall).toBeDefined()
       const payload = upsertCall?.args[0] as Array<Record<string, unknown>>
       expect(payload).toHaveLength(3)
+      expect(upsertCall?.args[1]).toMatchObject({ ignoreDuplicates: true })
       // Every row carries the same evento_id + included=true.
       for (const row of payload) {
         expect(row.evento_id).toBe('e-1')
@@ -216,6 +229,24 @@ __pushSupabaseResponse<ProductoLite[]>({
         expect(row.precio_venta).toBeNull()
         expect(row.margen).toBeNull()
       }
+    })
+
+    it('does not upsert existing rows, preserving their persisted markups', async () => {
+      __pushSupabaseResponse<ProductoLite[]>({
+        data: [mkProducto({ id: 'p-1' }), mkProducto({ id: 'p-2' })],
+        error: null,
+      })
+      __pushSupabaseResponse<Array<{ producto_id: string }>>({
+        data: [{ producto_id: 'p-1' }, { producto_id: 'p-2' }],
+        error: null,
+      })
+
+      const { data, error } = await makeService().inicializarDesdeCatalogo('e-1')
+
+      expect(error).toBeNull()
+      expect(data).toEqual([])
+      const calls = __getSupabaseMockCalls()
+      expect(calls.some((c) => c.metodo === 'upsert')).toBe(false)
     })
 
     it('returns empty array when the catalog has no productos', async () => {

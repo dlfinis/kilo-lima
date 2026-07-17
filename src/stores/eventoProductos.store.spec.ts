@@ -160,7 +160,7 @@ describe('useEventoProductosStore', () => {
 
   it('actualizarPrecio recomputes the row state from the service', async () => {
     __pushSupabaseResponse<EventoProducto>({
-      data: mkEP('ep-1', { precio_venta: 20, margen: 0.5 }),
+      data: mkEP('ep-1', { precio_venta: 20, margen: 0.4, ganancia_markup: 0.5, contribucion_markup: 0.25 }),
       error: null,
     })
 
@@ -170,10 +170,12 @@ describe('useEventoProductosStore', () => {
       const eventsStore = useEventsStore()
       eventsStore.eventos.push(mkEvento('e-1', 'planificacion'))
 
-      await store.actualizarPrecio('e-1', 'p-ep-1', 20, 0.5)
+      await store.actualizarPrecio('e-1', 'p-ep-1', 20, 0.4, 0.5, 0.25)
 
       expect(store.productosPorEvento.get('e-1')?.[0]?.precio_venta).toBe(20)
-      expect(store.productosPorEvento.get('e-1')?.[0]?.margen).toBe(0.5)
+      expect(store.productosPorEvento.get('e-1')?.[0]?.margen).toBe(0.4)
+      expect(store.productosPorEvento.get('e-1')?.[0]?.ganancia_markup).toBe(0.5)
+      expect(store.productosPorEvento.get('e-1')?.[0]?.contribucion_markup).toBe(0.25)
     })
   })
 
@@ -183,7 +185,7 @@ describe('useEventoProductosStore', () => {
       const eventsStore = useEventsStore()
       eventsStore.eventos.push(mkEvento('e-1', 'cerrado'))
 
-      const resultado = await store.actualizarPrecio('e-1', 'p-ep-1', 20, 0.5)
+      const resultado = await store.actualizarPrecio('e-1', 'p-ep-1', 20, 0.4, 0.5, 0.25)
 
       expect(resultado.error?.code).toBe('EVENTO_CERRADO')
     })
@@ -195,7 +197,7 @@ describe('useEventoProductosStore', () => {
   // "manual price = 0" and broke auto-calc on the next reload.
   it('actualizarPrecio propagates precioVenta=null to the service (no 0 coercion)', async () => {
     __pushSupabaseResponse<EventoProducto>({
-      data: mkEP('ep-1', { precio_venta: null, margen: 0.3 }),
+      data: mkEP('ep-1', { precio_venta: null, margen: 0.3, ganancia_markup: 0.4, contribucion_markup: 0.1 }),
       error: null,
     })
 
@@ -205,11 +207,13 @@ describe('useEventoProductosStore', () => {
       const eventsStore = useEventsStore()
       eventsStore.eventos.push(mkEvento('e-1', 'planificacion'))
 
-      await store.actualizarPrecio('e-1', 'p-ep-1', null, 0.3)
+      await store.actualizarPrecio('e-1', 'p-ep-1', null, null, 0.4, 0.1)
 
       const fila = store.productosPorEvento.get('e-1')?.[0]
       expect(fila?.precio_venta).toBeNull()
       expect(fila?.margen).toBe(0.3)
+      expect(fila?.ganancia_markup).toBe(0.4)
+      expect(fila?.contribucion_markup).toBe(0.1)
     })
   })
 
